@@ -48,7 +48,7 @@ class ParseRequest(BaseModel):
     image: str
 
 @app.post("/inference")
-async def parse(parse_request: ParseRequest):
+def parse(parse_request: ParseRequest):
     print('start parsing...')
     start = time.time()
     ocr_response = mistral.ocr.process(model="mistral-ocr-latest", document={
@@ -80,7 +80,7 @@ def upload_file(file: UploadFile = File(...)):
     return {"url": res_url["secure_url"]}
 
 @app.get("/")
-async def root():
+def root():
     return {"message": "API Server Ready"}
 
 if __name__ == "__main__":
