@@ -4,7 +4,7 @@ import Browser from 'webextension-polyfill';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { geminiResponseText, ai } from '../lib/agent';
-import { Message, Conversation, Model } from '../types';
+import { Message, Conversation, Model, ToolCall } from '../types';
 import Header from './components/Header';
 import Home from './components/Home';
 import ChatContainer from './components/ChatContainer';
@@ -13,9 +13,10 @@ import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
 import { systemPrompt } from './utils/SystemPrompt';
 import { fileHandler } from './utils/FileHandler';
+import { availableFunctions } from '../lib/tools';
 
 const App = () => {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<any[]>([]);
     const [isFirstMessage, setIsFirstMessage] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState("");
@@ -208,10 +209,10 @@ const App = () => {
         prompt.push({ role: "system", content: systemPrompt });
         for await (const msg of messages) {
             if (msg.isUser && !msg.isTool) {
-                prompt.push({ role: "user", content: [{ type: "text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
+                prompt.push({ role: "user", content: [{ type: "input_text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
             }
             if (!msg.isUser && !msg.isTool) {
-                prompt.push({ role: "assistant", content: [{ type: "text", text: msg.content.text }] });
+                prompt.push({ role: "assistant", content: [{ type: "output_text", text: msg.content.text }] });
             }
             if (msg.isTool && msg.content.tool?.toolCall?.type === "tool-call") {
                 prompt.push({ role: "assistant", content: [msg.content.tool.toolCall] });
@@ -220,7 +221,7 @@ const App = () => {
                 prompt.push({ role: "tool", content: [msg.content.tool.toolResult] });
             }
         };
-        prompt.push({ role: "user", content: [{ type: "text", text: content }, ...await fileHandler(files)] });
+        prompt.push({ role: "user", content: [{ type: "input_text", text: content }, ...await fileHandler(files)] });
         try {
             let finish = false;
             chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -234,83 +235,31 @@ const App = () => {
                     console.log(`Debugger attached to tab ${tabs[0].id}`);
                 });
             });
+            let functionExecState;
             do {
+                console.log("Calling ai...");
                 const responseStream = ai(currentModel, prompt, abortControllerRef.current.signal);
                 let response = "";
+                const finalToolCalls: Record<string, ToolCall> = {};
                 for await (const res of responseStream) {
                     console.log(prompt);
-                    if (res.type === "text-delta") {
-                        response += res.textDelta;
+                    if (res.type === "response.output_item.added" && res.item.type === "function_call") {
+                        finalToolCalls[res.output_index] = res.item as ToolCall;
+                    } else if (res.type === "response.function_call_arguments.delta") {
+                        const index = res.output_index;
+                        if (finalToolCalls[index]) {
+                            finalToolCalls[index].arguments += res.delta;
+                        }
+                    }
+                    if (res.type === "response.output_text.delta") {
+                        response += res.delta;
                         setMessages(prev => {
                             const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: response, files: [...(msg.content.files || [])] } } : msg);
                             updateConversationsDB(update);
                             return update;
                         });
                     }
-                    // if (res.type === "tool-result") {
-                    //     const toolCall = res;
-                    //     const functionID = toolCall.toolCallId;
-                    //     const functionName = toolCall.toolName;
-                    //     const functionArgs = toolCall.args;
-                    //     const functionResponse = toolCall.result;
-                    //     prompt.push({
-                    //         role: "assistant", content: [{
-                    //             type: "tool-call",
-                    //             toolCallId: functionID,
-                    //             toolName: functionName,
-                    //             args: functionArgs,
-                    //         }]
-                    //     });
-                    //     prompt.push({
-                    //         role: "tool", content: [{
-                    //             type: "tool-result",
-                    //             toolCallId: functionID,
-                    //             toolName: functionName,
-                    //             args: functionArgs,
-                    //             result: functionResponse.message,
-                    //         }]
-                    //     });
-                    //     if (functionResponse.status === "success" && functionResponse.data) {
-                    //         if (functionResponse.data.type === "dom") {
-                    //             if (domContentIndex) {
-                    //                 prompt.splice(domContentIndex, 1);
-                    //             }
-                    //             domContentIndex = prompt.length;
-                    //             prompt.push({ role: "user", content: [{ type: "text", text: `PAGE_URL: ${functionResponse.data.url}` }, { type: "image", image: new URL(functionResponse.data.annotatedImage) }] });
-                    //         }
-                    //         if (functionResponse.data.type === "pdf") {
-                    //             setMessages(prev => {
-                    //                 const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: response, files: [...(msg.content.files || []), functionResponse.file] } } : msg);
-                    //                 updateConversationsDB(update);
-                    //                 return update;
-                    //             });
-                    //         }
-                    //     }
-                    // setMessages(prev => {
-                    //     const update = [...prev, {
-                    //         id: `tool-${messageId}`, content: {
-                    //             tool: {
-                    //                 toolCall: {
-                    //                     type: "tool-call",
-                    //                     toolCallId: functionID,
-                    //                     toolName: functionName,
-                    //                     args: functionArgs,
-                    //                 },
-                    //                 toolResult: {
-                    //                     type: "tool-result",
-                    //                     toolCallId: functionID,
-                    //                     toolName: functionName,
-                    //                     args: functionArgs,
-                    //                     result: functionResponse.message,
-                    //                 },
-                    //             },
-                    //         }, isUser: false, isTool: true, isStreaming: false, isError: false,
-                    //     }];
-                    //     updateConversationsDB(update);
-                    //     return update;
-                    // });
-                    // }
-                    if (res.type === "finish") {
+                    if (res.type === "response.completed" && !functionExecState) {
                         finish = true;
                     }
                     if (res.type === "error") {
@@ -321,11 +270,26 @@ const App = () => {
                             return update;
                         });
                         setMessages(prev => {
-                            const update = [...prev, { id: `error-${messageId}`, content: { text: `*${res.error}*` }, isUser: false, isTool: false, isStreaming: false, isError: true }];
+                            const update = [...prev, { id: `error-${messageId}`, content: { text: `*${res.message}*` }, isUser: false, isTool: false, isStreaming: false, isError: true }];
                             updateConversationsDB(update);
                             return update;
                         });
                     }
+                }
+                functionExecState = false;
+                for await (const [index, toolCall] of Object.entries(finalToolCalls)){
+                    const toolName = toolCall.name;
+                    const toolArgs = JSON.parse(toolCall.arguments);
+                    const toolCallResult = await availableFunctions[toolName](toolArgs);
+                    console.log("tsresult", toolCallResult)
+                    prompt.push(toolCall);
+                    prompt.push({
+                        type: "function_call_output",
+                        call_id: toolCall.call_id,
+                        output: toolCallResult.message
+                    });
+                    if (toolName === "fetchScreen") prompt.push({ role: "user", content: [{ type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
+                    functionExecState = true;
                 }
                 setMessages(prev => {
                     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: response, files: [...(msg.content.files || [])] } } : msg);
@@ -349,9 +313,9 @@ const App = () => {
                         updateConversationsDB(update);
                         return update;
                     });
-                    prompt.push({ role: "assistant", content: [{ type: "text", text: response }] });
+                    prompt.push({ role: "assistant", content: [{ type: "output_text", text: response }] });
                 }
-            } while (!finish);
+            } while (!finish || functionExecState);
         } catch (error) {
             console.log(error);
             if (!abortControllerRef.current?.signal.aborted) {

@@ -1,4 +1,3 @@
-import jsPDF from 'jspdf';
 import { marked } from 'marked';
 import type { DomProps } from '../types';
 
@@ -53,6 +52,28 @@ export const fetchScreen = async () => {
         }
         chrome.runtime.sendMessage({ action: "SET_DOM", props: domProps });
         return { status: "success", message: "Success: Dom fetched", data: { type: "dom", url: currentUrl, annotatedImage: jsonResponse.image_url, ocr_content: jsonResponse.ocr_response } };
+    }).catch((error) => {
+        return { status: "error", message: "Error: " + error };
+    });
+}
+
+export const screenshot = async () => {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (!tabs || !tabs[0]?.id) {
+                return;
+            }
+            const currentUrl = tabs[0].url;
+            chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
+                const base64Image = dataUrl.split(',')[1];
+                resolve({ currentUrl, base64Image });
+            }).catch((error) => {
+                reject("Failed to capture DOM");
+            });
+        });
+    }).then((data) => {
+        const { currentUrl, base64Image } = data as { currentUrl: string, base64Image: string };
+        return { status: "success", message: "Success: Screenshot fetched", data: { type: "screenshot", url: currentUrl, image: base64Image } };
     }).catch((error) => {
         return { status: "error", message: "Error: " + error };
     });
@@ -402,19 +423,6 @@ export const wait = async ({ ms }: { ms: number }) => {
     });
 }
 
-export const pdf = ({ text }: { text: string }) => {
-    return new Promise(async (resolve, reject) => {
-        const content = await marked(text);
-        const pdf = new jsPDF();
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(12);
-        pdf.text(content.replace(/<[^>]+>/g, '').trim(), 10, 10);
-        const pdfBlob = pdf.output("blob");
-        const pdfFile = new File([pdfBlob], "generated.pdf", { type: "application/pdf" });
-        resolve({ status: "success", message: "Success: PDF generated", data: { type: "pdf", file: pdfFile } });
-    });
-}
-
 export const availableFunctions: { [key: string]: (args: any) => Promise<any> } = {
     "fetchScreen": fetchScreen,
     "click": click,
@@ -430,5 +438,4 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<any> } 
     "checkScrollbar": checkScrollbar,
     "scroll": scroll,
     "wait": wait,
-    "pdf": pdf,
 };

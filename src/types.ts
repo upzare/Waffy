@@ -94,3 +94,12 @@ export interface DomProps {
     content: string,
     interactivity: boolean
 }
+
+export interface ToolCall {
+    arguments: string;
+    call_id: string;
+    id: string;
+    name: string;
+    status: string;
+    type: string;
+}

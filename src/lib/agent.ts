@@ -3,193 +3,252 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
-import { APICallError, streamText, tool } from 'ai';
-import { availableFunctions } from './tools';
 import { fetchPrompt } from '../sidepanel/utils/SystemPrompt';
+import { OpenAI } from "openai";
+import { availableFunctions } from './tools';
 
 export async function* ai(model: string, messages: any[], signal?: AbortSignal) {
-    const tools = {
-        fetchScreen: tool({
-            description: "Get the current page screenshot as annotated image.",
-            parameters: z.object({}),
-            execute: availableFunctions["fetchScreen"],
-        }),
-        click: tool({
-            description: "Simulate a click on the specified DOM element",
-            parameters: z.object({
-                elementId: z.number().describe("The ID of the element to click. DO NOT USE ANY RANDOM ID."),
-            }),
-            execute: availableFunctions["click"],
-        }),
-        typeText: tool({
-            description: "Type text into the specified element",
-            parameters: z.object({
-                elementId: z.number().describe("The ID of the input element. DO NOT USE ANY RANDOM ID."),
-                text: z.string().describe("The text to type"),
-                // global: z.boolean().describe("Whether to type the text globally (TRUE) or within an element (FALSE)"),
-            }),
-            execute: availableFunctions["typeText"],
-        }),
-        enterKey: tool({
-            description: "Send enter key to the page",
-            parameters: z.object({}),
-            execute: availableFunctions["enterKey"],
-        }),
-        getOption: tool({
-            description: "Get all available options for the specified select element",
-            parameters: z.object({
-                elementId: z.number().describe("The ID of the specific element. DO NOT USE ANY RANDOM ID."),
-            }),
-            execute: availableFunctions["getOption"],
-        }),
-        setOption: tool({
-            description: "Set the value of a specified select. Fetch the available options first.",
-            parameters: z.object({
-                elementId: z.number().describe("The ID of the specific element. DO NOT USE ANY RANDOM ID."),
-                value: z.string().describe("The value to set. DO NOT USE ANY RANDOM VALUE. ALWAYS USE THE VALUES RETURNED BY getOptions. FETCH THE AVAILABLE OPTIONS FIRST."),
-            }),
-            execute: availableFunctions["setOption"],
-        }),
-        loadingState: tool({
-            description: "Check whether the page is loading or fully loaded",
-            parameters: z.object({}),
-            execute: availableFunctions["loadingState"],
-        }),
-        goto: tool({
-            description: "Navigate to a given URL in current tab.",
-            parameters: z.object({
-                url: z.string().describe("The URL to navigate to."),
-            }),
-            execute: availableFunctions["goto"],
-        }),
-        // open: tool({
-        //     description: "Navigate to a given URL in new tab.",
-        //     parameters: z.object({
-        //         url: z.string().describe("The URL to navigate to."),
-        //     }),
-        //     execute: availableFunctions["open"],
-        // }),
-        close: tool({
-            description: "Closes the current tab",
-            parameters: z.object({}),
-            execute: availableFunctions["close"],
-        }),
-        reload: tool({
-            description: "Reloads the current tab",
-            parameters: z.object({}),
-            execute: availableFunctions["reload"],
-        }),
-        checkScrollbar: tool({
-            description: "Check whether the page is scrollable or not. Returns scroll position if it is scrollable.",
-            parameters: z.object({}),
-            execute: availableFunctions["checkScrollbar"],
-        }),
-        scroll: tool({
-            description: "Scrolls the page in the specified direction and returns the current scrollbar position",
-            parameters: z.object({
-                direction: z.enum(["up", "down", "left", "right"]).describe("The direction to scroll"),
-                // x: z.number().describe("The number of pixels to scroll horizontally"),
-                // y: z.number().describe("The number of pixels to scroll vertically"),
-            }),
-            execute: availableFunctions["scroll"],
-        }),
-        wait: tool({
-            description: "Wait for a specified amount of time",
-            parameters: z.object({
-                ms: z.number().describe("The amount of time to wait in milliseconds"),
-            }),
-            execute: availableFunctions["wait"],
-        }),
-        pdf: tool({
-            description: "Generate PDF file with text",
-            parameters: z.object({
-                text: z.string().describe("Text to add inside PDF file, with markdown support"),
-            }),
-            execute: availableFunctions["pdf"],
-        }),
-    };
+    const all_tools = [
+        {
+            "type": "function",
+            "name": "fetchScreen",
+            "description": "Get the current page screenshot as annotated image.",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "click",
+            "description": "Simulate a click on the specified DOM element",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+                    }
+                },
+                "required": ["elementId"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "typeText",
+            "description": "Type text into the specified element",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "The text to type"
+                    }
+                },
+                "required": ["elementId", "text"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "enterKey",
+            "description": "Send enter key to the page",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "getOption",
+            "description": "Get all available options for the specified select element",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the specific element. DO NOT USE ANY RANDOM ID."
+                    }
+                },
+                "required": ["elementId"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "setOption",
+            "description": "Set the value of a specified select. Fetch the available options first.",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "The value to set. DO NOT USE ANY RANDOM VALUE. ALWAYS USE THE VALUES RETURNED BY getOptions. FETCH THE AVAILABLE OPTIONS FIRST."
+                    }
+                },
+                "required": ["elementId", "value"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "loadingState",
+            "description": "Check whether the page is loading or fully loaded",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "goto",
+            "description": "Navigate to a given URL in current tab.",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to navigate to."
+                    }
+                },
+                "required": ["url"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "open",
+            "description": "Navigate to a given URL in new tab.",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to navigate to."
+                    }
+                },
+                "required": ["url"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "close",
+            "description": "Closes the current tab",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "reload",
+            "description": "Reloads the current tab",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "checkScrollbar",
+            "description": "Check whether the page is scrollable or not. Returns scroll position if it is scrollable.",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "scroll",
+            "description": "Scrolls the page in the specified direction and returns the current scrollbar position",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "direction": {
+                        "type": "string",
+                        "enum": ["up", "down", "left", "right"],
+                        "description": "The direction to scroll"
+                    }
+                },
+                "required": ["direction"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "type": "function",
+            "name": "wait",
+            "description": "Wait for a specified amount of time",
+            "strict": true,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ms": {
+                        "type": "number",
+                        "description": "The amount of time to wait in milliseconds"
+                    }
+                },
+                "required": ["ms"],
+                "additionalProperties": false
+            }
+        },
+    ];
     const settings: Record<string, unknown> = await Browser.storage.local.get("extension_settings");
     const records = JSON.parse(settings.extension_settings as string);
-    const genAI = createGoogleGenerativeAI({ apiKey: records.geminiApiKey });
-    const openai = createOpenAI({ apiKey: records.gptAPIKey, baseURL: "http://0.0.0.0:4000/v1" });
-    let currentModel;
-    let domContentIndex: number;
-    if (model.startsWith("gpt") || model.startsWith("o1")) {
-        currentModel = openai(model, {
-            parallelToolCalls: false,
-        });
-    } else {
-        currentModel = genAI(model);
-    }
-    const response = streamText({
-        model: currentModel,
-        tools: tools,
-        messages: messages,
-        maxSteps: 500,
-        abortSignal: signal,
-        experimental_continueSteps: true,
-        // providerOptions: {
-        //     openai: {
-        //         reasoningEffort: "high",
-        //     },
-        // },
-        onError: async (error) => {
-            console.log('Stream Error:', error);
-            if (APICallError.isInstance(error)) {
-                console.log('API Error:', error.message);
-            }
-        },
-        onStepFinish: async (step) => {
-            console.log("STEP FINISH:", step);
-            if (step.finishReason === "tool-calls") {
-                const toolCall = step.toolCalls[0];
-                const functionID = toolCall.toolCallId;
-                const functionName = toolCall.toolName;
-                const functionArgs = toolCall.args;
-                const functionResponse = step.toolResults[0].result;
-                // messages.push({
-                //     role: "assistant", content: [{
-                //         type: "tool-call",
-                //         toolCallId: functionID,
-                //         toolName: functionName,
-                //         args: functionArgs,
-                //     }]
-                // });
-                // messages.push({
-                //     role: "tool", content: [{
-                //         type: "tool-result",
-                //         toolCallId: functionID,
-                //         toolName: functionName,
-                //         args: functionArgs,
-                //         result: functionResponse.message,
-                //     }]
-                // });
-                if (functionResponse.status === "success" && functionResponse.data) {
-                    if (functionResponse.data.type === "dom") {
-                        if (domContentIndex) {
-                            messages.splice(domContentIndex, 1);
-                        }
-                        domContentIndex = messages.length;
-                        let dom_content = fetchPrompt;
-                        dom_content += `
-<PAGE_METDATA>
-<PAGE_URL>${functionResponse.data.url}</PAGE_URL>
-</PAGE_METDATA>
-<PAGE_TEXT_CONTENT>
-${functionResponse.data.ocr_content}
-</PAGE_TEXT_CONTENT>
-`;
-                        messages.push({ role: "user", content: [{ type: "text", text: dom_content }, { type: "image", image: new URL(functionResponse.data.annotatedImage) }] });
-                    }
-                }
-            }
-        },
+    // const genAI = createGoogleGenerativeAI({ apiKey: records.geminiApiKey });
+    // const openai = createOpenAI({ apiKey: records.gptAPIKey, baseURL: "http://0.0.0.0:4000/v1" });
+    const client = new OpenAI({ apiKey: records.gptAPIKey, dangerouslyAllowBrowser: true });
+    // const openai = createOpenAI({ compatibility: "strict", apiKey: records.gptAPIKey });
+    // let currentModel;
+    // let domContentIndex: number;
+    // if (model.startsWith("gpt") || model.startsWith("o1")) {
+    //     currentModel = openai(model, {
+    //         parallelToolCalls: false,
+    //     });
+    // } else {
+    //     currentModel = genAI(model);
+    // }
+    const response = await client.responses.create({
+        model: "gpt-4o",
+        input: messages,
+        tools: all_tools as any,
+        stream: true,
+        parallel_tool_calls: false,
+        tool_choice: 'auto',
+        truncation: "auto",
     });
 
-    for await (const res of response.fullStream) {
+    for await (const event of response) {
         if (signal?.aborted) return;
-        yield res;
-        console.log(res);
+        yield event;
     }
 }
 

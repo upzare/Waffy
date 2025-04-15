@@ -1,4 +1,4 @@
-type FileFormat = { type: string, data: string, mimeType: string } | { type: string, image: string };
+type FileFormat = { type: string, data: string, mimeType: string } | { type: string, image_url: string };
 
 export const fileHandler = async (fileList: File[]): Promise<FileFormat[]> => {
     const files: FileFormat[] = [];
@@ -11,12 +11,12 @@ export const fileHandler = async (fileList: File[]): Promise<FileFormat[]> => {
         }).then(res => res.json());
         if (file.type.startsWith("image/")) {
             files.push({
-                type: "image",
-                image: upload.url,
+                type: "input_image",
+                image_url: upload.url,
             });
         } else {
             files.push({
-                type: "file",
+                type: "input_file",
                 data: upload.url,
                 mimeType: file.type,
             });
