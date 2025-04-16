@@ -1,11 +1,6 @@
 import Browser from 'webextension-polyfill';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { z } from 'zod';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
-import { fetchPrompt } from '../sidepanel/utils/SystemPrompt';
 import { OpenAI } from "openai";
-import { availableFunctions } from './tools';
 
 export async function* ai(model: string, messages: any[], signal?: AbortSignal) {
     const all_tools = [
@@ -223,21 +218,9 @@ export async function* ai(model: string, messages: any[], signal?: AbortSignal) 
     ];
     const settings: Record<string, unknown> = await Browser.storage.local.get("extension_settings");
     const records = JSON.parse(settings.extension_settings as string);
-    // const genAI = createGoogleGenerativeAI({ apiKey: records.geminiApiKey });
-    // const openai = createOpenAI({ apiKey: records.gptAPIKey, baseURL: "http://0.0.0.0:4000/v1" });
     const client = new OpenAI({ apiKey: records.gptAPIKey, dangerouslyAllowBrowser: true });
-    // const openai = createOpenAI({ compatibility: "strict", apiKey: records.gptAPIKey });
-    // let currentModel;
-    // let domContentIndex: number;
-    // if (model.startsWith("gpt") || model.startsWith("o1")) {
-    //     currentModel = openai(model, {
-    //         parallelToolCalls: false,
-    //     });
-    // } else {
-    //     currentModel = genAI(model);
-    // }
     const response = await client.responses.create({
-        model: "gpt-4o",
+        model: model,
         input: messages,
         tools: all_tools as any,
         stream: true,
