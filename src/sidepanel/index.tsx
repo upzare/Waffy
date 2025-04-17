@@ -118,10 +118,6 @@ const App = () => {
                         { id: "o1", name: "O1", description: "Very Powerfull Reasoning Model" },
                         { id: "gpt-4o", name: "GPT-4o", description: "Very Powerfull LLM" },
                         { id: "gpt-4o-mini", name: "GPT-4o-Mini", description: "GPT Mini Powerfull LLM" },
-                        { id: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash 8B", description: "High Volume & Basic Tasks" },
-                        { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Advanced Reasoning Tasks" },
-                        { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", description: "New Multimodal Understanding" },
-                        { id: "gemini-2.0-pro-exp-02-05", name: "Gemini 2.0 Pro Exp", description: "Gemini 2.0 Pro Experimental" },
                     ]);
                 }
             }
