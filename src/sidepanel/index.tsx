@@ -232,6 +232,7 @@ const App = () => {
                 });
             });
             let functionExecState;
+            let domContentIndex;
             do {
                 console.log("Calling ai...");
                 const responseStream = ai(currentModel, prompt, abortControllerRef.current.signal);
@@ -273,7 +274,7 @@ const App = () => {
                     }
                 }
                 functionExecState = false;
-                for await (const [index, toolCall] of Object.entries(finalToolCalls)){
+                for await (const [index, toolCall] of Object.entries(finalToolCalls)) {
                     const toolName = toolCall.name;
                     const toolArgs = JSON.parse(toolCall.arguments);
                     const toolCallResult = await availableFunctions[toolName](toolArgs);
@@ -284,7 +285,21 @@ const App = () => {
                         call_id: toolCall.call_id,
                         output: toolCallResult.message
                     });
-                    if (toolName === "fetchScreen") prompt.push({ role: "user", content: [{ type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
+                    if (toolName === "fetchScreen") {
+                        if (domContentIndex) {
+                            prompt.splice(domContentIndex, 1);
+                        }
+                        domContentIndex = prompt.length;
+                        let dom_content = `
+ <PAGE_METDATA>
+ <PAGE_URL>${toolCallResult.data.url}</PAGE_URL>
+ </PAGE_METDATA>
+ <PAGE_TEXT_CONTENT>
+ ${toolCallResult.data.ocr_content}
+ </PAGE_TEXT_CONTENT>
+ `;
+                        prompt.push({ role: "user", content: [{ type: "input_text", text: dom_content }, { type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
+                    }
                     functionExecState = true;
                 }
                 setMessages(prev => {
