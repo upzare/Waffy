@@ -1,0 +1,24 @@
+model_list:
+  - model_name: gpt-4o ### RECEIVED MODEL NAME ###
+    litellm_params: # all params accepted by litellm.completion() - https://docs.litellm.ai/docs/completion/input
+      model: openai/gpt-4o ### MODEL NAME sent to `litellm.completion()` ###
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY" # does os.getenv("AZURE_API_KEY_EU")
+      rpm: 6      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
+  
+  # Use this if you want to make requests to `claude-3-haiku-20240307`,`claude-3-opus-20240229`,`claude-2.1` without defining them on the config.yaml
+  # Default models
+  # Works for ALL Providers and needs the default provider credentials in .env
+  # - model_name: "*" 
+  #   litellm_params:
+  #     model: "*"
+
+litellm_settings: # module level litellm settings - https://github.com/BerriAI/litellm/blob/main/litellm/__init__.py
+  drop_params: True
+  callbacks: proxy.proxy_handler_instance
+  # success_callback: ["langfuse"] # OPTIONAL - if you want to start sending LLM Logs to Langfuse. Make sure to set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` in your env
+
+general_settings: 
+  database_url: "os.environ/DATABASE_URL"
+  master_key: sk-1234 # [OPTIONAL] Only use this if you to require all calls to contain this key (Authorization: Bearer sk-1234)
+  # alerting: ["slack"] # [OPTIONAL] If you want Slack Alerts for Hanging LLM requests, Slow llm responses, Budget Alerts. Make sure to set `SLACK_WEBHOOK_URL` in your env

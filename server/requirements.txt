@@ -21,3 +21,4 @@ cloudinary
 fastapi
 uvicorn
 mistralai
+prisma
