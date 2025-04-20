@@ -1,26 +1,24 @@
-type FileFormat = { type: string, data: string, mimeType: string } | { type: string, image_url: string };
+type FileFormat = { type: string, payload: Record<string, any> };
 
 export const fileHandler = async (fileList: File[]): Promise<FileFormat[]> => {
     const files: FileFormat[] = [];
     for await (const file of fileList) {
-        const formdata = new FormData();
-        formdata.append("file", file);
-        const upload = await fetch("http://localhost:8000/upload", {
-            method: "POST",
-            body: formdata
-        }).then(res => res.json());
-        if (file.type.startsWith("image/")) {
-            files.push({
-                type: "input_image",
-                image_url: upload.url,
-            });
-        } else {
-            files.push({
-                type: "input_file",
-                data: upload.url,
+        const buffer = await file.arrayBuffer();
+        const base64String = btoa(
+            new Uint8Array(buffer).reduce(
+                (data, byte) => data + String.fromCharCode(byte),
+                ''
+            )
+        );
+        files.push({
+            type: "file",
+            payload: {
+                name: file.name,
+                size: file.size,
                 mimeType: file.type,
-            });
-        }
+                content: base64String
+            }
+        });
     };
     return files;
 };

@@ -184,8 +184,8 @@ const App = () => {
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: content, files: files, tool: {} }, isUser: true, isTool: false, isStreaming: false, isError: false },
-                { id: `assistant-${messageId}`, content: { text: "", files: [], tool: {} }, isUser: false, isTool: false, isStreaming: true, isError: false }
+                { id: `user-${messageId}`, content: { text: content, files: files }, isUser: true, isStreaming: false, isError: false },
+                { id: `assistant-${messageId}`, content: { text: "", files: [] }, isUser: false, isStreaming: true, isError: false }
             ];
             updateConversationsDB(update);
             return update;
@@ -203,11 +203,13 @@ const App = () => {
         // let domContentIndex;
         // prompt.push({ role: "system", content: systemPrompt });
         for await (const msg of messages) {
-            if (msg.isUser && !msg.isTool) {
-                prompt.push({ role: "user", content: [{ type: "input_text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
+            if (msg.isUser) {
+                // prompt.push({ role: "user", content: [{ type: "input_text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
+                prompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
             }
-            if (!msg.isUser && !msg.isTool) {
-                prompt.push({ role: "assistant", content: [{ type: "output_text", text: msg.content.text }] });
+            if (!msg.isUser) {
+                // prompt.push({ role: "assistant", content: [{ type: "output_text", text: msg.content.text }] });
+                prompt.push({ type: "response", content: [{ type: "text", text: msg.content.text }] });
             }
             // if (msg.isTool && msg.content.tool?.toolCall?.type === "tool-call") {
             //     prompt.push({ role: "assistant", content: [msg.content.tool.toolCall] });
@@ -216,7 +218,8 @@ const App = () => {
             //     prompt.push({ role: "tool", content: [msg.content.tool.toolResult] });
             // }
         };
-        prompt.push({ role: "user", content: [{ type: "input_text", text: content }, ...await fileHandler(files)] });
+        prompt.push({ type: "prompt", content: [{ type: "text", text: content }, ...await fileHandler(files)] });
+        // prompt.push({ role: "user", content: [{ type: "input_text", text: content }, ...await fileHandler(files)] });
         try {
             let finish = false;
             chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -232,10 +235,10 @@ const App = () => {
             });
             let functionExecState;
             let domContentIndex;
+            let response = "";
             do {
                 console.log("Calling ai...");
                 const responseStream = ai(currentModel, prompt, abortControllerRef.current.signal);
-                let response = "";
                 const finalToolCalls: Record<string, ToolCall> = {};
                 for await (const res of responseStream) {
                     // if (res.type === "response.output_item.added" && res.item.type === "function_call") {
@@ -269,7 +272,7 @@ const App = () => {
                             return update;
                         });
                         setMessages(prev => {
-                            const update = [...prev, { id: `error-${messageId}`, content: { text: `*${res.message}*` }, isUser: false, isTool: false, isStreaming: false, isError: true }];
+                            const update = [...prev, { id: `error-${messageId}`, content: { text: `*${res.message}*` }, isUser: false, isStreaming: false, isError: true }];
                             updateConversationsDB(update);
                             return update;
                         });
@@ -322,19 +325,20 @@ const App = () => {
                     setMessages(prev => {
                         const update = [
                             ...prev,
-                            { id: `assistant-${messageId}`, content: { text: "", files: [], tool: {} }, isUser: false, isTool: false, isStreaming: true, isError: false }
+                            { id: `assistant-${messageId}`, content: { text: "", files: [] }, isUser: false, isStreaming: true, isError: false }
                         ];
                         updateConversationsDB(update);
                         return update;
                     });
-                    prompt.push({ role: "assistant", content: [{ type: "output_text", text: response }] });
+                    prompt.push({ type: "response", content: [{ type: "text", text: response }] });
+                    // prompt.push({ role: "assistant", content: [{ type: "output_text", text: response }] });
                 }
             } while (!finish || functionExecState);
         } catch (error) {
             console.log(error);
             if (!abortControllerRef.current?.signal.aborted) {
                 setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: "*User interupted while processing.*" }, isUser: false, isTool: false, isStreaming: false, isError: true }];
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: "*User interupted while processing.*" }, isUser: false, isStreaming: false, isError: true }];
                     updateConversationsDB(update);
                     return update;
                 });
