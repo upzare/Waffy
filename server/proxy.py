@@ -11,7 +11,9 @@ from util.utils import detect_device
 import cloudinary
 import cloudinary.uploader
 from mistralai import Mistral
-from server.instructions import SYSTEM_PROMPT, TOOLS
+from instructions import SYSTEM_PROMPT, TOOLS
+
+DEBUG = True
 
 config = {
     "som_model_path": "weights/icon_detect/model.pt",
@@ -20,7 +22,6 @@ config = {
     "device": detect_device(),
     "BOX_TRESHOLD": 0.05,
 }
-
 omniparser = Omniparser(config)
 
 cloudinary.config( 
@@ -32,7 +33,7 @@ cloudinary.config(
 
 mistral = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
 
-class MyCustomHandler(CustomLogger):
+class CustomHandler(CustomLogger):
     def __init__(self):
         self.client_props = {}
         self.client_fc = {}
@@ -46,40 +47,63 @@ class MyCustomHandler(CustomLogger):
             "audio_transcription",
         ]):
         try:
-            data["input"].insert(0, {'role': 'system', 'content': SYSTEM_PROMPT})
+            data["model"] = "gpt-4o"
             data["tools"] = TOOLS
+            data["stream"] = True
             data["parallel_tool_calls"] = False
             data["tool_choice"] = "auto"
             data["truncation"] = "auto"
+            data["input"] = [{'role': 'system', 'content': SYSTEM_PROMPT}]
 
             screenshot_req = False
             parser_tasks = []
-            upload_tasks = []
             ocr_tasks = []
             metadata = {}
 
-            for index, messages in enumerate(data["input"]):
+            for index, messages in enumerate(data["data"]):
                 messages = dict(messages)
-                if ("type" in messages and messages["type"] == "screenshot"):
+                if ("type" in messages and messages["type"] == "prompt"):
+                    content = []
+                    for msg in messages["content"]:
+                        if ("type" in msg and msg["type"] == "text"):
+                            content.append({ "type": "input_text", "text": msg["text"] })
+                        elif ("type" in msg and msg["type"] == "file"):
+                            file = msg["payload"]
+                            file_content = file["content"]
+                            mime_type = file["mimeType"]
+                            data_uri = f"data:{mime_type};base64,{file_content}"
+                            if file["mimeType"].startswith("image"):
+                                content.append({ "type": "input_image", "image_url": data_uri })
+                            else:
+                                content.append({ "type": "input_file", "filename": file["name"], "file_data": data_uri })
+                    data["input"].append({ "role": "user", "content": content })
+                elif ("type" in messages and messages["type"] == "response"):
+                    content = []
+                    for msg in messages["content"]:
+                        if ("type" in msg and msg["type"] == "text"):
+                            content.append({ "type": "output_text", "text": msg["text"] })
+                        elif ("type" in msg and msg["type"] == "file"):
+                            payload = msg["payload"]
+                            if payload["mimeType"].startswith("image"):
+                                content.append({ "type": "output_image", "image_url": payload["url"] })
+                            else:
+                                content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
+                    data["input"].append({ "role": "assistant", "content": content })
+                elif ("type" in messages and messages["type"] == "screenshot"):
                     screenshot_req = True
-                    original_image = f"data:image/png;base64,{messages['image']}"
                     parser_task = self.async_parse(messages["image"])
-                    result = (await asyncio.gather(parser_task))[0]
-                    annotated_image, item_props = result
-                    upload_task = self.async_upload(annotated_image)
-                    ocr_task = self.async_ocr(original_image)
+                    ocr_task = self.async_ocr(messages['image'])
                     parser_tasks.append(parser_task)
-                    upload_tasks.append(upload_task)
                     ocr_tasks.append(ocr_task)
                     metadata[index] = messages["metadata"]
-                    self.client_props[data["metadata"]["client_id"]] = {"meta": messages["metadata"], "props": item_props}
 
             if (screenshot_req):
-                image_url = await asyncio.gather(*[task for task in upload_tasks])
+                parser_content = await asyncio.gather(*[task for task in parser_tasks])
                 ocr_content = await asyncio.gather(*[task for task in ocr_tasks])
-                for index, image, ocr in zip(metadata, image_url, ocr_content):
+                for index, (image, props), ocr in zip(metadata, parser_content, ocr_content):
                     meta = metadata[index]
-                    data["input"].pop(index)
+                    print("IMAGE:", (await asyncio.gather(self.async_upload(image)))[0]) if DEBUG else None
+                    self.client_props[data["metadata"]["client_id"]] = { "meta": messages["metadata"], "props": props }
                     data["input"].append({
                         "role": "user",
                         "content": [
@@ -93,10 +117,11 @@ class MyCustomHandler(CustomLogger):
                             }
                         ]
                     })
-                    print("IMAGE:", image)
         
         except Exception as e:
-            print("PRE-Error:", e)
+            print("PRE-ERROR:", e)
+        
+        del data["data"]
         return data
     
     async def async_post_call_streaming_iterator_hook(self, user_api_key_dict, response, request_data):
@@ -111,7 +136,7 @@ class MyCustomHandler(CustomLogger):
                         if ("elementId" in toolArgs):
                             element_id = toolArgs["elementId"]
                             props = self.client_props[request_data["metadata"]["client_id"]]["props"]
-                            print("CONVERTING ID:", element_id)
+                            print("CONVERTING ID:", element_id) if DEBUG else None
                             target = list(filter(lambda e: e["id"] == str(element_id), props))[0] if props else None
                             devicePixelRatio = self.client_props[request_data["metadata"]["client_id"]]["meta"]["pixelRatio"]
                             if target:
@@ -142,7 +167,7 @@ class MyCustomHandler(CustomLogger):
                     yield type(data)(**data_dict)
                     continue
             except Exception as e:
-                print("POST-Error:", e)
+                print("POST-ERROR:", e)
 
             yield data
 
@@ -165,24 +190,26 @@ class MyCustomHandler(CustomLogger):
             return annotated_image, item_props
         annotated_image, item_props = await asyncio.to_thread(parse)
         return annotated_image, item_props
-
-    async def async_upload(self, image):
+    
+    async def async_ocr(self, image):
+        image_uri = f"data:image/png;base64,{image}"
+        def get_ocr():
+            return mistral.ocr.process(model="mistral-ocr-latest", document={
+                "type": "image_url",
+                "image_url": image_uri,
+            })
+        ocr_response = await asyncio.to_thread(get_ocr)
+        return ocr_response.pages[0].markdown
+    
+    # For debugging purposes
+    async def async_upload(self, image_uri):
         def upload():
             return cloudinary.uploader.upload(
-                image,
+                image_uri,
                 public_id=f"waffy-inference-{time.time()}",
                 overwrite=True
             )["secure_url"]
         imageUrl = await asyncio.to_thread(upload)
         return imageUrl
-    
-    async def async_ocr(self, image):
-        def get_ocr():
-            return mistral.ocr.process(model="mistral-ocr-latest", document={
-                "type": "image_url",
-                "image_url": image,
-            })
-        ocr_response = await asyncio.to_thread(get_ocr)
-        return ocr_response.pages[0].markdown
 
-proxy_handler_instance = MyCustomHandler()
+proxy_handler_instance = CustomHandler()
