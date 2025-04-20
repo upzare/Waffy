@@ -105,6 +105,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const name = message.name;
         const args = message.args;
         switch (name) {
+            case "CLEAR_VALUE": {
+                const element = document.activeElement as HTMLInputElement;
+                const inputTags = ["input", "select", "textarea"];
+                if (element && inputTags.includes(element.tagName.toLowerCase())) {
+                    element.value = "";
+                    sendResponse({ status: "success", value: "Value cleared successfully" });
+                } else {
+                    sendResponse({ status: "error", value: "Element is not an input element" });
+                }
+                break;
+            }
             case "GET_OPTION": {
                 const element = document.activeElement as HTMLSelectElement;
                 if (element && element.tagName.toLowerCase() === "select") {

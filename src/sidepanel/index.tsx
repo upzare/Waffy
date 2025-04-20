@@ -11,7 +11,6 @@ import ChatContainer from './components/ChatContainer';
 import InputContainer from './components/InputContainer';
 import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
-import { systemPrompt } from './utils/SystemPrompt';
 import { fileHandler } from './utils/FileHandler';
 import { availableFunctions } from '../lib/tools';
 
@@ -202,7 +201,7 @@ const App = () => {
         // });
         const prompt = [];
         // let domContentIndex;
-        prompt.push({ role: "system", content: systemPrompt });
+        // prompt.push({ role: "system", content: systemPrompt });
         for await (const msg of messages) {
             if (msg.isUser && !msg.isTool) {
                 prompt.push({ role: "user", content: [{ type: "input_text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
@@ -210,12 +209,12 @@ const App = () => {
             if (!msg.isUser && !msg.isTool) {
                 prompt.push({ role: "assistant", content: [{ type: "output_text", text: msg.content.text }] });
             }
-            if (msg.isTool && msg.content.tool?.toolCall?.type === "tool-call") {
-                prompt.push({ role: "assistant", content: [msg.content.tool.toolCall] });
-            }
-            if (msg.isTool && msg.content.tool?.toolResult?.type === "tool-result") {
-                prompt.push({ role: "tool", content: [msg.content.tool.toolResult] });
-            }
+            // if (msg.isTool && msg.content.tool?.toolCall?.type === "tool-call") {
+            //     prompt.push({ role: "assistant", content: [msg.content.tool.toolCall] });
+            // }
+            // if (msg.isTool && msg.content.tool?.toolResult?.type === "tool-result") {
+            //     prompt.push({ role: "tool", content: [msg.content.tool.toolResult] });
+            // }
         };
         prompt.push({ role: "user", content: [{ type: "input_text", text: content }, ...await fileHandler(files)] });
         try {
@@ -239,14 +238,17 @@ const App = () => {
                 let response = "";
                 const finalToolCalls: Record<string, ToolCall> = {};
                 for await (const res of responseStream) {
-                    console.log(prompt);
-                    if (res.type === "response.output_item.added" && res.item.type === "function_call") {
+                    // if (res.type === "response.output_item.added" && res.item.type === "function_call") {
+                    //     finalToolCalls[res.output_index] = res.item as ToolCall;
+                    // } else if (res.type === "response.function_call_arguments.delta") {
+                    //     const index = res.output_index;
+                    //     if (finalToolCalls[index]) {
+                    //         finalToolCalls[index].arguments += res.delta;
+                    //     }
+                    // }
+                    if (res.type === "response.output_item.done" && res.item.type === "function_call") {
                         finalToolCalls[res.output_index] = res.item as ToolCall;
-                    } else if (res.type === "response.function_call_arguments.delta") {
-                        const index = res.output_index;
-                        if (finalToolCalls[index]) {
-                            finalToolCalls[index].arguments += res.delta;
-                        }
+                        console.log("ToolCall:", finalToolCalls);
                     }
                     if (res.type === "response.output_text.delta") {
                         response += res.delta;
@@ -290,15 +292,16 @@ const App = () => {
                             prompt.splice(domContentIndex, 1);
                         }
                         domContentIndex = prompt.length;
-                        let dom_content = `
- <PAGE_METDATA>
- <PAGE_URL>${toolCallResult.data.url}</PAGE_URL>
- </PAGE_METDATA>
- <PAGE_TEXT_CONTENT>
- ${toolCallResult.data.ocr_content}
- </PAGE_TEXT_CONTENT>
- `;
-                        prompt.push({ role: "user", content: [{ type: "input_text", text: dom_content }, { type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
+                        prompt.push(toolCallResult.data);
+//                         let dom_content = `
+//  <PAGE_METDATA>
+//  <PAGE_URL>${toolCallResult.data.url}</PAGE_URL>
+//  </PAGE_METDATA>
+//  <PAGE_TEXT_CONTENT>
+//  ${toolCallResult.data.ocr_content}
+//  </PAGE_TEXT_CONTENT>
+//  `;
+//                         prompt.push({ role: "user", content: [{ type: "input_text", text: dom_content }, { type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
                     }
                     functionExecState = true;
                 }

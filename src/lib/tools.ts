@@ -1,20 +1,22 @@
-import { marked } from 'marked';
-import type { DomProps } from '../types';
+const KEY_CODES = {
+    Enter: 13,
+    Backspace: 8,
+    Delete: 46,
+    Tab: 9,
+    Escape: 27,
+    Space: 32,
+    ArrowUp: 38,
+    ArrowDown: 40,
+    ArrowLeft: 37,
+    ArrowRight: 39,
+    PageUp: 33,
+    PageDown: 34,
+};
+
+type KEY_TYPES = keyof typeof KEY_CODES;
 
 export async function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getDom(): Promise<DomProps[] | string> {
-    return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: "GET_DOM" }, (response) => {
-            if (response) {
-                resolve(response);
-            } else {
-                reject("Failed to get DOM data");
-            }
-        });
-    });
 }
 
 export const fetchScreen = async () => {
@@ -23,106 +25,54 @@ export const fetchScreen = async () => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            const currentUrl = tabs[0].url;
-            chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
-                const base64String = dataUrl.split(',')[1];
-                resolve({ currentUrl, base64String });
-            }).catch((error) => {
-                reject("Failed to capture DOM");
-            });
-        });
-    }).then(async (data) => {
-        const { currentUrl, base64String } = data as { currentUrl: string, base64String: string };
-        const response = await fetch("http://localhost:8000/inference", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                image: base64String,
-            }),
-        });
-        return { currentUrl, response };
-    }).then(async (data) => {
-        const { currentUrl, response } = data as { currentUrl: string, response: Response };
-        const jsonResponse = await response.json();
-        let domProps = [];
-        for await (const res of jsonResponse.props) {
-            domProps.push(res);
-        }
-        chrome.runtime.sendMessage({ action: "SET_DOM", props: domProps });
-        return { status: "success", message: "Success: Dom fetched", data: { type: "dom", url: currentUrl, annotatedImage: jsonResponse.image_url, ocr_content: jsonResponse.ocr_response } };
-    }).catch((error) => {
-        return { status: "error", message: "Error: " + error };
-    });
-}
-
-export const screenshot = async () => {
-    return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
+            const meta = {
+                url: tabs[0].url,
+                title: tabs[0].title,
+                pixelRatio: window.devicePixelRatio,
+                loading_status: tabs[0].status
             }
-            const currentUrl = tabs[0].url;
             chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
                 const base64Image = dataUrl.split(',')[1];
-                resolve({ currentUrl, base64Image });
+                resolve({ meta, base64Image });
             }).catch((error) => {
                 reject("Failed to capture DOM");
             });
         });
     }).then((data) => {
-        const { currentUrl, base64Image } = data as { currentUrl: string, base64Image: string };
-        return { status: "success", message: "Success: Screenshot fetched", data: { type: "screenshot", url: currentUrl, image: base64Image } };
+        const { meta, base64Image } = data as { meta: Record<string, string>, base64Image: string };
+        return { status: "success", message: "Success: Screen fetched", data: { type: "screenshot", metadata: meta, image: base64Image } };
     }).catch((error) => {
         return { status: "error", message: "Error: " + error };
     });
 }
 
-export const click = async ({ elementId, highlight = true }: { elementId: number, highlight?: boolean }) => {
+export const click = async ({ x, y, highlight = true }: { x: number, y: number, highlight?: boolean }) => {
+    console.log("CLICK: ", x, y);
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            const annotatedDom: DomProps[] = (await getDom()) as DomProps[];
-            console.log("ANNOTATED DOM: ", annotatedDom);
-            if (typeof annotatedDom === "string") {
-                reject(annotatedDom);
-                return;
-            }
-            const target = annotatedDom.find(e => e.id === elementId.toString());
-            console.log("TARGET: ", target);
-            if (target) {
-                const devicePixelRatio = window.devicePixelRatio;
-                const x = target.x;
-                const y = target.y;
-                const click_cords_x = (x + target.width / 2) / devicePixelRatio;
-                const click_cords_y = (y + target.height / 2) / devicePixelRatio;
-                console.log("CLICK CORDS: ", click_cords_x, click_cords_y);
-                chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Input.dispatchMouseEvent", {
-                    type: 'mousePressed',
-                    x: click_cords_x,
-                    y: click_cords_y,
-                    button: 'left',
-                    clickCount: 1,
-                });
-                sleep(50);
-                if (highlight) chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: {} });
-                chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Input.dispatchMouseEvent", {
-                    type: 'mouseReleased',
-                    x: click_cords_x,
-                    y: click_cords_y,
-                    button: 'left',
-                    clickCount: 1,
-                });
-                if (chrome.runtime.lastError) {
-                    reject("Failed to click on coordinates");
-                } else {
-                    resolve("Clicked on coordinates");
-                }
+            chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Input.dispatchMouseEvent", {
+                type: 'mousePressed',
+                x,
+                y,
+                button: 'left',
+                clickCount: 1,
+            });
+            sleep(50);
+            if (highlight) chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: {} });
+            chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Input.dispatchMouseEvent", {
+                type: 'mouseReleased',
+                x,
+                y,
+                button: 'left',
+                clickCount: 1,
+            });
+            if (chrome.runtime.lastError) {
+                reject("Failed to click on coordinates");
             } else {
-                reject("Element not found");
+                resolve("Clicked on coordinates");
             }
         });
     }).then((res) => {
@@ -132,32 +82,33 @@ export const click = async ({ elementId, highlight = true }: { elementId: number
     });
 }
 
-export const enterKey = async () => {
+export const keyPress = async ({ key }: { key: KEY_TYPES }) => {
+    console.log("KEYPRESS: ", key);
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await chrome.debugger.sendCommand({ tabId: tabs[0]?.id }, 'Input.dispatchKeyEvent', {
+            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
                 type: 'keyDown',
-                windowsVirtualKeyCode: 13,
-                key: 'Enter',
-                code: 'Enter',
+                windowsVirtualKeyCode: KEY_CODES[key],
+                key: key,
+                code: key,
                 text: '\r',
             });
             sleep(50);
             chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: {} });
-            await chrome.debugger.sendCommand({ tabId: tabs[0]?.id }, 'Input.dispatchKeyEvent', {
+            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
                 type: 'keyUp',
-                windowsVirtualKeyCode: 13,
-                key: 'Enter',
-                code: 'Enter',
+                windowsVirtualKeyCode: KEY_CODES[key],
+                key: key,
+                code: key,
                 text: '\r',
             });
             if (chrome.runtime.lastError) {
-                reject("Failed to press enter key");
+                reject("Failed to press key");
             } else {
-                resolve("Enter key pressed");
+                resolve("Key pressed");
             }
         });
     }).then((res) => {
@@ -167,17 +118,18 @@ export const enterKey = async () => {
     });
 }
 
-export const typeText = async ({ elementId, text }: { elementId: number, text: string }) => {
+export const typeText = async ({ x, y, text }: { x: number, y: number, text: string }) => {
+    console.log("TYPETEXT: ", x, y, text);
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await click({ elementId, highlight: false });
+            await click({ x, y, highlight: false });
             chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: { timeout: text.length * 150 } });
             for await (const char of text) {
                 if (char === '\n') {
-                    enterKey();
+                    keyPress({ key: "Enter" });
                     continue;
                 }
                 await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
@@ -204,16 +156,20 @@ export const typeText = async ({ elementId, text }: { elementId: number, text: s
     });
 }
 
-export const getOption = async ({ elementId }: { elementId: number }) => {
+export const clearValue = async ({ x, y }: { x: number, y: number }) => {
+    console.log("CLEARVALUE: ", x, y);
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await click({ elementId });
-            await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "GET_OPTION", args: {} })
+            await click({ x, y });
+            await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "CLEAR_VALUE", args: {} })
                 .then((res) => {
-                    resolve(res.value);
+                    if (res.status === "success")
+                        resolve(res.value);
+                    else
+                        reject(res.value);
                 })
                 .catch((error) => {
                     reject(error.value);
@@ -226,16 +182,46 @@ export const getOption = async ({ elementId }: { elementId: number }) => {
     });
 }
 
-export const setOption = async ({ elementId, value }: { elementId: number, value: string }) => {
+export const getOption = async ({ x, y }: { x: number, y: number, }) => {
+    console.log("GETOPTION: ", x, y);
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await click({ elementId });
+            await click({ x, y });
+            await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "GET_OPTION", args: {} })
+                .then((res) => {
+                    if (res.status === "success")
+                        resolve(res.value);
+                    else
+                        reject(res.value);
+                })
+                .catch((error) => {
+                    reject(error.value);
+                });
+        });
+    }).then((res) => {
+        return { status: "success", message: "Success: " + res };;
+    }).catch((error) => {
+        return { status: "error", message: "Error: " + error };
+    });
+}
+
+export const setOption = async ({ x, y, value }: { x: number, y: number, value: string }) => {
+    console.log("SETOPTION: ", x, y, value);
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+            if (!tabs || !tabs[0]?.id) {
+                return;
+            }
+            await click({ x, y });
             await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "SET_OPTION", args: { value } })
                 .then((res) => {
-                    resolve(res.value);
+                    if (res.status === "success")
+                        resolve(res.value);
+                    else
+                        reject(res.value);
                 })
                 .catch((error) => {
                     reject(error.value);
@@ -263,7 +249,6 @@ export const loadingState = async () => {
                         reject("Failed to get the state of the page");
                     } else {
                         const readyState = result?.result?.value;
-                        console.log("ready state: ", readyState);
                         if (readyState === "complete") {
                             resolve("Page is fully loaded");
                         } else {
@@ -373,7 +358,10 @@ export const scroll = async ({ direction }: { direction: string }) => {
             }
             await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "SCROLL", args: { direction } })
                 .then((res) => {
-                    resolve(res.value);
+                    if (res.status === "success")
+                        resolve(res.value);
+                    else
+                        reject(res.value);
                 })
                 .catch((error) => {
                     reject(error);
@@ -427,7 +415,8 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<any> } 
     "fetchScreen": fetchScreen,
     "click": click,
     "typeText": typeText,
-    "enterKey": enterKey,
+    "clearValue": clearValue,
+    "keyPress": keyPress,
     "getOption": getOption,
     "setOption": setOption,
     "loadingState": loadingState,

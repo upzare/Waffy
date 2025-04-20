@@ -218,15 +218,16 @@ export async function* ai(model: string, messages: any[], signal?: AbortSignal) 
     ];
     const settings: Record<string, unknown> = await Browser.storage.local.get("extension_settings");
     const records = JSON.parse(settings.extension_settings as string);
-    const client = new OpenAI({ apiKey: records.gptAPIKey, dangerouslyAllowBrowser: true });
+    const client = new OpenAI({ apiKey: records.gptAPIKey, dangerouslyAllowBrowser: true, baseURL: "http://localhost:4000/" });
     const response = await client.responses.create({
         model: model,
         input: messages,
-        tools: all_tools as any,
+        // tools: all_tools as any,
         stream: true,
-        parallel_tool_calls: false,
-        tool_choice: 'auto',
-        truncation: "auto",
+        metadata: {
+            client_id: "unique-client-123",
+            trace_user_id: "user-123"
+        }
     });
 
     for await (const event of response) {
