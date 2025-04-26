@@ -1,150 +1,322 @@
-import { useEffect, useRef } from 'react';
-import { InputContainerProps } from '../../types';
-import { SUPPORTED_TYPES, MAX_UPLOAD_SIZE } from '../../config';
-import toast from 'react-hot-toast';
+import { useState, useEffect, useRef } from "react";
+import toast from "react-hot-toast";
+import type { InputContainerProps } from "../../types";
 
 const InputContainer: React.FC<InputContainerProps> = ({
-    isGenerating,
-    isRecording,
-    textareaRef,
-    fileInputRef,
-    message,
-    files,
-    setMessage,
-    setFiles,
-    onSpeechRecognition,
-    onSendMessage,
-    onStopGeneration,
+  isGenerating,
+  isRecording,
+  textareaRef,
+  fileInputRef,
+  message,
+  files,
+  setMessage,
+  setFiles,
+  onSpeechRecognition,
+  onSendMessage,
+  onStopGeneration,
 }) => {
-    const fileInputIconRef = useRef<HTMLButtonElement>(null);
-    const microphoneIconRef = useRef<HTMLButtonElement>(null);
-    const sendIconRef = useRef<HTMLButtonElement>(null);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputIconRef = useRef<HTMLButtonElement>(null);
+  const microphoneIconRef = useRef<HTMLButtonElement>(null);
+  const sendIconRef = useRef<HTMLButtonElement>(null);
 
-    useEffect(() => {
-        if (textareaRef.current) textareaRef.current.focus();
-    }, []);
-    
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto";
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-            textareaRef.current.focus();
+  const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
+  const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+
+  useEffect(() => {
+    if (textareaRef.current) textareaRef.current.focus();
+  }, []);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.focus();
+    }
+  }, [message]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(event.target as Node)) {
+        setShowOptionsMenu(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, []);
+
+  const handleKeyDown = async (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onSendMessage();
+    }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      if (Array.from(e.target.files).every((file) => SUPPORTED_TYPES.includes(file.type))) {
+        if (Array.from(e.target.files).every((file) => file.size <= MAX_UPLOAD_SIZE)) {
+          const newFiles = Array.from(e.target.files);
+          setFiles((prev) => [...prev, ...newFiles]);
+        } else {
+          toast.error("File Size Exceeded", { duration: 3000 });
         }
-    }, [message]);
+      } else {
+        toast.error("Unsupported File Type", { duration: 3000 });
+      }
+    }
+  }
 
-    const handleKeyDown = async (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onSendMessage();
-        }
-    };
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            if (Array.from(e.target.files).every(file => SUPPORTED_TYPES.includes(file.type))) {
-                if (Array.from(e.target.files).every(file => file.size <= MAX_UPLOAD_SIZE)) {
-                    const newFiles = Array.from(e.target.files);
-                    setFiles(prev => [...prev, ...newFiles]);
-                } else {
-                    toast.error("File Size Exceeded", { duration: 3000 });
-                }
-            } else {
-                toast.error("Unsupported File Type", { duration: 3000 });
-            }
-        }
-    };
+  const toggleOptionsMenu = () => {
+    setShowOptionsMenu(!showOptionsMenu);
+  }
 
-    const removeFile = (index: number) => {
-        setFiles(prev => prev.filter((_, i) => i !== index));
-    };
+  return (
+    <div className="input-container">
+      <div className="input-box">
+        <div className="input-options-container" ref={optionsMenuRef}>
+          <button className="options-button" onClick={toggleOptionsMenu} title="Options">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="1"></circle>
+              <circle cx="12" cy="5" r="1"></circle>
+              <circle cx="12" cy="19" r="1"></circle>
+            </svg>
+          </button>
 
-    return (
-        <div className="input-container">
-            <div className="input-box">
-                <textarea
-                    ref={textareaRef}
-                    className="input-textarea"
-                    placeholder="Type a message..."
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    rows={1}
-                    disabled={!!(isGenerating || isRecording)}
-                />
-                <div className="input-buttons">
-                    {isGenerating ? (
-                        <button
-                            className="action-button stop-button"
-                            onClick={onStopGeneration}
-                            title="Stop generating"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M464 256A208 208 0 1 0 48 256a208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm192-96l128 0c17.7 0 32 14.3 32 32l0 128c0 17.7-14.3 32-32 32l-128 0c-17.7 0-32-14.3-32-32l0-128c0-17.7 14.3-32 32-32z" /></svg>
-                        </button>
-                    ) : (
-                        <>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                style={{ display: "none" }}
-                                multiple
-                                accept={SUPPORTED_TYPES.join(",")}
-                                onChange={handleFileUpload}
-                            />
-                            <button
-                                ref={fileInputIconRef}
-                                className="action-button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={!!(isGenerating || isRecording)}
-                                title="Attach files"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M364.2 83.8c-24.4-24.4-64-24.4-88.4 0l-184 184c-42.1 42.1-42.1 110.3 0 152.4s110.3 42.1 152.4 0l152-152c10.9-10.9 28.7-10.9 39.6 0s10.9 28.7 0 39.6l-152 152c-64 64-167.6 64-231.6 0s-64-167.6 0-231.6l184-184c46.3-46.3 121.3-46.3 167.6 0s46.3 121.3 0 167.6l-176 176c-28.6 28.6-75 28.6-103.6 0s-28.6-75 0-103.6l144-144c10.9-10.9 28.7-10.9 39.6 0s10.9 28.7 0 39.6l-144 144c-6.7 6.7-6.7 17.7 0 24.4s17.7 6.7 24.4 0l176-176c24.4-24.4 24.4-64 0-88.4z" /></svg>
-                            </button>
-                            {message === "" ? (
-                                <button
-                                    ref={microphoneIconRef}
-                                    className="action-button"
-                                    onClick={onSpeechRecognition}
-                                    title="Microphone"
-                                    disabled={!!(isGenerating || isRecording)}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M192 0C139 0 96 43 96 96l0 160c0 53 43 96 96 96s96-43 96-96l0-160c0-53-43-96-96-96zM64 216c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 40c0 89.1 66.2 162.7 152 174.4l0 33.6-48 0c-13.3 0-24 10.7-24 24s10.7 24 24 24l72 0 72 0c13.3 0 24-10.7 24-24s-10.7-24-24-24l-48 0 0-33.6c85.8-11.7 152-85.3 152-174.4l0-40c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 40c0 70.7-57.3 128-128 128s-128-57.3-128-128l0-40z" /></svg>
-                                </button>
-                            ) : (
-                                <button
-                                    ref={sendIconRef}
-                                    className="action-button"
-                                    onClick={onSendMessage}
-                                    disabled={!!(isGenerating || isRecording)}
-                                    title="Send"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.2 160 480l0-83.6c0-4 1.5-7.8 4.2-10.8L331.8 202.8c5.8-6.3 5.6-16-.4-22s-15.7-6.4-22-.7L106 360.8 17.7 316.6C7.1 311.3 .3 300.7 0 288.9s5.9-22.8 16.1-28.7l448-256c10.7-6.1 23.9-5.5 34 1.4z" /></svg>
-                                </button>
-                            )}
-                        </>
-                    )}
-                </div>
+          {showOptionsMenu && (
+            <div className="options-menu">
+              <div className="options-menu-item">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span>Settings</span>
+              </div>
+              <div className="options-menu-item">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>GPT-4</span>
+              </div>
+              <div className="options-menu-item">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>Share</span>
+              </div>
+              <div className="options-menu-item">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>Help</span>
+              </div>
             </div>
-            {files.length > 0 && (
-                <div id="file-preview-container">
-                    {files.map((file, index) => (
-                        <div key={`${file.name}-${index}`} className="input-file-preview">
-                            {file.type.startsWith("image/") ? (
-                                <img
-                                    src={URL.createObjectURL(file)}
-                                    className="input-file-thubmnail"
-                                    alt={file.name}
-                                />
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M0 64C0 28.7 28.7 0 64 0L224 0l0 128c0 17.7 14.3 32 32 32l128 0 0 288c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zm384 64l-128 0L256 0 384 128z" /></svg>
-                            )}
-                            <span className="input-file-preview-name" title={file.name}>{file.name}</span>
-                            <span className="input-remove-file" onClick={() => removeFile(index)}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z" /></svg></span>
-                        </div>
-                    ))}
-                </div>
-            )}
+          )}
         </div>
-    )
+
+        <textarea
+          ref={textareaRef}
+          className="input-textarea"
+          placeholder="Type a message..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          disabled={!!(isGenerating || isRecording)}
+        />
+        <div className="input-buttons">
+          {isGenerating ? (
+            <button className="action-button stop-button" onClick={onStopGeneration} title="Stop generating">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <rect x="9" y="9" width="6" height="6"></rect>
+              </svg>
+            </button>
+          ) : (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: "none" }}
+                multiple
+                accept={SUPPORTED_TYPES.join(",")}
+                onChange={handleFileUpload}
+              />
+              <button
+                ref={fileInputIconRef}
+                className="action-button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!!(isGenerating || isRecording)}
+                title="Attach files"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                </svg>
+              </button>
+              {message === "" ? (
+                <button
+                  ref={microphoneIconRef}
+                  className="action-button"
+                  onClick={onSpeechRecognition}
+                  title="Microphone"
+                  disabled={!!(isGenerating || isRecording)}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  ref={sendIconRef}
+                  className="action-button send-button"
+                  onClick={onSendMessage}
+                  disabled={!!(isGenerating || isRecording)}
+                  title="Send"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {files.length > 0 && (
+        <div id="file-preview-container">
+          {files.map((file, index) => (
+            <div key={`${file.name}-${index}`} className="input-file-preview">
+              {file.type.startsWith("image/") ? (
+                <img
+                  src={URL.createObjectURL(file) || "/placeholder.svg"}
+                  className="input-file-thubmnail"
+                  alt={file.name}
+                />
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                  <polyline points="13 2 13 9 20 9"></polyline>
+                </svg>
+              )}
+              <span className="input-file-preview-name" title={file.name}>
+                {file.name}
+              </span>
+              <span className="input-remove-file" onClick={() => removeFile(index)}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default InputContainer;

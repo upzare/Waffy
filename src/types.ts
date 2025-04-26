@@ -12,20 +12,19 @@ export interface Model {
 }
 
 export interface HeaderProps {
-    models: Model[];
-    currentModel: string;
     currentTitle: string;
-    conversations: Conversation[];
-    conversationID: React.MutableRefObject<string>;
     isNewChat: boolean;
     onNewChat: () => void;
-    onSelectConversation: (id: string) => void;
-    onSelectModel: (id: string) => void;
-    onItemRemove: (id: string) => void;
 }
 
-export interface HomeProps {
+export interface HeroProps {
     homeSection: React.RefObject<HTMLDivElement>;
+    onPromptClick: (prompt: string) => void;
+}
+
+export interface SuggestedPromptProps {
+  text: string;
+  onClick?: () => void;
 }
 
 export interface ChatContainerProps {
@@ -44,6 +43,14 @@ export interface InputContainerProps {
     onSpeechRecognition: () => Promise<void>;
     onSendMessage: () => Promise<void>;
     onStopGeneration: () => Promise<void>;
+}
+
+export interface HistorySidebarProps {
+    conversations: Conversation[];
+    visible: boolean;
+    onSelectConversation: (id: string) => void;
+    onRemoveConversation: (id: string) => void;
+    currentConversationId: string;
 }
 
 export interface Message {
@@ -75,6 +82,13 @@ export interface DomMessage {
     dom: string;
 }
 
+export interface ParticlesProps {
+    className?: string;
+    quantity?: number;
+    staticity?: number;
+    ease?: number;
+    refresh?: boolean;
+}
 
 export interface Settings {
     geminiApiKey: string;
@@ -82,7 +96,6 @@ export interface Settings {
     systemPrompt: string;
     fetchPrompt: string;
 }
-
 
 export interface DomProps {
     id: string,
