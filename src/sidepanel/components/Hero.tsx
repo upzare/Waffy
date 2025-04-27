@@ -2,28 +2,28 @@ import SuggestedPrompt from "./SuggestedPrompt";
 import type { HeroProps } from "../../types";
 
 const Hero: React.FC<HeroProps> = ({ homeSection, onPromptClick }) => {
-  const suggestedPrompts = [
-    "Help me debug my CSS",
-    "Explain how JavaScript work",
-    "Generate a React component",
-  ];
+    const suggestedPrompts = [
+        "Help me debug my CSS",
+        "Explain how JavaScript work",
+        "Generate a React component",
+    ];
 
-  return (
-    <div className="welcome-section" ref={homeSection}>
-      <div className="hero-content">
-        <div className="hero-logo-container">
-          <img src="/logo.svg" alt="Waffy Logo" className="hero-logo" />
-          <div className="hero-logo-glow"></div>
-        </div>
+    return (
+        <div className="welcome-section" ref={homeSection}>
+            <div className="hero-content">
+                <div className="hero-logo-container">
+                    <img src="/logo.svg" alt="Waffy Logo" className="hero-logo" />
+                    <div className="hero-logo-glow"></div>
+                </div>
 
-        {/* <h1 className="hero-title">WAFFY</h1>
+                {/* <h1 className="hero-title">WAFFY</h1>
         <p className="hero-subtitle">AI-Powered Web Assistant</p>
 
         <div className="hero-description">
           Your intelligent companion for web development, research, and content creation
         </div> */}
 
-        {/* <div className="capabilities-container">
+                {/* <div className="capabilities-container">
           <div className="capability-item">
             <div className="capability-icon">
               <svg
@@ -97,18 +97,18 @@ const Hero: React.FC<HeroProps> = ({ homeSection, onPromptClick }) => {
             <div className="capability-label">Images</div>
           </div>
         </div> */}
-      </div>
+            </div>
 
-      <div className="suggested-prompts-container">
-        <h2 className="suggested-prompts-title">Try asking</h2>
-        <div className="suggested-prompts">
-          {suggestedPrompts.map((prompt, index) => (
-            <SuggestedPrompt key={index} text={prompt} onClick={() => onPromptClick(prompt)} />
-          ))}
+            <div className="suggested-prompts-container">
+                <h2 className="suggested-prompts-title">Try asking</h2>
+                <div className="suggested-prompts">
+                    {suggestedPrompts.map((prompt, index) => (
+                        <SuggestedPrompt key={index} text={prompt} onClick={() => onPromptClick(prompt)} />
+                    ))}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  )
+    )
 }
 
 export default Hero;

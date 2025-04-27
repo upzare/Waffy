@@ -23,8 +23,8 @@ export interface HeroProps {
 }
 
 export interface SuggestedPromptProps {
-  text: string;
-  onClick?: () => void;
+    text: string;
+    onClick?: () => void;
 }
 
 export interface ChatContainerProps {
