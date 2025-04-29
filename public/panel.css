@@ -186,6 +186,7 @@ body {
     font-weight: 800;
     margin: 0 0 0.5rem;
     background: linear-gradient(90deg, #ffffff, #cccccc);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: 2px;
