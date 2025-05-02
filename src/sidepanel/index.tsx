@@ -1,18 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import Browser from 'webextension-polyfill';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { geminiResponseText, ai } from '../lib/agent';
-import { Message, Conversation, Model, ToolCall } from '../types';
+import { Message, Conversation, ToolCall } from '../types';
 import Header from './components/Header';
-import Home from './components/Home';
 import ChatContainer from './components/ChatContainer';
 import InputContainer from './components/InputContainer';
 import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
 import { fileHandler } from './utils/FileHandler';
 import { availableFunctions } from '../lib/tools';
+import HistorySidebar from './components/HistorySidebar';
+import Hero from './components/Hero';
+import Particles from './components/Particles';
 
 const App = () => {
     const [messages, setMessages] = useState<any[]>([]);
@@ -22,10 +23,10 @@ const App = () => {
     const [files, setFiles] = useState<File[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [isRecorded, setIsRecorded] = useState(false);
+    const [sidebarHovered, setSidebarHovered] = useState(false);
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [currentModel, setCurrentModel] = useState("");
-    const [models, setModels] = useState<Model[]>([]);
     const [currentTitle, setCurrentTitle] = useState("New Chat");
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -41,8 +42,19 @@ const App = () => {
     useEffect(() => {
         initDB();
         fetchConversations();
-        fetchModels();
         Mousetrap.bind("ctrl+space", () => { speechRecognition() });
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const threshold = window.innerWidth - 10;
+            if (e.clientX > threshold) {
+                setSidebarHovered(true);
+            } else if (e.clientX < window.innerWidth - 300) {
+                setSidebarHovered(false);
+            }
+        }
+
+        document.addEventListener("mousemove", handleMouseMove);
+        return () => document.removeEventListener("mousemove", handleMouseMove);
     }, []);
 
     useEffect(() => {
@@ -107,28 +119,6 @@ const App = () => {
         }
     };
 
-    const fetchModels = async () => {
-        Browser.storage.local.get("extension_settings").then((result: any) => {
-            if (result.extension_settings) {
-                const settings = JSON.parse(result.extension_settings as string);
-                if (settings.geminiApiKey) {
-                    setModels(prev => [
-                        ...prev,
-                        { id: "o1", name: "O1", description: "Very Powerfull Reasoning Model" },
-                        { id: "gpt-4o", name: "GPT-4o", description: "Very Powerfull LLM" },
-                        { id: "gpt-4o-mini", name: "GPT-4o-Mini", description: "GPT Mini Powerfull LLM" },
-                    ]);
-                }
-            }
-        });
-        setModels(prev => {
-            if (prev.length > 0) {
-                setCurrentModel(prev[0].id);
-            }
-            return prev;
-        });
-    };
-
     const updateConversationsDB = async (updatedMessages: Message[]) => {
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
         if (conversationDB) {
@@ -164,10 +154,6 @@ const App = () => {
 
     const handleSendMessage = async () => {
         if ((!message.trim() && files.length === 0) || isGenerating) return;
-        if (!models.find(m => m.id === currentModel)) {
-            toast.error("No Model Selected", { duration: 3000 });
-            return;
-        }
         let messageId = Date.now().toString();
         setIsGenerating(true);
         if (textareaRef.current) {
@@ -296,15 +282,15 @@ const App = () => {
                         }
                         domContentIndex = prompt.length;
                         prompt.push(toolCallResult.data);
-//                         let dom_content = `
-//  <PAGE_METDATA>
-//  <PAGE_URL>${toolCallResult.data.url}</PAGE_URL>
-//  </PAGE_METDATA>
-//  <PAGE_TEXT_CONTENT>
-//  ${toolCallResult.data.ocr_content}
-//  </PAGE_TEXT_CONTENT>
-//  `;
-//                         prompt.push({ role: "user", content: [{ type: "input_text", text: dom_content }, { type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
+                        //                         let dom_content = `
+                        //  <PAGE_METDATA>
+                        //  <PAGE_URL>${toolCallResult.data.url}</PAGE_URL>
+                        //  </PAGE_METDATA>
+                        //  <PAGE_TEXT_CONTENT>
+                        //  ${toolCallResult.data.ocr_content}
+                        //  </PAGE_TEXT_CONTENT>
+                        //  `;
+                        //                         prompt.push({ role: "user", content: [{ type: "input_text", text: dom_content }, { type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
                     }
                     functionExecState = true;
                 }
@@ -407,18 +393,6 @@ const App = () => {
         }
     };
 
-    const handleSelectModel = (id: string) => {
-        toast.promise(
-            new Promise<void>(resolve => { setCurrentModel(id); resolve() }),
-            {
-                loading: "Switching Model...",
-                success: <b>Switched to {models.find(m => m.id === id)?.name}</b>,
-                error: <b>Failed to switch model</b>,
-            }, { duration: 2000 }
-        );
-        textareaRef.current?.focus();
-    };
-
     const handleItemRemove = async (id: string) => {
         const conversation = conversations.find(c => c.id === id);
         if (conversation) {
@@ -439,33 +413,35 @@ const App = () => {
                 position="top-center"
                 reverseOrder={false}
             />
-            <Header
-                models={models}
-                currentModel={currentModel}
-                currentTitle={currentTitle}
+            <Particles className="particles" quantity={150} />
+            <HistorySidebar
                 conversations={conversations}
-                conversationID={conversationID}
-                isNewChat={isFirstMessage && messages.length === 0}
-                onNewChat={handleNewChat}
+                visible={sidebarHovered}
                 onSelectConversation={handleSelectConversation}
-                onSelectModel={handleSelectModel}
-                onItemRemove={handleItemRemove}
+                onRemoveConversation={handleItemRemove}
+                currentConversationId={conversationID.current}
             />
-            <Home homeSection={homeSection} />
-            <ChatContainer messages={messages} />
-            <InputContainer
-                isGenerating={isGenerating}
-                isRecording={isRecording}
-                textareaRef={textareaRef}
-                fileInputRef={fileInputRef}
-                message={message}
-                files={files}
-                setMessage={setMessage}
-                setFiles={setFiles}
-                onSpeechRecognition={speechRecognition}
-                onSendMessage={handleSendMessage}
-                onStopGeneration={handleStopGeneration}
-            />
+            <div className="container">
+                <Header currentTitle={currentTitle} isNewChat={messages.length === 0} onNewChat={handleNewChat} />
+                {isFirstMessage ?
+                    <Hero homeSection={homeSection as any} onPromptClick={handleNewChat} />
+                    :
+                    <ChatContainer messages={messages} />
+                }
+                <InputContainer
+                    isGenerating={isGenerating}
+                    isRecording={isRecording}
+                    textareaRef={textareaRef as any}
+                    fileInputRef={fileInputRef as any}
+                    message={message}
+                    files={files}
+                    setMessage={setMessage}
+                    setFiles={setFiles}
+                    onSpeechRecognition={speechRecognition}
+                    onSendMessage={handleSendMessage}
+                    onStopGeneration={handleStopGeneration}
+                />
+            </div>
         </>
     );
 };

@@ -1,10 +1,8 @@
-import { useEffect, useRef } from 'react';
-import { ChatContainerProps } from '../../types';
-import RenderResponse from '../utils/RenderResponse';
+import { useEffect, useRef } from "react";
+import RenderResponse from "../utils/RenderResponse";
+import type { ChatContainerProps } from "../../types";
 
-const ChatContainer: React.FC<ChatContainerProps> = ({
-    messages
-}) => {
+const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -15,71 +13,121 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
     return (
         <div className="chat-container" ref={chatContainerRef}>
-            {messages.map((msg, index) => (
-                !msg.isTool &&
-                <div key={index} className={`message ${msg.isError ? "error" : msg.isUser ? "user" : "assistant"}`}>
-                    {!msg.isError &&
-                        <div className="message-avatar">
-                            {msg.isUser ? (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512l388.6 0c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304l-91.4 0z" /></svg>) : (<img src="logo.svg" alt="Assistant Logo" />)}
-                        </div>}
-                    <div className="message-content">
-                        {msg.isUser ? (
-                            <>
-                                {msg.content.text}
-                                {msg.content.files && msg.content.files.length > 0 && (
+            {messages.map(
+                (msg, index) =>
+                    !msg.isTool && (
+                        <div key={index} className={`message ${msg.isError ? "error" : msg.isUser ? "user" : "assistant"}`}>
+                            {!msg.isError && (
+                                <div className="message-avatar">
+                                    {msg.isUser ? (
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        >
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="12" cy="7" r="4"></circle>
+                                        </svg>
+                                    ) : (
+                                        <img src="/logo.svg" alt="Assistant Logo" />
+                                    )}
+                                </div>
+                            )}
+                            <div className="message-content">
+                                {msg.isUser ? (
                                     <>
-                                        {msg.content.files.map((file) => (
-                                                <div key={`${file.name}-${index}`} className="message-file-preview" onClick={() => window.open(URL.createObjectURL(file))}>
-                                                    {file.type.startsWith("image/") ? (
-                                                        <img
-                                                            src={URL.createObjectURL(file)}
-                                                            className="message-file-thubmnail"
-                                                            alt={file.name}
-                                                        />
-                                                    ) : (
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M0 64C0 28.7 28.7 0 64 0L224 0l0 128c0 17.7 14.3 32 32 32l128 0 0 288c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zm384 64l-128 0L256 0 384 128z" /></svg>
-                                                    )}
-                                                    <span className="message-file-preview-name" title={file.name}>{file.name}</span>
-                                                </div>
-                                            )
+                                        {msg.content.text}
+                                        {msg.content.files && msg.content.files.length > 0 && (
+                                            <>
+                                                {msg.content.files.map((file: File, fileIndex: number) => (
+                                                    <div
+                                                        key={`${file.name}-${fileIndex}`}
+                                                        className="message-file-preview"
+                                                        onClick={() => window.open(URL.createObjectURL(file))}
+                                                    >
+                                                        {file.type.startsWith("image/") ? (
+                                                            <img
+                                                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                                                className="message-file-thubmnail"
+                                                                alt={file.name}
+                                                            />
+                                                        ) : (
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                            >
+                                                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                                                                <polyline points="13 2 13 9 20 9"></polyline>
+                                                            </svg>
+                                                        )}
+                                                        <span className="message-file-preview-name" title={file.name}>
+                                                            {file.name}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <RenderResponse content={msg.content.text} />
+                                        {msg.content.files && msg.content.files.length > 0 && (
+                                            <>
+                                                {msg.content.files.map((file: File, fileIndex: number) => (
+                                                    <div
+                                                        key={`${file.name}-${fileIndex}`}
+                                                        className="message-file-preview"
+                                                        onClick={() => window.open(URL.createObjectURL(file))}
+                                                    >
+                                                        {file.type.startsWith("image/") ? (
+                                                            <img
+                                                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                                                className="message-file-thubmnail"
+                                                                alt={file.name}
+                                                            />
+                                                        ) : (
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                            >
+                                                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                                                                <polyline points="13 2 13 9 20 9"></polyline>
+                                                            </svg>
+                                                        )}
+                                                        <span className="message-file-preview-name" title={file.name}>
+                                                            {file.name}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
+                                        {msg.isStreaming && (
+                                            <div className="loading-indicator">
+                                                <span></span>
+                                                <span></span>
+                                                <span></span>
+                                            </div>
                                         )}
                                     </>
                                 )}
-                            </>
-                        ) : (
-                            <>
-                                <RenderResponse content={msg.content.text} />
-                                {msg.content.files && msg.content.files.length > 0 && (
-                                    <>
-                                        {msg.content.files.map((file) => (
-                                                <div key={`${file.name}-${index}`} className="message-file-preview" onClick={() => window.open(URL.createObjectURL(file))}>
-                                                    {file.type.startsWith("image/") ? (
-                                                        <img
-                                                            src={URL.createObjectURL(file)}
-                                                            className="message-file-thubmnail"
-                                                            alt={file.name}
-                                                        />
-                                                    ) : (
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M0 64C0 28.7 28.7 0 64 0L224 0l0 128c0 17.7 14.3 32 32 32l128 0 0 288c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zm384 64l-128 0L256 0 384 128z" /></svg>
-                                                    )}
-                                                    <span className="message-file-preview-name" title={file.name}>{file.name}</span>
-                                                </div>
-                                            )
-                                        )}
-                                    </>
-                                )}
-                                {msg.isStreaming && (
-                                    <div className="loading-indicator">
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </div>
-            ))}
+                            </div>
+                        </div>
+                    )
+            )}
         </div>
     )
 }
