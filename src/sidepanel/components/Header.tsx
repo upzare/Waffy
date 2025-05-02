@@ -28,7 +28,7 @@ const Header: React.FC<HeaderProps> = ({ currentTitle, isNewChat, onNewChat }) =
 
             {!isNewChat && (
                 <div className="header-center">
-                    <div className="header-title">{currentTitle}</div>
+                    <div className="header-title" title={currentTitle}>{currentTitle}</div>
                 </div>
             )}
 

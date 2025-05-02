@@ -71,7 +71,7 @@ body {
 .header-title {
     font-size: 1rem;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.8);
+    color: white;
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -681,6 +681,7 @@ body {
     margin-bottom: 0.5rem;
     background: rgba(255, 255, 255, 0.05);
     transition: all 0.2s;
+    cursor: pointer;
 }
 
 .history-item:hover {
@@ -694,7 +695,6 @@ body {
 
 .history-item-content {
     flex: 1;
-    cursor: pointer;
     overflow: hidden;
 }
 

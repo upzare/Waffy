@@ -17,9 +17,9 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                     <div className="no-history">No conversation history</div>
                 ) : (
                     conversations.map((conv) => (
-                        <div key={conv.id} className={`history-item ${conv.id === currentConversationId ? "active" : ""}`}>
-                            <div className="history-item-content" onClick={() => onSelectConversation(conv.id)}>
-                                <span className="history-item-title">{conv.title}</span>
+                        <div key={conv.id} className={`history-item ${conv.id === currentConversationId ? "active" : ""}`} onClick={() => onSelectConversation(conv.id)}>
+                            <div className="history-item-content">
+                                <span className="history-item-title" title={conv.title}>{conv.title}</span>
                                 <span className="history-item-date">{new Date(conv.timestamp).toLocaleDateString()}</span>
                             </div>
                             <button
