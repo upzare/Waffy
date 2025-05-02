@@ -780,3 +780,62 @@ body {
         opacity: 0.5;
     }
 }
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    margin: 2px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(245, 245, 245, 0.3);
+    border-radius: 10px;
+    border: 1px solid rgba(200, 200, 200, 0.1);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 245, 245, 0.5);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Chat container scrollbar styling */
+.chat-container::-webkit-scrollbar-thumb {
+    background: rgba(245, 245, 245, 0.3);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+}
+
+.chat-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 245, 245, 0.5);
+}
+
+/* Input container scrollbar styling */
+.input-textarea::-webkit-scrollbar {
+    width: 4px;
+    background: #22222299;
+}
+
+.input-textarea::-webkit-scrollbar-thumb {
+    background: rgba(245, 245, 245, 0.3);
+}
+
+/* History sidebar scrollbar styling */
+.history-list::-webkit-scrollbar-thumb {
+    background: rgba(245, 245, 245, 0.3);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 245, 245, 0.5);
+}
