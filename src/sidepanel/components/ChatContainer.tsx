@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import RenderResponse from "../utils/RenderResponse";
+import { File, User } from "lucide-react";
 import type { ChatContainerProps } from "../../types";
 
 const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
@@ -20,18 +21,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                             {!msg.isError && (
                                 <div className="message-avatar">
                                     {msg.isUser ? (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="12" cy="7" r="4"></circle>
-                                        </svg>
+                                        <User />
                                     ) : (
                                         <img src="/logo.svg" alt="Assistant Logo" />
                                     )}
@@ -51,23 +41,12 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                                                     >
                                                         {file.type.startsWith("image/") ? (
                                                             <img
-                                                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                                                src={URL.createObjectURL(file)}
                                                                 className="message-file-thubmnail"
                                                                 alt={file.name}
                                                             />
                                                         ) : (
-                                                            <svg
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                viewBox="0 0 24 24"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                strokeWidth="2"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                            >
-                                                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                                                                <polyline points="13 2 13 9 20 9"></polyline>
-                                                            </svg>
+                                                            <File />
                                                         )}
                                                         <span className="message-file-preview-name" title={file.name}>
                                                             {file.name}
@@ -90,23 +69,12 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                                                     >
                                                         {file.type.startsWith("image/") ? (
                                                             <img
-                                                                src={URL.createObjectURL(file) || "/placeholder.svg"}
+                                                                src={URL.createObjectURL(file)}
                                                                 className="message-file-thubmnail"
                                                                 alt={file.name}
                                                             />
                                                         ) : (
-                                                            <svg
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                viewBox="0 0 24 24"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                strokeWidth="2"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                            >
-                                                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                                                                <polyline points="13 2 13 9 20 9"></polyline>
-                                                            </svg>
+                                                            <File />
                                                         )}
                                                         <span className="message-file-preview-name" title={file.name}>
                                                             {file.name}
