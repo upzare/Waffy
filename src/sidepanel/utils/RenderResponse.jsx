@@ -1,9 +1,9 @@
 import { useState } from "react";
 import Markdown from "react-markdown";
-import { Copy, Check } from "lucide-react";
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { funky } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Copy, Check } from "lucide-react";
 
 export default function RenderResponse({ content }) {
   const Pre = ({ children }) => {
