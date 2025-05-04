@@ -26,7 +26,6 @@ const App = () => {
     const [sidebarHovered, setSidebarHovered] = useState(false);
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [currentModel, setCurrentModel] = useState("");
     const [currentTitle, setCurrentTitle] = useState("New Chat");
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -229,7 +228,7 @@ const App = () => {
             let response = "";
             do {
                 console.log("Calling ai...");
-                const responseStream = ai(currentModel, prompt, abortControllerRef.current.signal);
+                const responseStream = ai(prompt, abortControllerRef.current.signal);
                 const finalToolCalls: Record<string, ToolCall> = {};
                 for await (const res of responseStream) {
                     // if (res.type === "response.output_item.added" && res.item.type === "function_call") {

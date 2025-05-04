@@ -2,16 +2,13 @@ import Browser from 'webextension-polyfill';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { OpenAI } from "openai";
 
-export async function* ai(model: string, messages: any[], signal?: AbortSignal) {
+export async function* ai(messages: any[], signal?: AbortSignal) {
     const settings: Record<string, unknown> = await Browser.storage.local.get("extension_settings");
     const records = JSON.parse(settings.extension_settings as string);
     const client = new OpenAI({ apiKey: records.gptAPIKey, dangerouslyAllowBrowser: true, baseURL: "http://localhost:4000/" });
     // @ts-ignore
     const response = await client.responses.create({
-        // model: model,
         data: messages,
-        // input: messages,
-        // tools: all_tools as any,
         stream: true,
         metadata: {
             client_id: "unique-client-123",
