@@ -425,16 +425,29 @@ body {
     animation: fadeIn 0.3s ease-in;
     width: 80%;
     max-width: 900px;
+    transition: all 0.2s ease-out;
 }
 
 .message.user {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.message.assistant {
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(2px);
+}
+
+/* .message.user:hover {
+    box-shadow: 0 0px 10px 1px #ffffff20;
+    backdrop-filter: blur(3px);
+} */
+
+.message.assistant {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(4px);
+}
+
+.message.assistant:hover {
+    box-shadow: 0 0px 10px 1px #ffffff2b;
+    backdrop-filter: blur(5px);
 }
 
 .message.error {
@@ -443,6 +456,12 @@ body {
     text-align: center;
     padding-top: 1rem;
     padding-bottom: 1rem;
+    backdrop-filter: blur(4px);
+}
+
+.message.error:hover {
+    box-shadow: 0 0px 10px 1px #ff000040;
+    backdrop-filter: blur(5px);
 }
 
 .message-avatar {
@@ -875,6 +894,7 @@ body {
 .code-block {
     border-radius: 0.5rem;
     border: 1px solid white;
+    background: #000;
 }
 
 .code-header {
