@@ -423,11 +423,8 @@ const App = () => {
             />
             <div className="container">
                 <Header currentTitle={currentTitle} isNewChat={messages.length === 0} onNewChat={handleNewChat} />
-                {isFirstMessage ?
-                    <Hero homeSection={homeSection as any} onPromptClick={handleNewChat} />
-                    :
-                    <ChatContainer messages={messages} />
-                }
+                <Hero homeSection={homeSection} onPromptClick={handleNewChat} />
+                <ChatContainer messages={messages} />
                 <InputContainer
                     isGenerating={isGenerating}
                     isRecording={isRecording}
