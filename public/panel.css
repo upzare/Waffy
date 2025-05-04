@@ -5,6 +5,14 @@
     color-scheme: dark;
     color: rgba(255, 255, 255, 0.95);
     background-color: #000000;
+    /* Suggestion Prompt Colors */
+    --gradient-colors: #cb1a1a, #a129bc, #1b45aa, #1cac2b, #22bbb8, #cfc40b;
+    --color-1: #cb1a1a;
+    --color-2: #a129bc;
+    --color-3: #1b45aa;
+    --color-4: #1cac2b;
+    --color-5: #22bbb8;
+    --color-6: #cfc40b;
 }
 
 body {
@@ -46,7 +54,7 @@ body {
     justify-content: space-between;
     padding: 1rem 1.5rem;
     background: rgba(10, 10, 10, 0.7);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(3px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 10;
     gap: 1rem;
@@ -134,16 +142,25 @@ body {
 }
 
 /* Hero section styles */
-.welcome-section {
+.hero-section {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 2rem 1rem 3rem;
+    padding: 5rem 0rem;
     background: transparent;
     position: relative;
     overflow: hidden;
     z-index: 2;
+    transition: all 0.5s ease-out;
+}
+
+.hero-section.hidden {
+    max-height: 0;
+    max-width: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0rem 0rem;
 }
 
 .hero-content {
@@ -152,59 +169,9 @@ body {
     margin-bottom: 2rem;
 }
 
-.hero-logo-container {
-    position: relative;
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 1rem;
-}
-
-.hero-logo {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    position: relative;
-    z-index: 2;
-    filter: brightness(1.2);
-}
-
-.hero-logo-glow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 150%;
-    height: 150%;
-    background: radial-gradient(circle, rgba(0, 255, 128, 0.2) 0%, rgba(0, 0, 0, 0) 70%);
-    border-radius: 50%;
-    z-index: 1;
-    animation: pulse 3s infinite ease-in-out;
-}
-
 .hero-title {
-    font-size: 3rem;
+    font-size: 1.75rem;
     font-weight: 800;
-    margin: 0 0 0.5rem;
-    background: linear-gradient(90deg, #ffffff, #cccccc);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: 2px;
-}
-
-.hero-subtitle {
-    font-size: 1.2rem;
-    font-weight: 500;
-    margin: 0 0 1.5rem;
-    color: rgba(255, 255, 255, 0.8);
-    letter-spacing: 1px;
-}
-
-.hero-description {
-    font-size: 1rem;
-    color: rgba(255, 255, 255, 0.6);
-    max-width: 500px;
-    margin: 0 auto 2rem;
 }
 
 .capabilities-container {
@@ -229,6 +196,7 @@ body {
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(2px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     transition: all 0.3s ease;
@@ -250,6 +218,7 @@ body {
     color: rgba(255, 255, 255, 0.7);
 }
 
+/* Suggested Prompts */
 .suggested-prompts-container {
     width: 100%;
     max-width: 800px;
@@ -271,46 +240,167 @@ body {
     gap: 1rem;
 }
 
-.suggested-prompt {
-    background: rgba(0, 200, 83, 0.15);
-    border: 1px solid rgba(0, 200, 83, 0.3);
-    color: white;
-    padding: 0.8rem 1.2rem;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.3s;
-    position: relative;
+.suggested-prompt-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     overflow: hidden;
-    text-align: left;
+    height: 2.5rem;
+    cursor: pointer;
+    background-size: 300% 300%;
+    backdrop-filter: blur(1rem);
+    border-radius: 5rem;
+    transition: 0.5s;
+    animation: suggestionsGradient 8s ease infinite;
+    border: double 2px transparent;
+    padding: 0rem 1rem;
+    background-image: linear-gradient(#161a25, #161a25),
+        linear-gradient(137.48deg,
+            var(--color-1) 15%,
+            var(--color-2) 25%,
+            var(--color-3) 40%,
+            var(--color-4) 60%,
+            var(--color-5) 75%,
+            var(--color-6) 90%);
+    background-origin: border-box;
+    background-clip: content-box, border-box;
+    font-family: "Orbitron", sans-serif;
 }
 
-.suggested-prompt::before {
+.suggested-prompt-bg {
+    position: absolute;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    transition: 0.5s;
+    backdrop-filter: blur(1rem);
+    border-radius: 5rem;
+}
+
+.suggested-prompt-text {
+    z-index: 2;
+    /* font-family: "Orbitron", sans-serif; */
+    /* font-size: 12px; */
+    letter-spacing: 1px;
+    color: #ffffff;
+    text-shadow: 0 0 1px white;
+}
+
+.suggested-prompt-glow {
+    position: absolute;
+    display: flex;
+    width: 12rem;
+}
+
+.suggested-prompt-circle {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    filter: blur(2rem);
+}
+
+.suggested-prompt-circle:nth-of-type(1) {
+    background: rgba(245, 67, 79, 0.636);
+    animation: orbit 8s linear infinite;
+}
+
+.suggested-prompt-circle:nth-of-type(2) {
+    background: rgba(99, 30, 41, 0.704);
+    animation: orbit 10s linear infinite;
+}
+
+.suggested-prompt-button:hover .suggested-prompt-bg {
+    z-index: 1;
+    background-color: #161a25;
+}
+
+.suggested-prompt-button:hover {
+    transform: scale(1.05);
+    /* background-origin: border-box;
+    background-clip: content-box, border-box; */
+}
+
+.suggested-prompt-bg-stars {
+    position: relative;
+    background: transparent;
+    width: 200rem;
+    height: 200rem;
+}
+
+.suggested-prompt-bg-stars::after {
     content: "";
     position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    border-radius: 10px;
-    background: linear-gradient(45deg, rgba(0, 255, 128, 0.3), transparent, rgba(0, 255, 128, 0.3), transparent);
-    z-index: -1;
-    animation: shine 3s linear infinite;
+    top: -10rem;
+    left: -100rem;
+    width: 100%;
+    height: 100%;
+    animation: animStarRotate 90s linear infinite;
 }
 
-.suggested-prompt:hover {
-    background: rgba(0, 200, 83, 0.25);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 200, 83, 0.2);
+.suggested-prompt-bg-stars::after {
+    background-image: radial-gradient(#ffffff 1px, transparent 1%);
+    background-size: 50px 50px;
 }
 
-@keyframes shine {
+.suggested-prompt-bg-stars::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -50%;
+    width: 170%;
+    height: 500%;
+    animation: animStar 60s linear infinite;
+}
+
+.suggested-prompt-bg-stars::before {
+    background-image: radial-gradient(#ffffff 1px, transparent 1%);
+    background-size: 50px 50px;
+    opacity: 0.5;
+}
+
+@keyframes orbit {
+    from {
+        transform: rotate(0deg) translateX(100px) rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg) translateX(100px) rotate(-360deg);
+    }
+}
+
+@keyframes animStar {
+    from {
+        transform: translateY(0);
+    }
+
+    to {
+        transform: translateY(-135rem);
+    }
+}
+
+@keyframes animStarRotate {
+    from {
+        transform: rotate(360deg);
+    }
+
+    to {
+        transform: rotate(0);
+    }
+}
+
+@keyframes suggestionsGradient {
     0% {
-        background-position: -200% 0;
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
     }
 
     100% {
-        background-position: 200% 0;
+        background-position: 0% 50%;
     }
 }
 
@@ -335,16 +425,29 @@ body {
     animation: fadeIn 0.3s ease-in;
     width: 80%;
     max-width: 900px;
+    transition: all 0.2s ease-out;
 }
 
 .message.user {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.message.assistant {
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(2px);
+}
+
+/* .message.user:hover {
+    box-shadow: 0 0px 10px 1px #ffffff20;
+    backdrop-filter: blur(3px);
+} */
+
+.message.assistant {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(4px);
+}
+
+.message.assistant:hover {
+    box-shadow: 0 0px 10px 1px #ffffff2b;
+    backdrop-filter: blur(5px);
 }
 
 .message.error {
@@ -353,6 +456,12 @@ body {
     text-align: center;
     padding-top: 1rem;
     padding-bottom: 1rem;
+    backdrop-filter: blur(4px);
+}
+
+.message.error:hover {
+    box-shadow: 0 0px 10px 1px #ff000040;
+    backdrop-filter: blur(5px);
 }
 
 .message-avatar {
@@ -423,7 +532,7 @@ body {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     padding: 1rem;
     background: rgba(10, 10, 10, 0.7);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(3px);
     margin-top: auto;
     z-index: 10;
 }
@@ -785,6 +894,7 @@ body {
 .code-block {
     border-radius: 0.5rem;
     border: 1px solid white;
+    background: #000;
 }
 
 .code-header {

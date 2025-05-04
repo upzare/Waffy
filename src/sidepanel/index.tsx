@@ -26,7 +26,6 @@ const App = () => {
     const [sidebarHovered, setSidebarHovered] = useState(false);
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [currentModel, setCurrentModel] = useState("");
     const [currentTitle, setCurrentTitle] = useState("New Chat");
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -107,15 +106,20 @@ const App = () => {
         conversationID.current = uuid4();
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
         conversationDB?.add({ id: conversationID.current, title: title, timestamp: new Date(), messages: [] });
+        fetchConversations();
     }
 
     const fetchConversations = async () => {
         const dbr: IDBOpenDBRequest = indexedDB.open("WaffyDB", 1);
-        dbr.onsuccess = (event) => {
-            (event.target as IDBOpenDBRequest).result.transaction("conversations", "readwrite").objectStore("conversations").getAll().onsuccess = (event) => {
-                const data = (event.target as IDBRequest).result;
-                setConversations(data);
-            }
+        dbr.onsuccess = (dbEvent) => {
+            (dbEvent.target as IDBOpenDBRequest).result.transaction("conversations", "readwrite")
+                .objectStore("conversations").getAll().onsuccess = (event) => {
+                    const data = (event.target as IDBRequest).result;
+                    const sortedData = data.sort((a: Conversation, b: Conversation) => {
+                        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+                    });
+                    setConversations(sortedData);
+                }
         }
     };
 
@@ -224,7 +228,7 @@ const App = () => {
             let response = "";
             do {
                 console.log("Calling ai...");
-                const responseStream = ai(currentModel, prompt, abortControllerRef.current.signal);
+                const responseStream = ai(prompt, abortControllerRef.current.signal);
                 const finalToolCalls: Record<string, ToolCall> = {};
                 for await (const res of responseStream) {
                     // if (res.type === "response.output_item.added" && res.item.type === "function_call") {
@@ -373,6 +377,7 @@ const App = () => {
     };
 
     const handleSelectConversation = async (id: string) => {
+        if (id === conversationID.current) return;
         await fetchConversations();
         const conversation = conversations.find(c => c.id === id);
         if (conversation) {
@@ -423,11 +428,8 @@ const App = () => {
             />
             <div className="container">
                 <Header currentTitle={currentTitle} isNewChat={messages.length === 0} onNewChat={handleNewChat} />
-                {isFirstMessage ?
-                    <Hero homeSection={homeSection as any} onPromptClick={handleNewChat} />
-                    :
-                    <ChatContainer messages={messages} />
-                }
+                <Hero homeSection={homeSection} onPromptClick={handleNewChat} />
+                <ChatContainer messages={messages} />
                 <InputContainer
                     isGenerating={isGenerating}
                     isRecording={isRecording}
