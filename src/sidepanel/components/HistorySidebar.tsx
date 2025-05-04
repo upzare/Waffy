@@ -25,7 +25,10 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                             </div>
                             <button
                                 className="history-item-delete"
-                                onClick={() => onRemoveConversation(conv.id)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRemoveConversation(conv.id)
+                                }}
                                 title="Delete conversation"
                             >
                                 <Trash2 />

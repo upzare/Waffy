@@ -107,15 +107,20 @@ const App = () => {
         conversationID.current = uuid4();
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
         conversationDB?.add({ id: conversationID.current, title: title, timestamp: new Date(), messages: [] });
+        fetchConversations();
     }
 
     const fetchConversations = async () => {
         const dbr: IDBOpenDBRequest = indexedDB.open("WaffyDB", 1);
-        dbr.onsuccess = (event) => {
-            (event.target as IDBOpenDBRequest).result.transaction("conversations", "readwrite").objectStore("conversations").getAll().onsuccess = (event) => {
-                const data = (event.target as IDBRequest).result;
-                setConversations(data);
-            }
+        dbr.onsuccess = (dbEvent) => {
+            (dbEvent.target as IDBOpenDBRequest).result.transaction("conversations", "readwrite")
+                .objectStore("conversations").getAll().onsuccess = (event) => {
+                    const data = (event.target as IDBRequest).result;
+                    const sortedData = data.sort((a: Conversation, b: Conversation) => {
+                        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+                    });
+                    setConversations(sortedData);
+                }
         }
     };
 
@@ -373,6 +378,7 @@ const App = () => {
     };
 
     const handleSelectConversation = async (id: string) => {
+        if (id === conversationID.current) return;
         await fetchConversations();
         const conversation = conversations.find(c => c.id === id);
         if (conversation) {
