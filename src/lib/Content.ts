@@ -15,18 +15,6 @@ chrome.runtime.sendMessage({ action: 'GET_TAB_ID' }, (response) => {
     console.log("TAB ID: ", tabId);
 });
 
-function getDom(): Promise<DomProps[] | string> {
-    return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: "GET_DOM" }, (response: DomProps[] | string) => {
-            if (response) {
-                resolve(response);
-            } else {
-                reject("Failed to get DOM data");
-            }
-        });
-    });
-}
-
 function scroll(direction: string): Promise<string> {
     return new Promise((resolve, reject) => {
         const initialX = window.scrollX;
