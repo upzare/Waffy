@@ -16,6 +16,8 @@ const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({ text, onClick }) => {
             buttonRef.current.style.setProperty('--color-2', shuffledColors[1]);
             buttonRef.current.style.setProperty('--color-3', shuffledColors[2]);
             buttonRef.current.style.setProperty('--color-4', shuffledColors[3]);
+            buttonRef.current.style.setProperty('--color-5', shuffledColors[4]);
+            buttonRef.current.style.setProperty('--color-6', shuffledColors[5]);
         }
     }, []);
 
