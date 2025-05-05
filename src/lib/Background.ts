@@ -12,4 +12,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+
 export { };

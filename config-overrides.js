@@ -3,7 +3,6 @@ const { override } = require('customize-cra')
 const overrideEntry = (config) => {
   config.entry = {
     main: './src/index',
-    popup: './src/popup/index',
     sidepanel: './src/sidepanel/index',
     settings: './src/settings/index',
     background: './src/lib/Background',
