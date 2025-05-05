@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import toast, { Toaster } from 'react-hot-toast';
 import Browser from 'webextension-polyfill';
 import type { Settings } from '../types';
-import { fetchPrompt, systemPrompt } from '../sidepanel/utils/SystemPrompt';
 
 const sections = [
     { id: "general", label: "General", icon: "" },
@@ -11,10 +10,8 @@ const sections = [
 
 const Settings = () => {
     const [settings, setSettings] = useState<Settings>({
-        geminiApiKey: '',
-        gptAPIKey: '',
-        systemPrompt: '',
-        fetchPrompt: '',
+        client_id: "",
+        trace_user_id: "",
     });
     const [activeSection, setActiveSection] = useState('general');
 
@@ -56,10 +53,8 @@ const Settings = () => {
 
     const handleReset = async () => {
         const defaultSettings: Settings = {
-            geminiApiKey: '',
-            gptAPIKey: '',
-            systemPrompt: systemPrompt,
-            fetchPrompt: fetchPrompt,
+            client_id: "",
+            trace_user_id: "",
         };
         await Browser.storage.local.set({ extension_settings: JSON.stringify(defaultSettings) });
         chrome.sidePanel.setOptions({
@@ -78,72 +73,7 @@ const Settings = () => {
         switch (activeSection) {
             case 'general':
                 return (
-                    <div className="settings-section">
-                        <div className="setting-item">
-                            <h2>Gemini Models</h2>
-                            <label htmlFor="apiKey">Gemini API Key</label>
-                            <div className="api-key-input">
-                                <input
-                                    type="password"
-                                    id="apiKey"
-                                    value={settings.geminiApiKey}
-                                    onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
-                                    placeholder="Enter your API key"
-                                />
-                                <a
-                                    href="https://aistudio.google.com/app/apikey"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="link-button"
-                                >
-                                    Get API Key
-                                </a>
-                            </div>
-                            <p>Use Gemini API Key to use Gemini Models.</p>
-                        </div>
-                        <div className="setting-item">
-                            <h2>OpenAI Models</h2>
-                            <label htmlFor="apiKey">OpenAI API Key</label>
-                            <div className="api-key-input">
-                                <input
-                                    type="password"
-                                    id="apiKey"
-                                    value={settings.gptAPIKey}
-                                    onChange={(e) => setSettings({ ...settings, gptAPIKey: e.target.value })}
-                                    placeholder="Enter your API key"
-                                />
-                                <a
-                                    href="https://platform.openai.com/settings/organization/api-keys"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="link-button"
-                                >
-                                    Get API Key
-                                </a>
-                            </div>
-                            <p>Use OpenAI API Key to use GPT Models.</p>
-                        </div>
-                        <div className="setting-item">
-                            <h2>System Prompt</h2>
-                            <label htmlFor="input-textarea">Model System Prompt</label>
-                            <div className="input-textarea">
-                                <textarea
-                                    value={settings.systemPrompt}
-                                    onChange={(e) => setSettings({ ...settings, systemPrompt: e.target.value })}
-                                    placeholder="Specify system prompt for model..."
-                                />
-                            </div>
-                            <br />
-                            <label htmlFor="input-textarea">Fetch Screen Prompt</label>
-                            <div className="input-textarea">
-                                <textarea
-                                    value={settings.fetchPrompt}
-                                    onChange={(e) => setSettings({ ...settings, fetchPrompt: e.target.value })}
-                                    placeholder="System Prompt for model"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    <></>
                 );
             default:
                 return null;

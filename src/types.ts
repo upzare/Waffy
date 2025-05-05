@@ -91,10 +91,8 @@ export interface ParticlesProps {
 }
 
 export interface Settings {
-    geminiApiKey: string;
-    gptAPIKey: string;
-    systemPrompt: string;
-    fetchPrompt: string;
+    client_id: string;
+    trace_user_id: string;
 }
 
 export interface DomProps {
