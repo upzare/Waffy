@@ -180,36 +180,16 @@ const App = () => {
             updateConversationsDB(update);
             return update;
         });
-        // let systemPrompt = "";
-        // let fetchPrompt = "";
-        // await Browser.storage.local.get("extension_settings").then((result: any) => {
-        //     if (result.extension_settings) {
-        //         const settings = JSON.parse(result.extension_settings as string);
-        //         systemPrompt = settings.systemPrompt;
-        //         fetchPrompt = settings.fetchPrompt;
-        //     }
-        // });
         const prompt = [];
-        // let domContentIndex;
-        // prompt.push({ role: "system", content: systemPrompt });
         for await (const msg of messages) {
             if (msg.isUser) {
-                // prompt.push({ role: "user", content: [{ type: "input_text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
                 prompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
             }
             if (!msg.isUser) {
-                // prompt.push({ role: "assistant", content: [{ type: "output_text", text: msg.content.text }] });
                 prompt.push({ type: "response", content: [{ type: "text", text: msg.content.text }] });
             }
-            // if (msg.isTool && msg.content.tool?.toolCall?.type === "tool-call") {
-            //     prompt.push({ role: "assistant", content: [msg.content.tool.toolCall] });
-            // }
-            // if (msg.isTool && msg.content.tool?.toolResult?.type === "tool-result") {
-            //     prompt.push({ role: "tool", content: [msg.content.tool.toolResult] });
-            // }
         };
         prompt.push({ type: "prompt", content: [{ type: "text", text: content }, ...await fileHandler(files)] });
-        // prompt.push({ role: "user", content: [{ type: "input_text", text: content }, ...await fileHandler(files)] });
         try {
             let finish = false;
             chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -231,14 +211,6 @@ const App = () => {
                 const responseStream = ai(prompt, abortControllerRef.current.signal);
                 const finalToolCalls: Record<string, ToolCall> = {};
                 for await (const res of responseStream) {
-                    // if (res.type === "response.output_item.added" && res.item.type === "function_call") {
-                    //     finalToolCalls[res.output_index] = res.item as ToolCall;
-                    // } else if (res.type === "response.function_call_arguments.delta") {
-                    //     const index = res.output_index;
-                    //     if (finalToolCalls[index]) {
-                    //         finalToolCalls[index].arguments += res.delta;
-                    //     }
-                    // }
                     if (res.type === "response.output_item.done" && res.item.type === "function_call") {
                         finalToolCalls[res.output_index] = res.item as ToolCall;
                         console.log("ToolCall:", finalToolCalls);
@@ -286,15 +258,6 @@ const App = () => {
                         }
                         domContentIndex = prompt.length;
                         prompt.push(toolCallResult.data);
-                        //                         let dom_content = `
-                        //  <PAGE_METDATA>
-                        //  <PAGE_URL>${toolCallResult.data.url}</PAGE_URL>
-                        //  </PAGE_METDATA>
-                        //  <PAGE_TEXT_CONTENT>
-                        //  ${toolCallResult.data.ocr_content}
-                        //  </PAGE_TEXT_CONTENT>
-                        //  `;
-                        //                         prompt.push({ role: "user", content: [{ type: "input_text", text: dom_content }, { type: "input_image", image_url: toolCallResult.data.annotatedImage }] });
                     }
                     functionExecState = true;
                 }
@@ -321,7 +284,6 @@ const App = () => {
                         return update;
                     });
                     prompt.push({ type: "response", content: [{ type: "text", text: response }] });
-                    // prompt.push({ role: "assistant", content: [{ type: "output_text", text: response }] });
                 }
             } while (!finish || functionExecState);
         } catch (error) {

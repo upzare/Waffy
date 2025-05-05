@@ -30,9 +30,6 @@
       "description": "Open side panel"
     }
   },
-  "action": {
-    "default_popup": "popup.html"
-  },
   "side_panel": {
     "default_path": "panel.html"
   },
