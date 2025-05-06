@@ -12,13 +12,13 @@ export interface Model {
 }
 
 export interface HeaderProps {
+    currentConversationId: string | null;
     currentTitle: string;
-    isNewChat: boolean;
     onNewChat: () => void;
 }
 
 export interface HeroProps {
-    homeSection: React.RefObject<HTMLDivElement>;
+    homeSection: React.RefObject<HTMLDivElement | null>;
     onPromptClick: (prompt: string) => void;
 }
 
@@ -46,11 +46,11 @@ export interface InputContainerProps {
 }
 
 export interface HistorySidebarProps {
+    currentConversationId: string | null;
     conversations: Conversation[];
     visible: boolean;
     onSelectConversation: (id: string) => void;
     onRemoveConversation: (id: string) => void;
-    currentConversationId: string;
 }
 
 export interface Message {

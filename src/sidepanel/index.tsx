@@ -31,12 +31,12 @@ const App = () => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const homeSection = useRef<HTMLDivElement>(null);
-    const abortControllerRef = useRef<AbortController | null>(null);
+    const abortControllerRef = useRef<AbortController>(null);
     const userInterruptRef = useRef<boolean>(false);
 
-    const db = useRef<IDBDatabase>();
-    const db_request = useRef<IDBOpenDBRequest>();
-    const conversationID = useRef<string>("");
+    const db = useRef<IDBDatabase>(null);
+    const db_request = useRef<IDBOpenDBRequest>(null);
+    const conversationID = useRef<string>(null);
 
     useEffect(() => {
         initDB();
@@ -125,7 +125,7 @@ const App = () => {
 
     const updateConversationsDB = async (updatedMessages: Message[]) => {
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
-        if (conversationDB) {
+        if (conversationDB && conversationID.current) {
             conversationDB.get(conversationID.current).onsuccess = (event) => {
                 const data = (event.target as IDBRequest).result;
                 if (data) {
@@ -330,7 +330,7 @@ const App = () => {
         fetchConversations();
         setIsFirstMessage(true);
         setMessages([]);
-        conversationID.current = "";
+        conversationID.current = null;
         setCurrentTitle("New Chat");
         setMessage("");
         setFiles([]);
@@ -382,15 +382,22 @@ const App = () => {
             />
             <Particles className="particles" quantity={150} />
             <HistorySidebar
+                currentConversationId={conversationID.current}
                 conversations={conversations}
                 visible={sidebarHovered}
                 onSelectConversation={handleSelectConversation}
                 onRemoveConversation={handleItemRemove}
-                currentConversationId={conversationID.current}
             />
             <div className="container">
-                <Header currentTitle={currentTitle} isNewChat={messages.length === 0} onNewChat={handleNewChat} />
-                <Hero homeSection={homeSection} onPromptClick={handleNewChat} />
+                <Header
+                    currentConversationId={conversationID.current}
+                    currentTitle={currentTitle}
+                    onNewChat={handleNewChat}
+                />
+                <Hero
+                    homeSection={homeSection}
+                    onPromptClick={handleNewChat}
+                />
                 <ChatContainer messages={messages} />
                 <InputContainer
                     isGenerating={isGenerating}
