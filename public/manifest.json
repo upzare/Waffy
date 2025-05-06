@@ -23,11 +23,11 @@
   ],
   "options_page": "settings.html",
   "commands": {
-    "open_sidepanel": {
+    "open_side_panel": {
       "suggested_key": {
-        "default": "Alt+Shift+A"
+        "default": "Ctrl+I"
       },
-      "description": "Open side panel"
+      "description": "Open Waffy Side Panel"
     }
   },
   "side_panel": {
