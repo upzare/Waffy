@@ -1,5 +1,4 @@
 import Browser from 'webextension-polyfill';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { OpenAI } from "openai";
 
 export async function* ai(messages: any[], signal?: AbortSignal) {
@@ -27,10 +26,7 @@ export async function geminiResponseText(prompt: string) {
         const settings: Record<string, unknown> = await Browser.storage.local.get("extension_settings");
         const records = JSON.parse(settings.extension_settings as string);
         if (records.geminiApiKey) {
-            const genAI = new GoogleGenerativeAI(records.geminiApiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const result = await model.generateContent(prompt);
-            return { status: true, message: result.response.text() };
+            return { status: true, message: "Hello World" };
         } else {
             return { status: false, message: "API key not found. Please set it in the extension settings." };
         }
