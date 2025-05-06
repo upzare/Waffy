@@ -21,16 +21,24 @@ export async function* ai(messages: any[], signal?: AbortSignal) {
     }
 }
 
-export async function geminiResponseText(prompt: string) {
+export async function generateTitle(prompt: string) {
     try {
         const settings: Record<string, unknown> = await Browser.storage.local.get("extension_settings");
         const records = JSON.parse(settings.extension_settings as string);
-        if (records.geminiApiKey) {
-            return { status: true, message: "Hello World" };
-        } else {
-            return { status: false, message: "API key not found. Please set it in the extension settings." };
-        }
+        const client = new OpenAI({ apiKey: records.gptAPIKey, dangerouslyAllowBrowser: true, baseURL: "http://localhost:4000/" });
+        const response = await client.responses.create({
+            // @ts-ignore
+            title: prompt,
+            metadata: {
+                client_id: "unique-client-123",
+                trace_user_id: "user-123"
+            }
+        });
+
+        const title = response.output_text ?? "Untitled";
+        return title;
     } catch (error) {
-        return { status: false, message: "Sorry, I encountered an error while processing your request." };
+        console.error("Title Generation Error");
+        return "Untitled";
     }
 }
