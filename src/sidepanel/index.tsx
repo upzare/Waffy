@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
-import { geminiResponseText, ai } from '../lib/agent';
+import { ai, generateTitle } from '../lib/agent';
 import { Message, Conversation, ToolCall } from '../types';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
@@ -31,12 +31,12 @@ const App = () => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const homeSection = useRef<HTMLDivElement>(null);
-    const abortControllerRef = useRef<AbortController | null>(null);
+    const abortControllerRef = useRef<AbortController>(null);
     const userInterruptRef = useRef<boolean>(false);
 
-    const db = useRef<IDBDatabase>();
-    const db_request = useRef<IDBOpenDBRequest>();
-    const conversationID = useRef<string>("");
+    const db = useRef<IDBDatabase>(null);
+    const db_request = useRef<IDBOpenDBRequest>(null);
+    const conversationID = useRef<string>(null);
 
     useEffect(() => {
         initDB();
@@ -98,15 +98,32 @@ const App = () => {
     };
 
     const initConversation = async (prompt: string) => {
-        let titlePrompt = "system: You have to create a description for the given prompt. It must be meaningful and contain atleast 3 words or upto 6 words max. The description should be in the form of a single sentence. Do not include any other text, emojis or markdown formatting. Also no need to . at end.\n\n";
-        titlePrompt += `user: ${prompt}\n`;
-        let response = await geminiResponseText(titlePrompt);
-        let title = response?.status ? response?.message : "Untitled";
-        setCurrentTitle(title);
         conversationID.current = uuid4();
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
-        conversationDB?.add({ id: conversationID.current, title: title, timestamp: new Date(), messages: [] });
+        conversationDB?.add({ id: conversationID.current, title: "New Chat", timestamp: new Date(), messages: [] });
+        await createTitle(prompt);
         fetchConversations();
+    }
+
+    const createTitle = async (prompt: string) => {
+        const title = await generateTitle(prompt);
+        setCurrentTitle(title);
+        const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
+        if (conversationDB && conversationID.current) {
+            conversationDB.get(conversationID.current).onsuccess = (event) => {
+                const data = (event.target as IDBRequest).result;
+                if (data) {
+                    data.title = title;
+                    const res = conversationDB.put(data);
+                    res.onerror = (event) => {
+                        console.error("Error updating title:", event);
+                    };
+                    res.onsuccess = () => {
+                        return;
+                    };
+                }
+            }
+        }
     }
 
     const fetchConversations = async () => {
@@ -125,7 +142,7 @@ const App = () => {
 
     const updateConversationsDB = async (updatedMessages: Message[]) => {
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
-        if (conversationDB) {
+        if (conversationDB && conversationID.current) {
             conversationDB.get(conversationID.current).onsuccess = (event) => {
                 const data = (event.target as IDBRequest).result;
                 if (data) {
@@ -330,7 +347,7 @@ const App = () => {
         fetchConversations();
         setIsFirstMessage(true);
         setMessages([]);
-        conversationID.current = "";
+        conversationID.current = null;
         setCurrentTitle("New Chat");
         setMessage("");
         setFiles([]);
@@ -382,15 +399,22 @@ const App = () => {
             />
             <Particles className="particles" quantity={150} />
             <HistorySidebar
+                currentConversationId={conversationID.current}
                 conversations={conversations}
                 visible={sidebarHovered}
                 onSelectConversation={handleSelectConversation}
                 onRemoveConversation={handleItemRemove}
-                currentConversationId={conversationID.current}
             />
             <div className="container">
-                <Header currentTitle={currentTitle} isNewChat={messages.length === 0} onNewChat={handleNewChat} />
-                <Hero homeSection={homeSection} onPromptClick={handleNewChat} />
+                <Header
+                    currentConversationId={conversationID.current}
+                    currentTitle={currentTitle}
+                    onNewChat={handleNewChat}
+                />
+                <Hero
+                    homeSection={homeSection}
+                    onPromptClick={handleNewChat}
+                />
                 <ChatContainer messages={messages} />
                 <InputContainer
                     isGenerating={isGenerating}

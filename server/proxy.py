@@ -11,7 +11,7 @@ from util.utils import detect_device
 import cloudinary
 import cloudinary.uploader
 from mistralai import Mistral
-from instructions import SYSTEM_PROMPT, TOOLS
+from instructions import SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT, TOOLS
 
 DEBUG = True
 
@@ -47,81 +47,88 @@ class CustomHandler(CustomLogger):
             "audio_transcription",
         ]):
         try:
-            data["model"] = "gpt-4o"
-            data["tools"] = TOOLS
-            data["stream"] = True
-            data["parallel_tool_calls"] = False
-            data["tool_choice"] = "auto"
-            data["truncation"] = "auto"
-            data["input"] = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+            if ("data" in data):
+                data["model"] = "gpt-4o"
+                data["tools"] = TOOLS
+                data["stream"] = True
+                data["parallel_tool_calls"] = False
+                data["tool_choice"] = "auto"
+                data["truncation"] = "auto"
+                data["input"] = [{'role': 'system', 'content': SYSTEM_PROMPT}]
 
-            screenshot_req = False
-            parser_tasks = []
-            ocr_tasks = []
-            metadata = {}
+                screenshot_req = False
+                parser_tasks = []
+                ocr_tasks = []
+                metadata = {}
 
-            for index, messages in enumerate(data["data"]):
-                messages = dict(messages)
-                if ("type" in messages and messages["type"] == "prompt"):
-                    content = []
-                    for msg in messages["content"]:
-                        if ("type" in msg and msg["type"] == "text"):
-                            content.append({ "type": "input_text", "text": msg["text"] })
-                        elif ("type" in msg and msg["type"] == "file"):
-                            file = msg["payload"]
-                            file_content = file["content"]
-                            mime_type = file["mimeType"]
-                            data_uri = f"data:{mime_type};base64,{file_content}"
-                            if file["mimeType"].startswith("image"):
-                                content.append({ "type": "input_image", "image_url": data_uri })
-                            else:
-                                content.append({ "type": "input_file", "filename": file["name"], "file_data": data_uri })
-                    data["input"].append({ "role": "user", "content": content })
-                elif ("type" in messages and messages["type"] == "response"):
-                    content = []
-                    for msg in messages["content"]:
-                        if ("type" in msg and msg["type"] == "text"):
-                            content.append({ "type": "output_text", "text": msg["text"] })
-                        elif ("type" in msg and msg["type"] == "file"):
-                            payload = msg["payload"]
-                            if payload["mimeType"].startswith("image"):
-                                content.append({ "type": "output_image", "image_url": payload["url"] })
-                            else:
-                                content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
-                    data["input"].append({ "role": "assistant", "content": content })
-                elif ("type" in messages and messages["type"] == "screenshot"):
-                    screenshot_req = True
-                    parser_task = self.async_parse(messages["image"])
-                    ocr_task = self.async_ocr(messages['image'])
-                    parser_tasks.append(parser_task)
-                    ocr_tasks.append(ocr_task)
-                    metadata[index] = messages["metadata"]
+                for index, messages in enumerate(data["data"]):
+                    messages = dict(messages)
+                    if ("type" in messages and messages["type"] == "prompt"):
+                        content = []
+                        for msg in messages["content"]:
+                            if ("type" in msg and msg["type"] == "text"):
+                                content.append({ "type": "input_text", "text": msg["text"] })
+                            elif ("type" in msg and msg["type"] == "file"):
+                                file = msg["payload"]
+                                file_content = file["content"]
+                                mime_type = file["mimeType"]
+                                data_uri = f"data:{mime_type};base64,{file_content}"
+                                if file["mimeType"].startswith("image"):
+                                    content.append({ "type": "input_image", "image_url": data_uri })
+                                else:
+                                    content.append({ "type": "input_file", "filename": file["name"], "file_data": data_uri })
+                        data["input"].append({ "role": "user", "content": content })
+                    elif ("type" in messages and messages["type"] == "response"):
+                        content = []
+                        for msg in messages["content"]:
+                            if ("type" in msg and msg["type"] == "text"):
+                                content.append({ "type": "output_text", "text": msg["text"] })
+                            elif ("type" in msg and msg["type"] == "file"):
+                                payload = msg["payload"]
+                                if payload["mimeType"].startswith("image"):
+                                    content.append({ "type": "output_image", "image_url": payload["url"] })
+                                else:
+                                    content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
+                        data["input"].append({ "role": "assistant", "content": content })
+                    elif ("type" in messages and messages["type"] == "screenshot"):
+                        screenshot_req = True
+                        parser_task = self.async_parse(messages["image"])
+                        ocr_task = self.async_ocr(messages['image'])
+                        parser_tasks.append(parser_task)
+                        ocr_tasks.append(ocr_task)
+                        metadata[index] = messages["metadata"]
 
-            if (screenshot_req):
-                parser_content = await asyncio.gather(*[task for task in parser_tasks])
-                ocr_content = await asyncio.gather(*[task for task in ocr_tasks])
-                for index, (image, props), ocr in zip(metadata, parser_content, ocr_content):
-                    meta = metadata[index]
-                    print("IMAGE:", (await asyncio.gather(self.async_upload(image)))[0]) if DEBUG else None
-                    self.client_props[data["metadata"]["client_id"]] = { "meta": messages["metadata"], "props": props }
-                    data["input"].append({
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_text",
-                                "text": f"<PAGE_METDATA><URL>{meta['url']}</URL><TITLE>{meta['title']}</TITLE><LOADING_STATUS>{meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
-                            },
-                            {
-                                "type": "input_image",
-                                "image_url": image
-                            }
-                        ]
-                    })
+                if (screenshot_req):
+                    parser_content = await asyncio.gather(*[task for task in parser_tasks])
+                    ocr_content = await asyncio.gather(*[task for task in ocr_tasks])
+                    for index, (image, props), ocr in zip(metadata, parser_content, ocr_content):
+                        meta = metadata[index]
+                        print("IMAGE:", (await asyncio.gather(self.async_upload(image)))[0]) if DEBUG else None
+                        self.client_props[data["metadata"]["client_id"]] = { "meta": messages["metadata"], "props": props }
+                        data["input"].append({
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": f"<PAGE_METDATA><URL>{meta['url']}</URL><TITLE>{meta['title']}</TITLE><LOADING_STATUS>{meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
+                                },
+                                {
+                                    "type": "input_image",
+                                    "image_url": image
+                                }
+                            ]
+                        })
+                del data["data"]
+                
+            if ("title" in data):
+                data["model"] = "gpt-4.1-nano"
+                data["stream"] = False
+                data["input"] = [{'role': 'system', 'content': TITLE_SYSTEM_PROMPT}, { "role": "user", "content": data["title"] }]
+                del data["title"]
         
         except Exception as e:
             print("PRE-ERROR:", e)
         
-        del data["data"]
         return data
     
     async def async_post_call_streaming_iterator_hook(self, user_api_key_dict, response, request_data):

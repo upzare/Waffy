@@ -335,7 +335,7 @@ export const reload = async () => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            chrome.tabs.reload(tabs[0].id, undefined, () => {
+            chrome.tabs.reload(tabs[0].id, () => {
                 if (chrome.runtime.lastError) {
                     reject("Failed to reload the page");
                 } else {

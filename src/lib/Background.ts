@@ -8,4 +8,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+chrome.commands.onCommand.addListener((command) => {
+    if (command === "open_side_panel") {
+      chrome.windows.getCurrent(w => {
+        if (w.id) chrome.sidePanel.open({ windowId: w.id });
+      });
+    }
+  });
+
+  
 export { };

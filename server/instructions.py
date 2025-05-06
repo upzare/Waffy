@@ -65,6 +65,10 @@ YOU ARE **WAFFY**, AN ADVANCED AI ASSISTANT FUNCTIONING AS A CHROME EXTENSION. Y
 
 </SYSTEM_PROMPT>"""
 
+TITLE_SYSTEM_PROMPT = """<SYSTEM_PROMPT>
+You are a title generator of an AI assistant. You have to create a short description for the given prompt. It must be meaningful and contain atleast 3 words and upto 5 words maximum. The description should be in the form of a short single sentence. Do not include any other text, emojis or markdown formatting. Also no need of dot at end.
+</SYSTEM_PROMPT>"""
+
 TOOLS = [
     {
         "type": "function",
