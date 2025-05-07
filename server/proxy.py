@@ -11,7 +11,7 @@ from util.utils import detect_device
 import cloudinary
 import cloudinary.uploader
 from mistralai import Mistral
-from instructions import SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT, TOOLS
+from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
 
 DEBUG = True
 
@@ -47,14 +47,33 @@ class CustomHandler(CustomLogger):
             "audio_transcription",
         ]):
         try:
-            if ("data" in data):
-                data["model"] = "gpt-4o"
-                data["tools"] = TOOLS
-                data["stream"] = True
-                data["parallel_tool_calls"] = False
-                data["tool_choice"] = "auto"
-                data["truncation"] = "auto"
-                data["input"] = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+            if ("handler" in data):
+                if (data["handler"] == "t1"):
+                    data["model"] = "gpt-4o"
+                    data["tools"] = T1_TOOLS
+                    data["stream"] = True
+                    data["parallel_tool_calls"] = False
+                    data["tool_choice"] = "auto"
+                    data["truncation"] = "auto"
+                    data["input"] = [{'role': 'system', 'content': T1_PROMPT}]
+
+                elif (data["handler"] == "t2"):
+                    data["model"] = "gpt-4o"
+                    data["tools"] = T2_TOOLS
+                    data["stream"] = True
+                    data["parallel_tool_calls"] = False
+                    data["tool_choice"] = "auto"
+                    data["truncation"] = "auto"
+                    data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
+
+                elif (data["handler"] == "t3"):
+                    data["model"] = "gpt-4o"
+                    data["tools"] = T3_TOOLS
+                    data["stream"] = True
+                    data["parallel_tool_calls"] = False
+                    data["tool_choice"] = "auto"
+                    data["truncation"] = "auto"
+                    data["input"] = [{'role': 'system', 'content': T3_PROMPT}]
 
                 screenshot_req = False
                 parser_tasks = []
@@ -90,7 +109,7 @@ class CustomHandler(CustomLogger):
                                 else:
                                     content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
                         data["input"].append({ "role": "assistant", "content": content })
-                    elif ("type" in messages and messages["type"] == "screenshot"):
+                    elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t3"):
                         screenshot_req = True
                         parser_task = self.async_parse(messages["image"])
                         ocr_task = self.async_ocr(messages['image'])
@@ -123,7 +142,7 @@ class CustomHandler(CustomLogger):
             if ("title" in data):
                 data["model"] = "gpt-4.1-nano"
                 data["stream"] = False
-                data["input"] = [{'role': 'system', 'content': TITLE_SYSTEM_PROMPT}, { "role": "user", "content": data["title"] }]
+                data["input"] = [{'role': 'system', 'content': TITLE_PROMPT}, { "role": "user", "content": data["title"] }]
                 del data["title"]
         
         except Exception as e:
@@ -161,18 +180,18 @@ class CustomHandler(CustomLogger):
                                 data_dict["item"] = item
                                 yield type(data)(**data_dict)
                                 continue
-                elif ("type" in data_dict and data_dict["type"] == "response.function_call_arguments.delta" or data_dict["type"] == "response.function_call_arguments.done"):
-                    continue
-                elif ("type" in data_dict and data_dict["type"] == "response.completed"):
-                    output = data_dict["response"]["output"]
-                    for index, item in enumerate(output):
-                        item_dict = dict(item)
-                        if ("type" in item_dict and item_dict["type"] == "function_call"):
-                            fc_id = item_dict["id"]
-                            if (fc_id in self.client_fc):
-                                data_dict["response"]["output"][index] = self.client_fc[fc_id]
-                    yield type(data)(**data_dict)
-                    continue
+                # elif ("type" in data_dict and data_dict["type"] == "response.function_call_arguments.delta" or data_dict["type"] == "response.function_call_arguments.done"):
+                #     continue
+                # elif ("type" in data_dict and data_dict["type"] == "response.completed"):
+                #     output = data_dict["response"]["output"]
+                #     for index, item in enumerate(output):
+                #         item_dict = dict(item)
+                #         if ("type" in item_dict and item_dict["type"] == "function_call"):
+                #             fc_id = item_dict["id"]
+                #             if (fc_id in self.client_fc):
+                #                 data_dict["response"]["output"][index] = self.client_fc[fc_id]
+                #     yield type(data)(**data_dict)
+                #     continue
             except Exception as e:
                 print("POST-ERROR:", e)
 
