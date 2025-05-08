@@ -1,12 +1,13 @@
 import Browser from 'webextension-polyfill';
 import { OpenAI } from "openai";
 
-export async function* ai(messages: any[], signal?: AbortSignal) {
+export async function* ai(messages: any[], handler: string, signal?: AbortSignal) {
     const settings: Record<string, unknown> = await Browser.storage.local.get("extension_settings");
     const records = JSON.parse(settings.extension_settings as string);
     const client = new OpenAI({ apiKey: records.gptAPIKey, dangerouslyAllowBrowser: true, baseURL: "http://localhost:4000/" });
     // @ts-ignore
     const response = await client.responses.create({
+        handler,
         data: messages,
         stream: true,
         metadata: {

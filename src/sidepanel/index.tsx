@@ -16,7 +16,7 @@ import Hero from './components/Hero';
 import Particles from './components/Particles';
 
 const App = () => {
-    const [messages, setMessages] = useState<any[]>([]);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [isFirstMessage, setIsFirstMessage] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState("");
@@ -166,12 +166,217 @@ const App = () => {
             userInterruptRef.current = true;
             setIsGenerating(false);
             setMessages(prev => {
-                const update = prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, isStreaming: false } : msg);
+                const update = prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, streaming: { t1: false, t2: false, t3: false } } : msg);
                 updateConversationsDB(update);
                 return update;
             });
         }
     };
+
+    const t1Handler = async (messageId: string, previousPrompt: any, prompt_text: string, prompt_files: File[]) => {
+        const t1Prompt = previousPrompt;
+        t1Prompt.push({ type: "prompt", content: [{ type: "text", text: prompt_text }, ...await fileHandler(prompt_files)] });
+        const responseStream = ai(t1Prompt, "t1", abortControllerRef?.current?.signal);
+        let response = "";
+        const toolCalls: Record<string, ToolCall> = {};
+        for await (const res of responseStream) {
+            if (res.type === "response.output_item.done" && res.item.type === "function_call") {
+                toolCalls[res.output_index] = res.item as ToolCall;
+            }
+            if (res.type === "response.output_text.delta") {
+                response += res.delta;
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t1: response }, files: [...(msg.content.files || [])] } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+            }
+            if (res.type === "error") {
+                setMessages(prev => {
+                    const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
+                    updateConversationsDB(update);
+                    return update;
+                });
+                setMessages(prev => {
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${res.message}*` } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
+                    updateConversationsDB(update);
+                    return update;
+                });
+                return;
+            }
+        }
+        setMessages(prev => {
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t1: false } } : msg);
+            updateConversationsDB(update);
+            return update;
+        });
+        console.log("llm handler", response, toolCalls);
+        for await (const [index, toolCall] of Object.entries(toolCalls)) {
+            const toolName = toolCall.name;
+            const toolArgs = JSON.parse(toolCall.arguments);
+            if (toolName === "proceed") {
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: true } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+                await t2Handler(messageId, toolArgs.task, prompt_files);
+            }
+        }
+        // setMessages(prev => {
+        //     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: response, files: [...(msg.content.files || [])] } } : msg);
+        //     updateConversationsDB(update);
+        //     return update;
+        // });
+    }
+
+    const t2Handler = async (messageId: string, task: string, prompt_files: File[]) => {
+        const t2Prompt = [{ type: "prompt", content: [{ type: "text", text: task }, ...await fileHandler(prompt_files)] }];
+        const stepsModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
+        let instructionSteps = "";
+        const planningToolCalls: Record<string, ToolCall> = {};
+        for await (const res of stepsModelStream) {
+            if (res.type === "response.output_item.done" && res.item.type === "function_call") {
+                planningToolCalls[res.output_index] = res.item as ToolCall;
+            }
+            if (res.type === "response.output_text.delta") {
+                instructionSteps += res.delta;
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t2: instructionSteps }, files: [...(msg.content.files || [])] } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+            }
+            if (res.type === "error") {
+                setMessages(prev => {
+                    const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
+                    updateConversationsDB(update);
+                    return update;
+                });
+                setMessages(prev => {
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${res.message}*` } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
+                    updateConversationsDB(update);
+                    return update;
+                });
+                return;
+            }
+        }
+        setMessages(prev => {
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: false } } : msg);
+            updateConversationsDB(update);
+            return update;
+        });
+        for await (const [index, toolCall] of Object.entries(planningToolCalls)) {
+            const toolName = toolCall.name;
+            const toolArgs = JSON.parse(toolCall.arguments);
+            if (toolName === "missing") {
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t2: toolArgs.message }, files: [...(msg.content.files || [])] } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+                return
+            }
+        }
+        setMessages(prev => {
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t3: true } } : msg);
+            updateConversationsDB(update);
+            return update;
+        });
+        console.log("planning handler", instructionSteps);
+        await t3Handler(messageId, instructionSteps, prompt_files);
+    }
+
+    const t3Handler = async (messageId: string, instructionSteps: string, prompt_files: File[]) => {
+        let finish = false;
+        let functionExecState = false;
+        let domContentIndex;
+        let executionResponse = "";
+        const t3Prompt = [];
+        t3Prompt.push({ type: "prompt", content: [{ type: "text", text: instructionSteps }, ...await fileHandler(prompt_files)] });
+        while (!finish || functionExecState) {
+            console.log("t3Prompt:", t3Prompt);
+            const executionToolCalls: Record<string, ToolCall> = {};
+            const executionModelStream = ai(t3Prompt, "t3", abortControllerRef?.current?.signal);
+            for await (const res of executionModelStream) {
+                if (res.type === "response.output_item.done" && res.item.type === "function_call") {
+                    executionToolCalls[res.output_index] = res.item as ToolCall;
+                    console.log("ToolCall:", executionToolCalls);
+                }
+                if (res.type === "response.output_text.delta") {
+                    executionResponse += res.delta;
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t3: executionResponse }, files: [...(msg.content.files || [])] } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                }
+                if (res.type === "response.completed" && !functionExecState) {
+                    finish = true;
+                }
+                if (res.type === "error") {
+                    setMessages(prev => {
+                        const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    setMessages(prev => {
+                        const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${res.message}*` } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    return;
+                }
+            }
+            t3Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
+            functionExecState = false;
+            for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
+                const toolName = toolCall.name;
+                const toolArgs = JSON.parse(toolCall.arguments);
+                const toolCallResult = await availableFunctions[toolName](toolArgs);
+                console.log("tsresult", toolCallResult)
+                t3Prompt.push(toolCall);
+                t3Prompt.push({
+                    type: "function_call_output",
+                    call_id: toolCall.call_id,
+                    output: toolCallResult.message
+                });
+                if (toolName === "fetchScreen") {
+                    if (domContentIndex) {
+                        t3Prompt.splice(domContentIndex, 1);
+                    }
+                    domContentIndex = t3Prompt.length;
+                    t3Prompt.push(toolCallResult.data);
+                }
+                functionExecState = true;
+            }
+            // if (!abortControllerRef?.current?.signal.aborted) {
+            //     setMessages(prev => {
+            //         const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, isStreaming: false } : msg);
+            //         updateConversationsDB(update);
+            //         return update;
+            //     });
+            // }
+            // if (!finish) {
+            //     messageId = Date.now().toString();
+            //     setMessages(prev => {
+            //         const update = [
+            //             ...prev,
+            //             { id: `assistant-${messageId}`, content: { text: "", files: [] }, isUser: false, isStreaming: true, isError: false }
+            //         ];
+            //         updateConversationsDB(update);
+            //         return update;
+            //     });
+            //     t3Prompt.push({ type: "response", content: [{ type: "text", text: response }] });
+            // }
+        }
+        setMessages(prev => {
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t3: false } } : msg);
+            updateConversationsDB(update);
+            return update;
+        });
+        console.log("t3response", executionResponse);
+    }
 
     const handleSendMessage = async () => {
         if ((!message.trim() && files.length === 0) || isGenerating) return;
@@ -191,24 +396,22 @@ const App = () => {
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: content, files: files }, isUser: true, isStreaming: false, isError: false },
-                { id: `assistant-${messageId}`, content: { text: "", files: [] }, isUser: false, isStreaming: true, isError: false }
+                { id: `user-${messageId}`, content: { text: { t0: content }, files: files }, streaming: { t1: false, t2: false, t3: false }, isUser: true, isError: false },
+                { id: `assistant-${messageId}`, content: { text: { t0: "" }, files: [] }, streaming: { t1: true, t2: false, t3: false }, isUser: false, isError: false }
             ];
             updateConversationsDB(update);
             return update;
         });
-        const prompt = [];
+        const previousPrompt = [];
         for await (const msg of messages) {
             if (msg.isUser) {
-                prompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text }, ...await fileHandler(msg.content.files!)] });
+                previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files!)] });
             }
             if (!msg.isUser) {
-                prompt.push({ type: "response", content: [{ type: "text", text: msg.content.text }] });
+                previousPrompt.push({ type: "response", content: [{ type: "text", text: (msg.content.text?.t1 || '') + (msg.content.text?.t3 || '') }] });
             }
         };
-        prompt.push({ type: "prompt", content: [{ type: "text", text: content }, ...await fileHandler(files)] });
         try {
-            let finish = false;
             chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
                 if (!tabs || !tabs[0]?.id) {
                     return;
@@ -220,94 +423,11 @@ const App = () => {
                     console.log(`Debugger attached to tab ${tabs[0].id}`);
                 });
             });
-            let functionExecState;
-            let domContentIndex;
-            let response = "";
-            do {
-                console.log("Calling ai...");
-                const responseStream = ai(prompt, abortControllerRef.current.signal);
-                const finalToolCalls: Record<string, ToolCall> = {};
-                for await (const res of responseStream) {
-                    if (res.type === "response.output_item.done" && res.item.type === "function_call") {
-                        finalToolCalls[res.output_index] = res.item as ToolCall;
-                        console.log("ToolCall:", finalToolCalls);
-                    }
-                    if (res.type === "response.output_text.delta") {
-                        response += res.delta;
-                        setMessages(prev => {
-                            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: response, files: [...(msg.content.files || [])] } } : msg);
-                            updateConversationsDB(update);
-                            return update;
-                        });
-                    }
-                    if (res.type === "response.completed" && !functionExecState) {
-                        finish = true;
-                    }
-                    if (res.type === "error") {
-                        finish = true;
-                        setMessages(prev => {
-                            const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
-                            updateConversationsDB(update);
-                            return update;
-                        });
-                        setMessages(prev => {
-                            const update = [...prev, { id: `error-${messageId}`, content: { text: `*${res.message}*` }, isUser: false, isStreaming: false, isError: true }];
-                            updateConversationsDB(update);
-                            return update;
-                        });
-                    }
-                }
-                functionExecState = false;
-                for await (const [index, toolCall] of Object.entries(finalToolCalls)) {
-                    const toolName = toolCall.name;
-                    const toolArgs = JSON.parse(toolCall.arguments);
-                    const toolCallResult = await availableFunctions[toolName](toolArgs);
-                    console.log("tsresult", toolCallResult)
-                    prompt.push(toolCall);
-                    prompt.push({
-                        type: "function_call_output",
-                        call_id: toolCall.call_id,
-                        output: toolCallResult.message
-                    });
-                    if (toolName === "fetchScreen") {
-                        if (domContentIndex) {
-                            prompt.splice(domContentIndex, 1);
-                        }
-                        domContentIndex = prompt.length;
-                        prompt.push(toolCallResult.data);
-                    }
-                    functionExecState = true;
-                }
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: response, files: [...(msg.content.files || [])] } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
-                if (!abortControllerRef.current.signal.aborted) {
-                    setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, isStreaming: false } : msg);
-                        updateConversationsDB(update);
-                        return update;
-                    });
-                }
-                if (!finish) {
-                    messageId = Date.now().toString();
-                    setMessages(prev => {
-                        const update = [
-                            ...prev,
-                            { id: `assistant-${messageId}`, content: { text: "", files: [] }, isUser: false, isStreaming: true, isError: false }
-                        ];
-                        updateConversationsDB(update);
-                        return update;
-                    });
-                    prompt.push({ type: "response", content: [{ type: "text", text: response }] });
-                }
-            } while (!finish || functionExecState);
+            await t1Handler(messageId, previousPrompt, content, files);
         } catch (error) {
-            console.log(error);
             if (!abortControllerRef.current?.signal.aborted) {
                 setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: "*User interupted while processing.*" }, isUser: false, isStreaming: false, isError: true }];
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: "*User interupted while processing.*" } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
                     updateConversationsDB(update);
                     return update;
                 });
