@@ -55,10 +55,9 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: string, files?: File[], tool?: { toolCall?: { type: string, toolCallId: string, toolName: string, args: any }, toolResult?: { type: string, toolCallId: string, toolName: string, args: any, result: any } } };
+    content: { text?: { t0?: string, t1?: string, t2?: string, t3?: string }, files?: File[] };
+    streaming?: { t1?: boolean, t2?: boolean, t3?: boolean };
     isUser: boolean;
-    isTool: boolean;
-    isStreaming?: boolean;
     isError?: boolean;
 }
 
