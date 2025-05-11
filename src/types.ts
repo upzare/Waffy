@@ -55,11 +55,16 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: { t0?: string, t1?: string, t2?: string, t3?: string }, files?: File[] };
-    streaming?: { t1?: boolean, t2?: boolean, t3?: boolean };
+    content: { text?: { t0?: string, t1?: string, t2?: string, t3?: string, t4?: string }, files?: File[] };
+    streaming?: { t1?: boolean, t2?: boolean, t3?: boolean, t4?: boolean };
     isUser: boolean;
     isError?: boolean;
 }
+
+export interface FileFormat {
+    type: string,
+    payload: Record<string, any>
+};
 
 export interface StorageResult {
     isActive?: boolean;

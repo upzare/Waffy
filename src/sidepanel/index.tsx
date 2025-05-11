@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { ai, generateTitle } from '../lib/agent';
-import { Message, Conversation, ToolCall } from '../types';
+import { Message, Conversation, ToolCall, FileFormat } from '../types';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
 import InputContainer from './components/InputContainer';
@@ -32,7 +32,6 @@ const App = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const homeSection = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController>(null);
-    const userInterruptRef = useRef<boolean>(false);
 
     const db = useRef<IDBDatabase>(null);
     const db_request = useRef<IDBOpenDBRequest>(null);
@@ -159,23 +158,9 @@ const App = () => {
         }
     };
 
-    const handleStopGeneration = async () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-            userInterruptRef.current = true;
-            setIsGenerating(false);
-            setMessages(prev => {
-                const update = prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, streaming: { t1: false, t2: false, t3: false } } : msg);
-                updateConversationsDB(update);
-                return update;
-            });
-        }
-    };
-
-    const t1Handler = async (messageId: string, previousPrompt: any, prompt_text: string, prompt_files: File[]) => {
+    const t1Handler = async (messageId: string, previousPrompt: any, prompt_text: string, prompt_files: FileFormat[]) => {
         const t1Prompt = previousPrompt;
-        t1Prompt.push({ type: "prompt", content: [{ type: "text", text: prompt_text }, ...await fileHandler(prompt_files)] });
+        t1Prompt.push({ type: "prompt", content: [{ type: "text", text: prompt_text }, ...prompt_files] });
         const responseStream = ai(t1Prompt, "t1", abortControllerRef?.current?.signal);
         let response = "";
         const toolCalls: Record<string, ToolCall> = {};
@@ -192,17 +177,7 @@ const App = () => {
                 });
             }
             if (res.type === "error") {
-                setMessages(prev => {
-                    const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
-                    updateConversationsDB(update);
-                    return update;
-                });
-                setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${res.message}*` } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
-                    updateConversationsDB(update);
-                    return update;
-                });
-                return;
+                throw new Error(res.message);
             }
         }
         setMessages(prev => {
@@ -220,18 +195,14 @@ const App = () => {
                     updateConversationsDB(update);
                     return update;
                 });
-                await t2Handler(messageId, toolArgs.task, prompt_files);
+                return toolArgs.task;
             }
         }
-        // setMessages(prev => {
-        //     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: response, files: [...(msg.content.files || [])] } } : msg);
-        //     updateConversationsDB(update);
-        //     return update;
-        // });
+        return false;
     }
 
-    const t2Handler = async (messageId: string, task: string, prompt_files: File[]) => {
-        const t2Prompt = [{ type: "prompt", content: [{ type: "text", text: task }, ...await fileHandler(prompt_files)] }];
+    const t2Handler = async (messageId: string, task: string, prompt_files: FileFormat[]) => {
+        const t2Prompt = [{ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] }];
         const stepsModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
         let instructionSteps = "";
         const planningToolCalls: Record<string, ToolCall> = {};
@@ -248,17 +219,7 @@ const App = () => {
                 });
             }
             if (res.type === "error") {
-                setMessages(prev => {
-                    const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
-                    updateConversationsDB(update);
-                    return update;
-                });
-                setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${res.message}*` } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
-                    updateConversationsDB(update);
-                    return update;
-                });
-                return;
+                throw new Error(res.message);
             }
         }
         setMessages(prev => {
@@ -275,7 +236,7 @@ const App = () => {
                     updateConversationsDB(update);
                     return update;
                 });
-                return
+                return false;
             }
         }
         setMessages(prev => {
@@ -284,16 +245,16 @@ const App = () => {
             return update;
         });
         console.log("planning handler", instructionSteps);
-        await t3Handler(messageId, instructionSteps, prompt_files);
+        return instructionSteps;
     }
 
-    const t3Handler = async (messageId: string, instructionSteps: string, prompt_files: File[]) => {
+    const t3Handler = async (messageId: string, instructionSteps: string, prompt_files: FileFormat[]) => {
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
         let executionResponse = "";
         const t3Prompt = [];
-        t3Prompt.push({ type: "prompt", content: [{ type: "text", text: instructionSteps }, ...await fileHandler(prompt_files)] });
+        t3Prompt.push({ type: "prompt", content: [{ type: "text", text: instructionSteps }, ...prompt_files] });
         while (!finish || functionExecState) {
             console.log("t3Prompt:", t3Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
@@ -315,17 +276,7 @@ const App = () => {
                     finish = true;
                 }
                 if (res.type === "error") {
-                    setMessages(prev => {
-                        const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
-                        updateConversationsDB(update);
-                        return update;
-                    });
-                    setMessages(prev => {
-                        const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${res.message}*` } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
-                        updateConversationsDB(update);
-                        return update;
-                    });
-                    return;
+                    throw new Error(res.message);
                 }
             }
             t3Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
@@ -350,25 +301,6 @@ const App = () => {
                 }
                 functionExecState = true;
             }
-            // if (!abortControllerRef?.current?.signal.aborted) {
-            //     setMessages(prev => {
-            //         const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, isStreaming: false } : msg);
-            //         updateConversationsDB(update);
-            //         return update;
-            //     });
-            // }
-            // if (!finish) {
-            //     messageId = Date.now().toString();
-            //     setMessages(prev => {
-            //         const update = [
-            //             ...prev,
-            //             { id: `assistant-${messageId}`, content: { text: "", files: [] }, isUser: false, isStreaming: true, isError: false }
-            //         ];
-            //         updateConversationsDB(update);
-            //         return update;
-            //     });
-            //     t3Prompt.push({ type: "response", content: [{ type: "text", text: response }] });
-            // }
         }
         setMessages(prev => {
             const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t3: false } } : msg);
@@ -376,7 +308,38 @@ const App = () => {
             return update;
         });
         console.log("t3response", executionResponse);
+        setMessages(prev => {
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t4: true } } : msg);
+            updateConversationsDB(update);
+            return update;
+        });
+        return executionResponse;
     }
+
+    const t4Handler = async (messageId: string, task: string, instructionSteps: string, executionResponse: string) => {
+        const prompt = `**Task:** ${task}\n**Steps:** ${instructionSteps}\n**Output:** ${executionResponse}`;
+        const t4Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
+        const summaryModelStream = ai(t4Prompt, "t4", abortControllerRef?.current?.signal);
+        let summary = "";
+        for await (const res of summaryModelStream) {
+            if (res.type === "response.output_text.delta") {
+                summary += res.delta;
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t4: summary }, files: [...(msg.content.files || [])] } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+            }
+            if (res.type === "error") {
+                throw new Error(res.message);
+            }
+        }
+        setMessages(prev => {
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t4: false } } : msg);
+            updateConversationsDB(update);
+            return update;
+        });
+    };
 
     const handleSendMessage = async () => {
         if ((!message.trim() && files.length === 0) || isGenerating) return;
@@ -386,7 +349,6 @@ const App = () => {
             textareaRef.current.style.color = "#909090";
         }
         abortControllerRef.current = new AbortController();
-        userInterruptRef.current = false;
         let content = message.trim();
         if (isFirstMessage) {
             homeSection.current?.classList.add("hidden");
@@ -396,21 +358,25 @@ const App = () => {
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: { t0: content }, files: files }, streaming: { t1: false, t2: false, t3: false }, isUser: true, isError: false },
-                { id: `assistant-${messageId}`, content: { text: { t0: "" }, files: [] }, streaming: { t1: true, t2: false, t3: false }, isUser: false, isError: false }
+                { id: `user-${messageId}`, content: { text: { t0: content }, files: files }, isUser: true, isError: false },
+                { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { t1: true, t2: false, t3: false, t4: false }, isUser: false, isError: false }
             ];
             updateConversationsDB(update);
             return update;
         });
         const previousPrompt = [];
         for await (const msg of messages) {
-            if (msg.isUser) {
-                previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files!)] });
-            }
-            if (!msg.isUser) {
-                previousPrompt.push({ type: "response", content: [{ type: "text", text: (msg.content.text?.t1 || '') + (msg.content.text?.t3 || '') }] });
+            if (!msg.isError) {
+                if (msg.isUser) {
+                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files!)] });
+                } else {
+                    previousPrompt.push({ type: "response", content: [{ type: "text", text: msg.content.text?.t4 || msg.content.text?.t1 }] });
+                }
+            }else {
+                previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.t0}` }] });
             }
         };
+        const prompt_files = await fileHandler(files);
         try {
             chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
                 if (!tabs || !tabs[0]?.id) {
@@ -423,18 +389,34 @@ const App = () => {
                     console.log(`Debugger attached to tab ${tabs[0].id}`);
                 });
             });
-            await t1Handler(messageId, previousPrompt, content, files);
-        } catch (error) {
-            if (!abortControllerRef.current?.signal.aborted) {
-                setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: "*User interupted while processing.*" } }, streaming: { t1: false, t2: false, t3: false }, isUser: false, isError: true }];
-                    updateConversationsDB(update);
-                    return update;
-                });
-                userInterruptRef.current = false;
-            } else {
-                console.error(error);
+            const task = await t1Handler(messageId, previousPrompt, content, prompt_files);
+            if (task) {
+                const instructionSteps = await t2Handler(messageId, task, prompt_files);
+                if (instructionSteps) {
+                    const executionResponse = await t3Handler(messageId, instructionSteps, prompt_files);
+                    await t4Handler(messageId, task, instructionSteps, executionResponse);
+                }
             }
+        } catch (error) {
+            setMessages(prev => {
+                const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
+                updateConversationsDB(update);
+                return update;
+            });
+            setMessages(prev => {
+                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
+                updateConversationsDB(update);
+                return update;
+            });
+            let errorMessage = "Something went wrong.";
+            if ((error as any).message) {
+                errorMessage = (error as any).message;
+            }
+            setMessages(prev => {
+                const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${errorMessage}*` } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
+                updateConversationsDB(update);
+                return update;
+            });
         } finally {
             chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
                 if (!tabs || !tabs[0]?.id) {
@@ -446,24 +428,38 @@ const App = () => {
                     }
                 });
             });
-            if (!abortControllerRef.current?.signal.aborted) {
-                setIsGenerating(false);
-                setMessage("");
-                setFiles([]);
-                if (textareaRef.current) {
-                    textareaRef.current.style.height = "auto";
-                    textareaRef.current.style.color = "#ffffff";
-                };
+            if (abortControllerRef.current?.signal.aborted) {
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+                setMessages(prev => {
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: "*User interupted while processing.*" } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
+                    updateConversationsDB(update);
+                    return update;
+                });
             }
+            setIsGenerating(false);
+            setMessage("");
+            setFiles([]);
+            if (textareaRef.current) {
+                textareaRef.current.style.height = "auto";
+                textareaRef.current.style.color = "#ffffff";
+            };
             abortControllerRef.current = null;
+        }
+    };
+
+    const handleStopGeneration = async () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            setIsGenerating(false);
         }
     };
 
     const handleNewChat = async () => {
         await handleStopGeneration();
-        while (userInterruptRef.current) {
-            await new Promise(resolve => setTimeout(resolve, 1));
-        }
         fetchConversations();
         setIsFirstMessage(true);
         setMessages([]);
@@ -481,9 +477,6 @@ const App = () => {
         const conversation = conversations.find(c => c.id === id);
         if (conversation) {
             await handleStopGeneration();
-            while (userInterruptRef.current) {
-                await new Promise(resolve => setTimeout(resolve, 1));
-            }
             setMessages([]);
             await new Promise(resolve => setTimeout(resolve, 100));
             setIsFirstMessage(false);

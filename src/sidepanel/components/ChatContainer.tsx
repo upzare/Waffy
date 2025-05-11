@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import RenderResponse from "../utils/RenderResponse";
-import { ArrowLeft, Copy, File, RotateCcw, User } from "lucide-react";
+import { Copy, File, Repeat, User } from "lucide-react";
 import type { ChatContainerProps } from "../../types";
 
 const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
@@ -20,21 +20,18 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                         {!msg.isUser && !msg.isError && (
                             <div className="message-actions-container">
                                 <div className="message-actions">
-                                    <button className="message-action-button" title="Continue from here">
-                                        <ArrowLeft size={16} />
+                                    <button className="message-action-button" title="Retry">
+                                        <Repeat size={16} />
                                     </button>
                                     <button className="message-action-button" title="Copy to clipboard">
                                         <Copy size={16} />
-                                    </button>
-                                    <button className="message-action-button" title="Retry">
-                                        <RotateCcw size={16} />
                                     </button>
                                 </div>
                             </div>
                         )}
                         {msg.isError ? (
                             <div className="message-content">
-                                <RenderResponse content={msg.content.text?.t0} />
+                                <RenderResponse content={msg.content.text} error={true} />
                             </div>
                         ) : (
                             <>
@@ -76,7 +73,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                                         </>
                                     ) : (
                                         <>
-                                            <RenderResponse content={msg.content.text} isPlanning={msg.streaming?.t2} isExecuting={msg.streaming?.t3} />
+                                            <RenderResponse content={msg.content.text} isInitial={msg.streaming?.t1} isPlanning={msg.streaming?.t2} isExecuting={msg.streaming?.t3} isSummary={msg.streaming?.t4} />
                                             {msg.content.files && msg.content.files.length > 0 && (
                                                 <>
                                                     {msg.content.files.map((file: File, fileIndex: number) => (
@@ -100,13 +97,6 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                                                         </div>
                                                     ))}
                                                 </>
-                                            )}
-                                            {msg.streaming?.t1 && (
-                                                <div className="loading-indicator">
-                                                    <span></span>
-                                                    <span></span>
-                                                    <span></span>
-                                                </div>
                                             )}
                                         </>
                                     )}

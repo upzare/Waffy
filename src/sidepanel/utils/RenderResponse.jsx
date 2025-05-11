@@ -7,8 +7,11 @@ import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2 } from 'luci
 
 const RenderResponse = ({
     content,
+    isInitial = false,
     isPlanning = false,
     isExecuting = false,
+    isSummary = false,
+    error = false
 }) => {
     const [CopyIcon, setCopyIcon] = useState(Copy);
     const [isPlannningExpanded, setIsPlannningExpanded] = useState(false);
@@ -50,6 +53,48 @@ const RenderResponse = ({
     const toggleExecuting = () => {
         setIsExecutingExpanded(!isExecutingExpanded);
     };
+
+    if (error) {
+        return (
+            <div className="response-container">
+                {/* Rendering Error Response */}
+                <Markdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                        pre: Pre,
+                        code({ node, inline, className = "code", children, ...props }) {
+                            const match = /language-(\w+)/.exec(className || "")
+                            return !inline && match ? (
+                                <SyntaxHighlighter
+                                    style={funky}
+                                    language={match[1]}
+                                    PreTag="div"
+                                    className="syntax-highlighter"
+                                    {...props}
+                                >
+                                    {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
+                            ) : (
+                                <code className={className} {...props}>
+                                    {children}
+                                </code>
+                            )
+                        },
+                        div(props) {
+                            return (
+                                <div className="overflow-container">
+                                    {props.children}
+                                </div>
+                            );
+                        }
+                    }}
+                    className="markdown-content"
+                >
+                    {content.t0}
+                </Markdown>
+            </div>
+        )
+    }
 
     return (
         <div className="response-container">
@@ -100,12 +145,12 @@ const RenderResponse = ({
                             {isPlanning ? (
                                 <>
                                     <Loader2 size={16} className="dropdown-loading-icon" />
-                                    <span className="dropdown-label">Generating Steps...</span>
+                                    <span className="dropdown-label">Calculating Steps</span>
                                 </>
                             ) : (
                                 <>
                                     <CheckCircle2 size={16} className="dropdown-complete-icon" />
-                                    <span className="dropdown-label">Steps Generated</span>
+                                    <span className="dropdown-label">Steps Calculated</span>
                                 </>
                             )}
                         </div>
@@ -173,7 +218,7 @@ const RenderResponse = ({
                             {isExecuting ? (
                                 <>
                                     <Loader2 size={16} className="dropdown-loading-icon" />
-                                    <span className="dropdown-label">Executing Actions...</span>
+                                    <span className="dropdown-label">Executing Actions</span>
                                 </>
                             ) : (
                                 <>
@@ -232,6 +277,51 @@ const RenderResponse = ({
                             )}
                         </div>
                     )}
+                </div>
+            )}
+
+            {(content.t4 || isSummary) && (
+                <Markdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                        pre: Pre,
+                        code({ node, inline, className = "code", children, ...props }) {
+                            const match = /language-(\w+)/.exec(className || "")
+                            return !inline && match ? (
+                                <SyntaxHighlighter
+                                    style={funky}
+                                    language={match[1]}
+                                    PreTag="div"
+                                    className="syntax-highlighter"
+                                    {...props}
+                                >
+                                    {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
+                            ) : (
+                                <code className={className} {...props}>
+                                    {children}
+                                </code>
+                            )
+                        },
+                        div(props) {
+                            return (
+                                <div className="overflow-container">
+                                    {props.children}
+                                </div>
+                            );
+                        }
+                    }}
+                    className="markdown-content"
+                >
+                    {content.t4}
+                </Markdown>
+            )}
+
+            {(isInitial || isSummary) && (
+                <div className="loading-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
                 </div>
             )}
         </div>
