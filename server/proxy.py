@@ -49,7 +49,7 @@ class CustomHandler(CustomLogger):
         try:
             if ("handler" in data):
                 if (data["handler"] == "t1"):
-                    data["model"] = "gpt-4o"
+                    data["model"] = "gpt-4.1-mini"
                     data["tools"] = T1_TOOLS
                     data["stream"] = True
                     data["parallel_tool_calls"] = False
@@ -58,25 +58,27 @@ class CustomHandler(CustomLogger):
                     data["input"] = [{'role': 'system', 'content': T1_PROMPT}]
 
                 elif (data["handler"] == "t2"):
-                    data["model"] = "gpt-4o"
+                    data["model"] = "gpt-4.1-mini"
                     data["tools"] = T2_TOOLS
                     data["stream"] = True
+                    # data["temperature"] = 0
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
                     data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
 
                 elif (data["handler"] == "t3"):
-                    data["model"] = "gpt-4o"
+                    data["model"] = "gpt-4.1"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
+                    # data["temperature"] = 0
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
                     data["input"] = [{'role': 'system', 'content': T3_PROMPT}]
 
                 elif (data["handler"] == "t4"):
-                    data["model"] = "gpt-4o"
+                    data["model"] = "gpt-4.1-nano"
                     data["stream"] = True
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
@@ -124,6 +126,8 @@ class CustomHandler(CustomLogger):
                         parser_tasks.append(parser_task)
                         ocr_tasks.append(ocr_task)
                         metadata[index] = messages["metadata"]
+                    else:
+                        data["input"].append(messages)
 
                 if (screenshot_req):
                     parser_content = await asyncio.gather(*[task for task in parser_tasks])
@@ -188,18 +192,18 @@ class CustomHandler(CustomLogger):
                                 data_dict["item"] = item
                                 yield type(data)(**data_dict)
                                 continue
-                # elif ("type" in data_dict and data_dict["type"] == "response.function_call_arguments.delta" or data_dict["type"] == "response.function_call_arguments.done"):
-                #     continue
-                # elif ("type" in data_dict and data_dict["type"] == "response.completed"):
-                #     output = data_dict["response"]["output"]
-                #     for index, item in enumerate(output):
-                #         item_dict = dict(item)
-                #         if ("type" in item_dict and item_dict["type"] == "function_call"):
-                #             fc_id = item_dict["id"]
-                #             if (fc_id in self.client_fc):
-                #                 data_dict["response"]["output"][index] = self.client_fc[fc_id]
-                #     yield type(data)(**data_dict)
-                #     continue
+                elif ("type" in data_dict and data_dict["type"] == "response.function_call_arguments.delta" or data_dict["type"] == "response.function_call_arguments.done"):
+                    continue
+                elif ("type" in data_dict and data_dict["type"] == "response.completed"):
+                    output = data_dict["response"]["output"]
+                    for index, item in enumerate(output):
+                        item_dict = dict(item)
+                        if ("type" in item_dict and item_dict["type"] == "function_call"):
+                            fc_id = item_dict["id"]
+                            if (fc_id in self.client_fc):
+                                data_dict["response"]["output"][index] = self.client_fc[fc_id]
+                    yield type(data)(**data_dict)
+                    continue
             except Exception as e:
                 print("POST-ERROR:", e)
 
