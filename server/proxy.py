@@ -11,7 +11,7 @@ from util.utils import detect_device
 import cloudinary
 import cloudinary.uploader
 from mistralai import Mistral
-from instructions import SYSTEM_PROMPT, TITLE_SYSTEM_PROMPT, TOOLS
+from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
 
 DEBUG = True
 
@@ -47,14 +47,45 @@ class CustomHandler(CustomLogger):
             "audio_transcription",
         ]):
         try:
-            if ("data" in data):
-                data["model"] = "gpt-4o"
-                data["tools"] = TOOLS
-                data["stream"] = True
-                data["parallel_tool_calls"] = False
-                data["tool_choice"] = "auto"
-                data["truncation"] = "auto"
-                data["input"] = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+            if ("handler" in data):
+                if (data["handler"] == "t1"):
+                    data["model"] = "gpt-4.1"
+                    data["tools"] = T1_TOOLS
+                    data["stream"] = True
+                    data["temperature"] = 0.5
+                    data["parallel_tool_calls"] = False
+                    data["tool_choice"] = "auto"
+                    data["truncation"] = "auto"
+                    data["input"] = [{'role': 'system', 'content': T1_PROMPT}]
+
+                elif (data["handler"] == "t2"):
+                    data["model"] = "gpt-4.1-mini"
+                    data["tools"] = T2_TOOLS
+                    data["stream"] = True
+                    data["temperature"] = 0.1
+                    data["parallel_tool_calls"] = False
+                    data["tool_choice"] = "auto"
+                    data["truncation"] = "auto"
+                    data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
+
+                elif (data["handler"] == "t3"):
+                    data["model"] = "gpt-4.1"
+                    data["tools"] = T3_TOOLS
+                    data["stream"] = True
+                    data["temperature"] = 0.1
+                    data["parallel_tool_calls"] = False
+                    data["tool_choice"] = "auto"
+                    data["truncation"] = "auto"
+                    data["input"] = [{'role': 'system', 'content': T3_PROMPT}]
+
+                elif (data["handler"] == "t4"):
+                    data["model"] = "gpt-4.1-nano"
+                    data["stream"] = True
+                    data["temperature"] = 1
+                    data["parallel_tool_calls"] = False
+                    data["tool_choice"] = "auto"
+                    data["truncation"] = "auto"
+                    data["input"] = [{'role': 'system', 'content': T4_PROMPT}]
 
                 screenshot_req = False
                 parser_tasks = []
@@ -90,13 +121,15 @@ class CustomHandler(CustomLogger):
                                 else:
                                     content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
                         data["input"].append({ "role": "assistant", "content": content })
-                    elif ("type" in messages and messages["type"] == "screenshot"):
+                    elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t3"):
                         screenshot_req = True
                         parser_task = self.async_parse(messages["image"])
                         ocr_task = self.async_ocr(messages['image'])
                         parser_tasks.append(parser_task)
                         ocr_tasks.append(ocr_task)
                         metadata[index] = messages["metadata"]
+                    else:
+                        data["input"].append(messages)
 
                 if (screenshot_req):
                     parser_content = await asyncio.gather(*[task for task in parser_tasks])
@@ -123,7 +156,7 @@ class CustomHandler(CustomLogger):
             if ("title" in data):
                 data["model"] = "gpt-4.1-nano"
                 data["stream"] = False
-                data["input"] = [{'role': 'system', 'content': TITLE_SYSTEM_PROMPT}, { "role": "user", "content": data["title"] }]
+                data["input"] = [{'role': 'system', 'content': TITLE_PROMPT}, { "role": "user", "content": data["title"] }]
                 del data["title"]
         
         except Exception as e:

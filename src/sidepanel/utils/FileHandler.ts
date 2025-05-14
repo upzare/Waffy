@@ -1,4 +1,4 @@
-type FileFormat = { type: string, payload: Record<string, any> };
+import type { FileFormat } from "../../types";
 
 export const fileHandler = async (fileList: File[]): Promise<FileFormat[]> => {
     const files: FileFormat[] = [];

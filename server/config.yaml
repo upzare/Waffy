@@ -5,9 +5,45 @@ model_list:
       api_base: https://api.openai.com/v1
       api_key: "os.environ/OPENAI_API_KEY" # does os.getenv("AZURE_API_KEY_EU")
       rpm: 6      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
+  - model_name: gpt-4.1
+    litellm_params:
+      model: openai/gpt-4.1
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY"
+      rpm: 6
+  - model_name: gpt-4.1-mini
+    litellm_params:
+      model: openai/gpt-4.1-mini
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY"
+      rpm: 6
   - model_name: gpt-4.1-nano
     litellm_params:
       model: openai/gpt-4.1-nano
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY"
+      rpm: 6
+  - model_name: o1
+    litellm_params:
+      model: openai/o1
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY"
+      rpm: 6
+  - model_name: o1-mini
+    litellm_params:
+      model: openai/o1-mini
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY"
+      rpm: 6
+  - model_name: o3
+    litellm_params:
+      model: openai/o3
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY"
+      rpm: 6
+  - model_name: o3-mini
+    litellm_params:
+      model: openai/o3-mini
       api_base: https://api.openai.com/v1
       api_key: "os.environ/OPENAI_API_KEY"
       rpm: 6

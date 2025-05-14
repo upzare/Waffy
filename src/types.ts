@@ -55,12 +55,16 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: string, files?: File[], tool?: { toolCall?: { type: string, toolCallId: string, toolName: string, args: any }, toolResult?: { type: string, toolCallId: string, toolName: string, args: any, result: any } } };
+    content: { text?: { t0?: string, t1?: string, t2?: string, t3?: string, t4?: string }, files?: File[], task?: string };
+    streaming?: { t1?: boolean, t2?: boolean, t3?: boolean, t4?: boolean };
     isUser: boolean;
-    isTool: boolean;
-    isStreaming?: boolean;
     isError?: boolean;
 }
+
+export interface FileFormat {
+    type: string,
+    payload: Record<string, any>
+};
 
 export interface StorageResult {
     isActive?: boolean;

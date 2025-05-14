@@ -464,6 +464,56 @@ body {
     backdrop-filter: blur(5px);
 }
 
+.message-actions-container {
+    position: absolute;
+    top: -10px;
+    right: 5px;
+    z-index: 5;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+
+.message:hover .message-actions-container {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+.message-actions {
+    display: flex;
+    gap: 4px;
+    background: rgba(15, 15, 15, 0.8);
+    backdrop-filter: blur(8px);
+    padding: 2px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-action-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.message-action-button:hover {
+    background: rgba(0, 200, 83, 0.15);
+    color: rgba(0, 200, 83, 1);
+}
+
+.message-action-button:active {
+    transform: scale(0.95);
+}
+
 .message-avatar {
     width: 36px;
     height: 36px;
@@ -525,6 +575,118 @@ body {
     height: 1rem;
     width: 1rem;
     stroke: white;
+}
+
+/* Message dropdown styling */
+.response-container {
+    width: 100%;
+}
+
+.dropdown-container {
+    margin-top: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.dropdown-header:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.dropdown-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dropdown-loading-icon {
+    animation: spin 1.5s linear infinite;
+    color: #fff;
+}
+
+.dropdown-complete-icon {
+    color: #fff;
+}
+
+.dropdown-label {
+    font-weight: 400;
+    font-size: 0.75rem;
+}
+
+.dropdown-toggle {
+    color: #fff;
+    transition: transform 0.2s ease;
+}
+
+.dropdown-content {
+    padding: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    animation: expandContent 0.3s ease-out;
+}
+
+.dropdown-markdown {
+    word-break: break-word;
+    width: 100%;
+}
+
+.dropdown-loading {
+    display: flex;
+    justify-content: center;
+    padding: 1rem 0;
+}
+
+.dropdown-loading-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.dropdown-loading-dots span {
+    width: 8px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    animation: bounce 1.4s infinite ease-in-out;
+}
+
+.dropdown-loading-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.dropdown-loading-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes expandContent {
+    from {
+        max-height: 0;
+        opacity: 0;
+    }
+
+    to {
+        max-height: 1000px;
+        opacity: 1;
+    }
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Input container styles */
