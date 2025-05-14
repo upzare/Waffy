@@ -126,7 +126,8 @@ export const typeText = async ({ x, y, text }: { x: number, y: number, text: str
                 return;
             }
             await click({ x, y, highlight: false });
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: { timeout: text.length * 150 } });
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: { timeout: text.length * 150 + 300 } });
+            await sleep(300);
             for await (const char of text) {
                 if (char === '\n') {
                     keyPress({ key: "Enter" });

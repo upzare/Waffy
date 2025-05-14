@@ -49,9 +49,10 @@ class CustomHandler(CustomLogger):
         try:
             if ("handler" in data):
                 if (data["handler"] == "t1"):
-                    data["model"] = "gpt-4.1-mini"
+                    data["model"] = "gpt-4.1"
                     data["tools"] = T1_TOOLS
                     data["stream"] = True
+                    data["temperature"] = 0.5
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -61,7 +62,7 @@ class CustomHandler(CustomLogger):
                     data["model"] = "gpt-4.1-mini"
                     data["tools"] = T2_TOOLS
                     data["stream"] = True
-                    # data["temperature"] = 0
+                    data["temperature"] = 0.1
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -71,7 +72,7 @@ class CustomHandler(CustomLogger):
                     data["model"] = "gpt-4.1"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
-                    # data["temperature"] = 0
+                    data["temperature"] = 0.1
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -80,6 +81,7 @@ class CustomHandler(CustomLogger):
                 elif (data["handler"] == "t4"):
                     data["model"] = "gpt-4.1-nano"
                     data["stream"] = True
+                    data["temperature"] = 1
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"

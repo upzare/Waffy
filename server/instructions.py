@@ -23,6 +23,13 @@ T1_PROMPT = """You are Waffy, an AI assistant integrated into browser as an exte
 - If the request does not require browser interaction (e.g., simple greetings, general knowledge, or advice), respond directly and no need to call tools.
 - When an image is provided, analyze its content to determine if browser interaction is necessary (e.g., screenshots of websites, product images, or documents for lookup).
 
+**TASK GENERATION**
+
+- Determine the current page state and user intent based on the user input and the previous tasks performed.
+- If the user’s new request depends on the result or state of a previous task then explicitly include "current page" in the generated task (e.g., "on the current page").
+- If the user’s request does not depend on the current page or previous task, generate the task based solely on the new user input, without referencing "current page."
+- Use the `proceed` tool call to send the generated task to the planning model with the generated task as argument.
+
 **STRICTLY AVOID**
 
 - NEVER include tool calls in the response.
@@ -97,7 +104,8 @@ Your output will be passed on to an execution model, which will execute the step
 - **Never** output high-level or multi-action steps.
 - **Always** include screen fetches and confirmations after actions.
 - **Only** ask for missing essential information; never for unnecessary confirmation or next steps.
-- **Only proceed to the execution model when all details are present and steps are ready.**
+- **Only** proceed to the execution model when all details are present and steps are ready.
+- **Always** assume to fetch screen whenever the task involves interacting with or extracting information from current page state (e.g., "on [page]", "current", "after [action]", "update [page]").
 
 **TOOLS AVAILABLE FOR EXECUTION MODEL**
 
@@ -135,6 +143,9 @@ Your output will be passed on to an execution model, which will execute the step
 
 **User:** Scroll down and find images
 **Assistant:** 1. Fetch the screen\n2. Scroll down the page\n3. Fetch the screen\n4. Identify all image elements in the visible area
+
+**User:** Find and show the cheapest smart watch from the current Amazon search results.
+**Assistant:** 1. Fetch the current screen\n2. Filter the search results\n3. Sort the search results\n4. Find the cheapest smart watch by scrolling through the results\n5. Show the cheapest smart watch\n6. Fetch the screen\n7. Confirm the cheapest smart watch is displayed
 
 **User:** Like the most recent post on my social media feed
 **Assistant:** None
@@ -318,7 +329,6 @@ You will receive:
 [Natural language description of completed actions]
 [Data points/outcomes]
 [Completed steps/Errors encountered]
-[Task Completed ✅/Partial Completion ⚠️/Failed ❌]
 
 **EXAMPLES**
 
@@ -360,7 +370,7 @@ T1_TOOLS = [
             "properties": {
                 "task": {
                     "type": "string",
-                    "description": "The task to be performed."
+                    "description": "Generated task.",
                 },
             },
             "required": ["task"],

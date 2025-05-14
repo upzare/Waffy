@@ -13,7 +13,7 @@ export async function* ai(messages: any[], handler: string, signal?: AbortSignal
         metadata: {
             client_id: "unique-client-123",
             trace_user_id: "user-123"
-        }
+        },
     });
 
     for await (const event of response) {

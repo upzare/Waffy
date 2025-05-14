@@ -191,6 +191,11 @@ const App = () => {
             const toolArgs = JSON.parse(toolCall.arguments);
             if (toolName === "proceed") {
                 setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text }, files: [...(msg.content.files || [])] }, task: toolArgs.task } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+                setMessages(prev => {
                     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: true } } : msg);
                     updateConversationsDB(update);
                     return update;
@@ -201,8 +206,9 @@ const App = () => {
         return false;
     }
 
-    const t2Handler = async (messageId: string, task: string, prompt_files: FileFormat[]) => {
-        const t2Prompt = [{ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] }];
+    const t2Handler = async (messageId: string, task: string, previousTask: any, prompt_files: FileFormat[]) => {
+        const t2Prompt = previousTask;
+        t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
         const stepsModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
         let instructionSteps = "";
         const planningToolCalls: Record<string, ToolCall> = {};
@@ -231,8 +237,13 @@ const App = () => {
             const toolName = toolCall.name;
             const toolArgs = JSON.parse(toolCall.arguments);
             if (toolName === "missing") {
+                // setMessages(prev => {
+                //     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t2: "Insufficient information to perform task." }, files: [...(msg.content.files || [])] } } : msg);
+                //     updateConversationsDB(update);
+                //     return update;
+                // });
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t2: toolArgs.message }, files: [...(msg.content.files || [])] } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { t1: toolArgs.message }, files: [...(msg.content.files || [])] } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -301,6 +312,10 @@ const App = () => {
                 }
                 functionExecState = true;
             }
+            if (abortControllerRef.current?.signal.aborted) {
+                return false;
+            }
+
         }
         setMessages(prev => {
             const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t3: false } } : msg);
@@ -317,7 +332,7 @@ const App = () => {
     }
 
     const t4Handler = async (messageId: string, task: string, instructionSteps: string, executionResponse: string) => {
-        const prompt = `**Task:** ${task}\n**Steps:** ${instructionSteps}\n**Output:** ${executionResponse}`;
+        const prompt = `**Task:**\n${task}\n\n**Steps:**\n${instructionSteps}\n\n**Output:**\n${executionResponse}`;
         const t4Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
         const summaryModelStream = ai(t4Prompt, "t4", abortControllerRef?.current?.signal);
         let summary = "";
@@ -343,36 +358,42 @@ const App = () => {
 
     const handleSendMessage = async () => {
         if ((!message.trim() && files.length === 0) || isGenerating) return;
-        let messageId = Date.now().toString();
+        const messageId = Date.now().toString();
         setIsGenerating(true);
         if (textareaRef.current) {
             textareaRef.current.style.color = "#909090";
         }
         abortControllerRef.current = new AbortController();
-        let content = message.trim();
+        const prompt_text = message.trim();
         if (isFirstMessage) {
             homeSection.current?.classList.add("hidden");
             setIsFirstMessage(false);
-            initConversation(content);
+            initConversation(prompt_text);
         }
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: { t0: content }, files: files }, isUser: true, isError: false },
+                { id: `user-${messageId}`, content: { text: { t0: prompt_text }, files: files }, isUser: true, isError: false },
                 { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { t1: true, t2: false, t3: false, t4: false }, isUser: false, isError: false }
             ];
             updateConversationsDB(update);
             return update;
         });
         const previousPrompt = [];
+        const previousTask = [];
         for await (const msg of messages) {
             if (!msg.isError) {
                 if (msg.isUser) {
-                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files!)] });
+                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files || [])] });
                 } else {
-                    previousPrompt.push({ type: "response", content: [{ type: "text", text: msg.content.text?.t4 || msg.content.text?.t1 }] });
+                    const assistantPrompt = `${msg.content.text?.t1}\n\n**Steps:**\n${msg.content.text?.t2}\n\n**Output:**\n${msg.content.text?.t4}`;
+                    previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }] });
+                    if (msg.content?.task) {
+                        previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task, ...await fileHandler(msg.content.files || []) }] });
+                        previousTask.push({ type: "response", content: [{ type: "text", text: `**Steps:**\n${msg.content.text?.t2}\n\n**Output:**\n${msg.content.text?.t4}` }] });
+                    }
                 }
-            }else {
+            } else {
                 previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.t0}` }] });
             }
         };
@@ -389,12 +410,12 @@ const App = () => {
                     console.log(`Debugger attached to tab ${tabs[0].id}`);
                 });
             });
-            const task = await t1Handler(messageId, previousPrompt, content, prompt_files);
+            const task = await t1Handler(messageId, previousPrompt, prompt_text, prompt_files);
             if (task) {
-                const instructionSteps = await t2Handler(messageId, task, prompt_files);
+                const instructionSteps = await t2Handler(messageId, task, previousTask, prompt_files);
                 if (instructionSteps) {
                     const executionResponse = await t3Handler(messageId, instructionSteps, prompt_files);
-                    await t4Handler(messageId, task, instructionSteps, executionResponse);
+                    if (executionResponse) await t4Handler(messageId, task, instructionSteps, executionResponse);
                 }
             }
         } catch (error) {
