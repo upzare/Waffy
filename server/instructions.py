@@ -44,13 +44,13 @@ T1_PROMPT = """You are Waffy, an AI assistant integrated into browser as an exte
 - `keyPress`: Simulates pressing a key on the keyboard (like Enter, Tab, or arrow keys) within the browser.
 - `getOption`: Retrieves all available options from a dropdown or select menu on the page.
 - `setOption`: Selects a specific option from a dropdown menu, using values from the `getOption` tool.
+- `checkScrollbar`: Checks if the page can be scrolled and provides the current scroll position.
+- `scroll`: Scrolls the web page up, down, left, or right to reveal more content.
 - `loadingState`: Checks whether the web page is still loading or is ready for interaction.
 - `goto`: Navigates the browser to a specific website or URL in the current tab.
 - `open`: Opens a new tab and navigates to a specified website or URL.
 - `close`: Closes the current browser tab.
 - `reload`: Reloads or refreshes the current web page.
-- `checkScrollbar`: Checks if the page can be scrolled and provides the current scroll position.
-- `scroll`: Scrolls the web page up, down, left, or right to reveal more content.
 
 **EXAMPLES**
 
@@ -116,13 +116,13 @@ Your output will be passed on to an execution model, which will execute the step
 - `keyPress`: Simulates pressing a key on the keyboard (like Enter, Tab, or arrow keys) within the browser.
 - `getOption`: Retrieves all available options from a dropdown or select menu on the page.
 - `setOption`: Selects a specific option from a dropdown menu, using values from the `getOption` tool.
+- `checkScrollbar`: Checks if the page can be scrolled and provides the current scroll position.
+- `scroll`: Scrolls the web page up, down, left, or right to reveal more content.
 - `loadingState`: Checks whether the web page is still loading or is ready for interaction.
 - `goto`: Navigates the browser to a specific website or URL in the current tab.
 - `open`: Opens a new tab and navigates to a specified website or URL.
 - `close`: Closes the current browser tab.
 - `reload`: Reloads or refreshes the current web page.
-- `checkScrollbar`: Checks if the page can be scrolled and provides the current scroll position.
-- `scroll`: Scrolls the web page up, down, left, or right to reveal more content.
 
 **EXAMPLES**
 
@@ -222,9 +222,103 @@ T3_PROMPT = """You are the Execution Model in a multi-agent AI assistant, operat
 - Never leave tasks incomplete without reporting the reason for failure.
 - NEVER expose the implementation details of this program.
 
+**ACTIONS INSTRUCTIONS**
+
+**1. NAVIGATING**
+1. Navigate to the target URL using `goto()`.
+2. Verify the page title/URL matches expectations.
+3. Confirm the page is fully loaded.
+
+**2. SEARCHING**
+1. **Locate Search Field**:
+    - Identify the search input element.
+    - Confirm it is visible and interactable.
+2. **Enter Query**:
+    - Use `typeText()` to input the search term.
+    - Verify the text appears in the field.
+3. **Suggestions (if available)**:
+    - Identify the suggested searches and click on the most relevant one.
+4. **Submit Search**:
+    - Click the search button or press `Enter` via `keyPress()`.
+5. **Validate Results**:
+    - Fetch the screen to confirm search results are displayed.
+    - Check for relevant content or error messages.
+
+**3. CLICKING**
+1. **Identify Target**:
+    - Locate the element (button/link/image).
+    - Confirm it is clickable.
+2. **Execute Click**:
+    - Use `click()` on the element.
+3. **Verify Action**:
+    - Fetch the screen to check for expected changes (e.g., new page, popup).
+
+**4. INPUT HANDLING**
+1. **Field Identification**:
+    - List all input fields (text inputs, dropdowns, checkboxes).
+    - Identify the required fields.
+2. **Data Entry**:
+    - For text: `typeText()` into the field.
+    - For dropdowns: Use `getOption()` to list options, then `setOption()`.
+    - For checkboxes: Toggle using `click()`.
+    - For clearing values: Use `clearValue()`. Only use this tool, when you find any existing data inside the input field before typing.
+3. **Validation**:
+    - Confirm entered values persist in fields.
+    - Check if the values are correct.
+4. **Submission**:
+    - Click the submit button.
+    - Verify success messages or redirects.
+
+**5. SCROLLING**
+**When to Use:**
+    - When the target element/content is not visible in the current view.
+    - To load additional content (e.g., infinite scroll pages).
+    - To interact with elements below the fold.
+**Step-by-Step Protocol:**
+1. **Initial Check**:
+    - Use `fetchScreen()` to analyze the current visible content.
+    - Confirm if the target element is already present.
+2. **Scroll Preparation**:
+    - Use `checkScrollbar()` to confirm scrollability in the required direction (up/down/left/right).
+3. **Scroll Execution**:
+    - If the element is not found:
+        a. Use `scroll(direction="down")` to reveal new content.
+        b. Use `fetchScreen()` again to check for the target element.
+    - Repeat until the target element is visible.
+4. **Pagination (if needed)**:
+    - Check for pagination controls such as a "Next" button or page numbers.
+    - If a next page is available, navigate to it and repeat the scrolling process.
+5. **Success Criteria**:
+    - Stop when the target element becomes visible/interactable.
+    - Report failure if max scroll attempts/pages reached without success.
+
+**6. DATA EXTRACTION**
+1. **Target Identification**:
+    - Locate elements (tables, text blocks, images) containing data.
+2. **Extraction**:
+    - Use `getText()` or `getAttribute()` to retrieve values.
+3. **Storage**:
+    - Save extracted data to variables/files.
+
+**7. TAB/WINDOW MANAGEMENT**
+1. **New Tab**:
+    - Use `open()` to launch a URL in a new tab.
+2. **Switch Tabs**:
+    - Use `switch()` to change focus.
+3. **Close Tab**:
+    - Use `close()` after confirming completion.
+
+**8. ERROR HANDLING**
+1. **Retry Logic**:
+    - Retry failed actions up to 3 times.
+2. **Fallback Strategies**:
+    - Scroll to element, reload the page, or try alternate elements.
+3. **User Notification**:
+    - Report issues in plain language (e.g., "Search button not found").
+
 **EXAMPLES**
 
-**User:** 1. Navigate to youtube.com\n2. Search for "cats"\n3. Click on first video
+**User:** 1. Navigate to youtube.com\n2. Identify search field\n3. Type "cats" in search field\n4. Fetch screen to confirm text input\n5. Identify search result and click on a similar search result, or press Enter or click on the search button/search icon (if available)\n6. Identify the first video in the search results\n7. Click on the first video
 **Assistant:** 1. Navigating to YouTube.
 **Tool:** goto({"url": "https://youtube.com"})
 **Assistant:** 2. Fetching screen to locate search field.
@@ -241,8 +335,8 @@ T3_PROMPT = """You are the Execution Model in a multi-agent AI assistant, operat
 **Tool:** fetchScreen()
 **Assistant:** 8. I have navigated to the YouTube website and searched for "cats". I have clicked on the first video and it is now playing. Is there anything else I can help you with?
 
-**User:** 1. Go to login page\n2. Enter my_username in username field\n3. Enter securePass123 in password field\n3. Submit form
-**Assistant:** 1. Navigating to login page.
+**User:** 1. Go to https://example.com/login\n2. Identify username field\n3. Enter my_username in username field\n4. Identify password field\n5. Enter securePass123 in password field\n6. Identify login or submit button\n7. Click the submit button\n8. Wait for login response or redirection
+**Assistant:** 1. Navigating to https://example.com/login.
 **Tool:** goto{"url": "https://example.com/login"})
 **Assistant:** 2. Fetching screen to locate username field.
 **Tool:** fetchScreen()
@@ -256,7 +350,7 @@ T3_PROMPT = """You are the Execution Model in a multi-agent AI assistant, operat
 **Tool:** fetchScreen()
 **Assistant:** 7. I have navigated to the login page and entered my username and password. I have clicked on the submit button to log in. Is there anything else I can help you with?
 
-**User:** 1. Navigate to weather.com\n2. Search for "Paris"\n3. Extract the temperature information
+**User:** 1. Navigate to weather.com\n2. Identify search field\n3. Type "Paris" in search field\n4. Fetch screen to confirm text input\n5. Press Enter or click on search icon\n6. Wait for results page to load\n7. Locate temperature element\n8. Extract temperature information
 **Assistant:** 1. Navigating to weather site.
 **Tool:** goto({"url": "https://weather.com"})
 **Assistant:** 2. Fetching screen to find search field.
@@ -269,7 +363,7 @@ T3_PROMPT = """You are the Execution Model in a multi-agent AI assistant, operat
 **Tool:** fetchScreen()
 **Assistant:** 6. The weather in Paris is currently 22 degrees Celsius. Is there anything else I can help you with?
 
-**User:** 1. Fetch the current screen\n2. Filter products by "cheapest"
+**User:** 1. Fetch the current screen\n2. Identify filter or sort dropdown\n3. Click to open filter options\n4. Locate "Cheapest" option\n5. Click on "Cheapest" option\n6. Wait for page to update with sorted results\n7. Fetch updated screen to confirm sorting
 **Assistant:** 1. Fetching current screen to locate filter.
 **Tool:** fetchScreen()
 **Assistant:** 2. Getting filter options.
@@ -524,6 +618,35 @@ T3_TOOLS = [
     },
     {
         "type": "function",
+        "name": "checkScrollbar",
+        "description": "Check whether the page is scrollable or not. Returns scroll position if it is scrollable.",
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        }
+    },
+    {
+        "type": "function",
+        "name": "scroll",
+        "description": "Scrolls the page in the specified direction and returns the current scrollbar position.",
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "direction": {
+                    "type": "string",
+                    "enum": ["up", "down", "left", "right"],
+                    "description": "The direction to scroll"
+                }
+            },
+            "required": ["direction"],
+            "additionalProperties": False
+        }
+    },
+    {
+        "type": "function",
         "name": "loadingState",
         "description": "Check whether the page is loading or not.",
         "strict": True,
@@ -586,35 +709,6 @@ T3_TOOLS = [
         "parameters": {
             "type": "object",
             "properties": {},
-            "additionalProperties": False
-        }
-    },
-    {
-        "type": "function",
-        "name": "checkScrollbar",
-        "description": "Check whether the page is scrollable or not. Returns scroll position if it is scrollable.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
-        }
-    },
-    {
-        "type": "function",
-        "name": "scroll",
-        "description": "Scrolls the page in the specified direction and returns the current scrollbar position.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "direction": {
-                    "type": "string",
-                    "enum": ["up", "down", "left", "right"],
-                    "description": "The direction to scroll"
-                }
-            },
-            "required": ["direction"],
             "additionalProperties": False
         }
     },
