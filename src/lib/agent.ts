@@ -11,8 +11,8 @@ export async function* ai(messages: any[], handler: string, signal?: AbortSignal
         data: messages,
         stream: true,
         metadata: {
-            client_id: "unique-client-123",
-            trace_user_id: "user-123"
+            client_id: records.client_id,
+            trace_user_id: records.trace_user_id
         },
     });
 
@@ -31,8 +31,8 @@ export async function generateTitle(prompt: string) {
             // @ts-ignore
             title: prompt,
             metadata: {
-                client_id: "unique-client-123",
-                trace_user_id: "user-123"
+                client_id: records.client_id,
+                trace_user_id: records.trace_user_id
             }
         });
 
