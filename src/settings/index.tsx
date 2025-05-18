@@ -18,9 +18,9 @@ const Settings = () => {
     useEffect(() => {
         const loadSettings = async () => {
             try {
-                const stored = await Browser.storage.local.get("extension_settings");
-                if (stored.extension_settings) {
-                    setSettings(JSON.parse(stored.extension_settings as string));
+                const localStorage = await Browser.storage.local.get("data");
+                if (localStorage.data) {
+                    setSettings(JSON.parse(localStorage.data as string));
                 } else {
                     handleSave();
                 }
@@ -33,7 +33,7 @@ const Settings = () => {
 
     const handleSave = async () => {
         try {
-            await Browser.storage.local.set({ extension_settings: JSON.stringify(settings) });
+            await Browser.storage.local.set({ data: JSON.stringify(settings) });
             chrome.sidePanel.setOptions({
                 path: "panel.html",
                 enabled: false
@@ -56,7 +56,7 @@ const Settings = () => {
             client_id: "",
             trace_user_id: "",
         };
-        await Browser.storage.local.set({ extension_settings: JSON.stringify(defaultSettings) });
+        await Browser.storage.local.set({ data: JSON.stringify(defaultSettings) });
         chrome.sidePanel.setOptions({
             path: "panel.html",
             enabled: false
@@ -73,7 +73,9 @@ const Settings = () => {
         switch (activeSection) {
             case 'general':
                 return (
-                    <></>
+                    <>
+                    
+                    </>
                 );
             default:
                 return null;
