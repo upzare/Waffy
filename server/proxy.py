@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import asyncio
@@ -12,6 +13,9 @@ import cloudinary
 import cloudinary.uploader
 from mistralai import Mistral
 from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
+from redis import Redis
+from supabase import create_client, Client
+import hashlib
 
 DEBUG = True
 
@@ -32,6 +36,12 @@ cloudinary.config(
 )
 
 mistral = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+
+supabase_url: str = os.environ.get("SUPABASE_URL")
+supabase_key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+redis = Redis(host="localhost", port=6379)
 
 class CustomHandler(CustomLogger):
     def __init__(self):
@@ -72,7 +82,7 @@ class CustomHandler(CustomLogger):
                     data["model"] = "gpt-4.1"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
-                    data["temperature"] = 0.1
+                    data["temperature"] = 0
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -138,6 +148,7 @@ class CustomHandler(CustomLogger):
                         meta = metadata[index]
                         print("IMAGE:", (await asyncio.gather(self.async_upload(image)))[0]) if DEBUG else None
                         self.client_props[data["metadata"]["client_id"]] = { "meta": messages["metadata"], "props": props }
+                        # todo: correct index
                         data["input"].append({
                             "role": "user",
                             "content": [
@@ -204,12 +215,46 @@ class CustomHandler(CustomLogger):
                             fc_id = item_dict["id"]
                             if (fc_id in self.client_fc):
                                 data_dict["response"]["output"][index] = self.client_fc[fc_id]
+                    usage = data_dict["response"]["usage"]
+                    metadata = data_dict["response"]["metadata"]
+                    print("USAGE:", usage)
+                    update_task = await asyncio.gather(self.async_update_usage(metadata, usage))
+
+
                     yield type(data)(**data_dict)
                     continue
             except Exception as e:
                 print("POST-ERROR:", e)
-
+            
             yield data
+
+    async def async_update_usage(self, metadata, usage):
+        def update_usage():
+            keymap = "keymap:" + metadata["account_id"] + ":" + metadata["client_id"]
+            session = redis.hget(keymap, "session").decode("utf-8")
+            user_id = redis.hget(keymap, "user_id").decode("utf-8")
+            # DB Update
+            db_data = supabase.from_("credits").select("*", count="exact").eq("user_id", user_id).execute().data[0]
+            used_tokens = db_data["used_tokens"]
+            new_used_tokens = used_tokens + usage["used_tokens"]
+            used_credits = db_data["used_credits"]
+            new_used_credits = used_credits + usage["used_credits"]
+            current_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            supabase.from_("credits").update({"used_tokens": new_used_tokens, "used_credits": new_used_credits, "updated_at": current_time}).eq("user_id", user_id).execute()
+            # Redis Update
+            key = "session:" + session
+            redis_data = {
+                "active": True if db_data["linked_subscription"] else False,
+                "total_credits": db_data["total_credits"],
+                "used_credits": db_data["used_credits"],
+                "total_tokens": db_data["total_tokens"],
+                "used_tokens": db_data["used_tokens"],
+                "last_sync": int(time.time() * 1000)
+            }
+            redis.hset(key, "credits", json.dumps(redis_data))
+            redis.expire(key, 604800)
+        
+        return asyncio.to_thread(update_usage)
 
     async def async_parse(self, image):
         def parse():
