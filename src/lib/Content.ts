@@ -1,13 +1,4 @@
-import Browser, { runtime } from 'webextension-polyfill';
-import { TextMessage, StorageResult, DomMessage } from '../types';
-import { simplifyDOM, getSelector } from './actions';
-import type { DomProps } from '../types';
-
-const startup = async () => {
-    const result = await Browser.storage.local.get('isActive') as StorageResult;
-    await Browser.runtime.sendMessage({ type: 'toggle', isActive: result.isActive });
-}
-startup();
+import { DomMessage } from '../types';
 
 let tabId: number;
 chrome.runtime.sendMessage({ action: 'GET_TAB_ID' }, (response) => {
