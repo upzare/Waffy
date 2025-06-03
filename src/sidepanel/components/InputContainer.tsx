@@ -80,6 +80,10 @@ const InputContainer: React.FC<InputContainerProps> = ({
         setShowOptionsMenu(!showOptionsMenu);
     }
 
+    const handleSettings = () => {
+        chrome.runtime.openOptionsPage();
+    }
+
     return (
         <div className="input-container">
             <div className="input-box">
@@ -90,7 +94,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
 
                     {showOptionsMenu && (
                         <div className="options-menu">
-                            <div className="options-menu-item">
+                            <div className="options-menu-item" onClick={() => handleSettings()}>
                                 <Settings />
                                 <span>Settings</span>
                             </div>

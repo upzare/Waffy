@@ -19,14 +19,31 @@ export const initSettings = async () => {
     const localStorage = await Browser.storage.local.get();
     if (!localStorage.data) {
         Browser.storage.local.set({
-            data: JSON.stringify({
-                waffyAPI: "",
+            settings: JSON.stringify({
                 theme: "system",
                 enableHistory: true,
                 enableKeyboardShortcuts: true,
                 enableNotifications: true,
+            }),
+            data: JSON.stringify({
+                signed: false,
                 account: {
-                    account_id: "6b674948-3fd0-48c8-af43-56b9a204d965",
+                    account_id: "",
+                    email: "",
+                    name: "",
+                    phone_number: "",
+                },
+                subscription: {
+                    plan: "",
+                    created_at: 0,
+                    expires_at: 0,
+                    active: false,
+                },
+                credits: {
+                    total_credits: 0,
+                    used_credits: 0,
+                    total_tokens: 0,
+                    used_tokens: 0,
                 },
             })
         });
@@ -36,6 +53,7 @@ export const initSettings = async () => {
 export const getLocalStorage = async () => {
     const localStorage = await Browser.storage.local.get();
     localStorage.client = JSON.parse(localStorage.client as string);
+    localStorage.settings = JSON.parse(localStorage.settings as string);
     localStorage.data = JSON.parse(localStorage.data as string);
     return localStorage;
 }
