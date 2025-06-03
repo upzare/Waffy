@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
+import { getLocalStorage, initClient } from "../lib/client";
 import { ai, generateTitle } from '../lib/agent';
 import { Message, Conversation, ToolCall, FileFormat } from '../types';
 import Header from './components/Header';
@@ -14,8 +15,10 @@ import { availableFunctions } from '../lib/tools';
 import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
 import Particles from './components/Particles';
+import Browser from 'webextension-polyfill';
 
 const App = () => {
+    const [signed, setSigned] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [isFirstMessage, setIsFirstMessage] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -38,6 +41,8 @@ const App = () => {
     const conversationID = useRef<string>(null);
 
     useEffect(() => {
+        initClient();
+        initSigned();
         initDB();
         fetchConversations();
         Mousetrap.bind("ctrl+space", () => { speechRecognition() });
@@ -82,10 +87,16 @@ const App = () => {
         });
     };
 
+    const initSigned = async () => {
+        getLocalStorage().then((localStorage: Record<string, any>) => {
+            setSigned(localStorage.data.signed);
+        });
+    };
+
     const initDB = () => {
         db_request.current = indexedDB.open("WaffyDB", 1);
         db_request.current.onerror = (event) => {
-            console.error("Error opening database:", event);
+            console.log("Error connecting database:", event);
         };
         db_request.current.onupgradeneeded = (event) => {
             db.current = (event.target as IDBOpenDBRequest).result as IDBDatabase;
@@ -115,7 +126,7 @@ const App = () => {
                     data.title = title;
                     const res = conversationDB.put(data);
                     res.onerror = (event) => {
-                        console.error("Error updating title:", event);
+                        console.log("Error updating title:", event);
                     };
                     res.onsuccess = () => {
                         return;
@@ -148,7 +159,7 @@ const App = () => {
                     data.messages = updatedMessages;
                     const res = conversationDB.put(data);
                     res.onerror = (event) => {
-                        console.error("Error updating conversation:", event);
+                        console.log("Error updating data:", event);
                     };
                     res.onsuccess = () => {
                         return;
@@ -405,7 +416,7 @@ const App = () => {
                 }
                 chrome.debugger.attach({ tabId: tabs[0].id }, "1.3", () => {
                     if (chrome.runtime.lastError) {
-                        console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
+                        console.log("Debugger attach failed: ", chrome.runtime.lastError.message);
                     }
                     console.log(`Debugger attached to tab ${tabs[0].id}`);
                 });
@@ -445,7 +456,7 @@ const App = () => {
                 }
                 chrome.debugger.detach({ tabId: tabs[0].id }, () => {
                     if (chrome.runtime.lastError) {
-                        console.error("Error detaching from tab:", chrome.runtime.lastError.message);
+                        console.log("Error detaching from tab:", chrome.runtime.lastError.message);
                     }
                 });
             });

@@ -95,8 +95,20 @@ export interface ParticlesProps {
 }
 
 export interface Settings {
-    client_id: string;
-    trace_user_id: string;
+    waffyAPI: string;
+    theme?: "system" | "dark" | "light";
+    enableHistory?: boolean;
+    enableKeyboardShortcuts?: boolean;
+    enableNotifications?: boolean;
+    dataCollection?: "full" | "minimal" | "none";
+    account?: {
+        email?: string;
+        name?: string;
+        avatar?: string;
+        isLoggedIn?: boolean;
+        plan?: "free" | "pro" | "enterprise";
+        lastLogin?: string;
+    };
 }
 
 export interface DomProps {
