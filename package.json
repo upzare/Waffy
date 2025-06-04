@@ -1,17 +1,13 @@
 {
-  "name": "chrome-extension",
-  "version": "0.1.0",
+  "name": "waffy-extension",
+  "version": "0.0.0",
   "private": true,
   "dependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/jest": "^29.5.14",
-    "@types/node": "^22.15.10",
-    "lucide-react": "^0.507.0",
-    "marked": "^15.0.11",
+    "@types/zip-webpack-plugin": "^3.0.6",
+    "lucide-react": "^0.511.0",
+    "marked": "^15.0.12",
     "mousetrap": "^1.6.5",
-    "openai": "^4.97.0",
+    "openai": "^5.0.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hot-toast": "^2.5.2",
@@ -20,46 +16,55 @@
     "react-syntax-highlighter": "^15.6.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
-    "sanitize-html": "^2.16.0",
+    "sanitize-html": "^2.17.0",
     "spoken": "^1.1.17",
-    "typescript": "^4.9.5",
     "uuid": "^11.1.0",
-    "web-vitals": "^4.2.4",
+    "web-vitals": "^5.0.2",
     "webextension-polyfill": "^0.12.0",
-    "zod": "^3.24.1"
+    "zod": "^3.25.49"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-app-rewired build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "build": "cross-env NODE_ENV=production webpack",
+    "dev": "cross-env NODE_ENV=development webpack",
+    "start": "cross-env NODE_ENV=development webpack serve",
+    "stats": "cross-env NODE_ENV=production webpack --profile --json > stats.json"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.320",
+    "@babel/core": "^7.27.4",
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@babel/plugin-transform-react-jsx": "^7.27.1",
+    "@babel/plugin-transform-react-jsx-development": "^7.27.1",
+    "@babel/preset-env": "^7.27.2",
+    "@babel/preset-react": "^7.27.1",
+    "@types/chrome": "^0.0.326",
     "@types/mousetrap": "^1.6.15",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.3",
-    "@types/sanitize-html": "^2.16.0",
+    "@types/node": "^22.15.29",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
     "@types/webextension-polyfill": "^0.12.3",
-    "customize-cra": "^1.0.0",
-    "react-app-rewired": "^2.2.1"
+    "babel-eslint": "^10.1.0",
+    "babel-loader": "^10.0.0",
+    "babel-preset-react-app": "^10.1.0",
+    "browserslist": "^4.25.0",
+    "clean-webpack-plugin": "^4.0.0",
+    "copy-webpack-plugin": "^13.0.0",
+    "cross-env": "^7.0.3",
+    "css-loader": "^7.1.2",
+    "file-loader": "^6.2.0",
+    "html-loader": "^5.1.0",
+    "html-webpack-plugin": "^5.6.3",
+    "react-refresh": "^0.17.0",
+    "react-refresh-typescript": "^2.0.10",
+    "source-map-loader": "^5.0.0",
+    "terser-webpack-plugin": "^5.3.14",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^4.9.5",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.1",
+    "webpack-license-plugin": "^4.5.1",
+    "zip-webpack-plugin": "^4.0.3"
   }
 }
