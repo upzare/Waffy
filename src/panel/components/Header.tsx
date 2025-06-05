@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import AccountMenu from "./AccountMenu";
 import { Plus, User } from "lucide-react";
 import type { HeaderProps } from "../../types";
+import styles from "css/panel/Header.module.css";
 
 const Header: React.FC<HeaderProps> = ({ currentConversationId, currentTitle, onNewChat }) => {
     const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -21,28 +22,28 @@ const Header: React.FC<HeaderProps> = ({ currentConversationId, currentTitle, on
     }, []);
 
     return (
-        <header className="header">
-            <div className="header-left">
+        <header className={styles.header}>
+            <div className={styles.headerLeft}>
                 {!!!currentConversationId ? (
                     <a href="https://waffy.io" target="_blank" rel="noreferrer">
-                        <img src="/logo.svg" alt="Waffy Logo" className="header-logo-img" />
+                        <img src="/assets/logo.svg" alt="Waffy Logo" className={styles.headerLogoImg} />
                     </a>
                 ) : (
-                    <button className="new-chat-button" onClick={onNewChat} title="New Chat">
+                    <button className={styles.newChatButton} onClick={onNewChat} title="New Chat">
                         <Plus />
                     </button>
                 )}
             </div>
 
             {!!currentConversationId && (
-                <div className="header-center">
-                    <div className="header-title">{currentTitle}</div>
+                <div className={styles.headerCenter}>
+                    <div className={styles.headerTitle}>{currentTitle}</div>
                 </div>
             )}
 
-            <div className="header-right">
+            <div className={styles.headerRight}>
                 <button
-                    className="account-button"
+                    className={styles.accountButton}
                     title="Account"
                     onClick={() => setIsAccountMenuOpen(true)}
                 >
@@ -50,7 +51,7 @@ const Header: React.FC<HeaderProps> = ({ currentConversationId, currentTitle, on
                 </button>
             </div>
             <AccountMenu isOpen={isAccountMenuOpen} onClose={() => setIsAccountMenuOpen(false)} accountMenuRef={accountMenuRef} />
-        </header >
+        </header>
     )
 }
 

@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import type { HistorySidebarProps } from "../../types";
+import styles from "css/panel/HistorySidebar.module.css";
 
 const HistorySidebar: React.FC<HistorySidebarProps> = ({
     conversations,
@@ -9,22 +10,26 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
     currentConversationId,
 }) => {
     return (
-        <div className={`history-sidebar ${visible ? "visible" : ""}`}>
-            <div className="history-header">
+        <div className={`${styles.historySidebar} ${visible ? styles.visible : ""}`}>
+            <div className={styles.historyHeader}>
                 <h3>Conversation History</h3>
             </div>
-            <div className="history-list">
+            <div className={styles.historyList}>
                 {conversations.length === 0 ? (
-                    <div className="no-history">No conversation history</div>
+                    <div className={styles.noHistory}>No conversation history</div>
                 ) : (
                     conversations.map((conv) => (
-                        <div key={conv.id} className={`history-item ${conv.id === currentConversationId ? "active" : ""}`} onClick={() => onSelectConversation(conv.id)}>
-                            <div className="history-item-content">
-                                <span className="history-item-title" title={conv.title}>{conv.title}</span>
-                                <span className="history-item-date">{new Date(conv.timestamp).toLocaleDateString()}</span>
+                        <div 
+                            key={conv.id} 
+                            className={`${styles.historyItem} ${conv.id === currentConversationId ? styles.active : ""}`} 
+                            onClick={() => onSelectConversation(conv.id)}
+                        >
+                            <div className={styles.historyItemContent}>
+                                <span className={styles.historyItemTitle} title={conv.title}>{conv.title}</span>
+                                <span className={styles.historyItemDate}>{new Date(conv.timestamp).toLocaleDateString()}</span>
                             </div>
                             <button
-                                className="history-item-delete"
+                                className={styles.historyItemDelete}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onRemoveConversation(conv.id)

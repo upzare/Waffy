@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { CircleStop, EllipsisVertical, File, Info, Mic, Paperclip, Send, Settings, Share, X } from "lucide-react";
 import type { InputContainerProps } from "../../types";
+import styles from "css/panel/InputContainer.module.css";
 
 const InputContainer: React.FC<InputContainerProps> = ({
     isGenerating,
@@ -85,24 +86,24 @@ const InputContainer: React.FC<InputContainerProps> = ({
     }
 
     return (
-        <div className="input-container">
-            <div className="input-box">
-                <div className="input-options-container" ref={optionsMenuRef}>
-                    <button className="options-button" onClick={toggleOptionsMenu} title="Options">
+        <div className={styles.inputContainer}>
+            <div className={styles.inputBox}>
+                <div className={styles.inputOptionsContainer} ref={optionsMenuRef}>
+                    <button className={styles.optionsButton} onClick={toggleOptionsMenu} title="Options">
                         <EllipsisVertical />
                     </button>
 
                     {showOptionsMenu && (
-                        <div className="options-menu">
-                            <div className="options-menu-item" onClick={() => handleSettings()}>
+                        <div className={styles.optionsMenu}>
+                            <div className={styles.optionsMenuItem} onClick={() => handleSettings()}>
                                 <Settings />
                                 <span>Settings</span>
                             </div>
-                            <div className="options-menu-item">
+                            <div className={styles.optionsMenuItem}>
                                 <Share />
                                 <span>Share</span>
                             </div>
-                            <div className="options-menu-item">
+                            <div className={styles.optionsMenuItem}>
                                 <Info />
                                 <span>Help</span>
                             </div>
@@ -112,7 +113,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
 
                 <textarea
                     ref={textareaRef}
-                    className="input-textarea"
+                    className={styles.inputTextarea}
                     placeholder="Type a message..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
@@ -120,9 +121,9 @@ const InputContainer: React.FC<InputContainerProps> = ({
                     rows={1}
                     disabled={!!(isGenerating || isRecording)}
                 />
-                <div className="input-buttons">
+                <div className={styles.inputButtons}>
                     {isGenerating ? (
-                        <button className="action-button stop-button" onClick={onStopGeneration} title="Stop generating">
+                        <button className={`${styles.actionButton} ${styles.stopButton}`} onClick={onStopGeneration} title="Stop generating">
                             <CircleStop />
                         </button>
                     ) : (
@@ -137,7 +138,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
                             />
                             <button
                                 ref={fileInputIconRef}
-                                className="action-button"
+                                className={styles.actionButton}
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={!!(isGenerating || isRecording)}
                                 title="Attach files"
@@ -147,7 +148,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
                             {message === "" ? (
                                 <button
                                     ref={microphoneIconRef}
-                                    className="action-button"
+                                    className={styles.actionButton}
                                     onClick={onSpeechRecognition}
                                     title="Microphone"
                                     disabled={!!(isGenerating || isRecording)}
@@ -157,7 +158,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
                             ) : (
                                 <button
                                     ref={sendIconRef}
-                                    className="action-button send-button"
+                                    className={`${styles.actionButton} ${styles.sendButton}`}
                                     onClick={onSendMessage}
                                     disabled={!!(isGenerating || isRecording)}
                                     title="Send"
@@ -170,22 +171,22 @@ const InputContainer: React.FC<InputContainerProps> = ({
                 </div>
             </div>
             {files.length > 0 && (
-                <div id="file-preview-container">
+                <div className={styles.filePreviewContainer}>
                     {files.map((file, index) => (
-                        <div key={`${file.name}-${index}`} className="input-file-preview">
+                        <div key={`${file.name}-${index}`} className={styles.inputFilePreview}>
                             {file.type.startsWith("image/") ? (
                                 <img
                                     src={URL.createObjectURL(file)}
-                                    className="input-file-thubmnail"
+                                    className={styles.inputFileThubmnail}
                                     alt={file.name}
                                 />
                             ) : (
                                 <File />
                             )}
-                            <span className="input-file-preview-name" title={file.name}>
+                            <span className={styles.inputFilePreviewName} title={file.name}>
                                 {file.name}
                             </span>
-                            <span className="input-remove-file" onClick={() => removeFile(index)}>
+                            <span className={styles.inputRemoveFile} onClick={() => removeFile(index)}>
                                 <X />
                             </span>
                         </div>

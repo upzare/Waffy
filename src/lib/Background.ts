@@ -1,4 +1,3 @@
-import Browser from "webextension-polyfill";
 import { initClient, initSettings } from "./client";
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -23,5 +22,3 @@ chrome.commands.onCommand.addListener((command) => {
     });
   }
 });
-
-export { };

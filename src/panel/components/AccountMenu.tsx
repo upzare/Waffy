@@ -1,5 +1,5 @@
-import type React from "react";
 import { LogOut, CreditCard, User, ExternalLink } from "lucide-react";
+import styles from "css/panel/AccountMenu.module.css";
 
 interface AccountMenuProps {
     isOpen: boolean;
@@ -31,58 +31,61 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ isOpen, onClose, accountMenuR
     }
 
     return (
-        <div className="account-menu" ref={accountMenuRef}>
-            <div className="account-menu-header">
-                <div className="account-avatar-large">
+        <div className={styles.accountMenu} ref={accountMenuRef}>
+            <div className={styles.accountMenuHeader}>
+                <div className={styles.accountAvatarLarge}>
                     {user.avatar ? (
                         <img src={user.avatar || "/placeholder.svg"} alt={user.name} />
                     ) : (
-                        <div className="avatar-placeholder-large">
+                        <div className={styles.avatarPlaceholderLarge}>
                             <User size={24} />
                         </div>
                     )}
                 </div>
-                <div className="account-menu-user-info">
-                    <div className="account-menu-name">{user.name}</div>
-                    <div className="account-menu-email">{user.email}</div>
+                <div className={styles.accountMenuUserInfo}>
+                    <div className={styles.accountMenuName}>{user.name}</div>
+                    <div className={styles.accountMenuEmail}>{user.email}</div>
                 </div>
             </div>
 
-            <div className="account-menu-credits">
-                <div className="credits-header">
+            <div className={styles.accountMenuCredits}>
+                <div className={styles.creditsHeader}>
                     <span>Credits Usage</span>
-                    <span className="credits-count">
+                    <span className={styles.creditsCount}>
                         {user.credits.used} / {user.credits.total}
                     </span>
                 </div>
-                <div className="credits-progress-container">
-                    <div className="credits-progress-bar" style={{ width: `${user.credits.percentage}%` }}></div>
+                <div className={styles.creditsProgressContainer}>
+                    <div 
+                        className={styles.creditsProgressBar} 
+                        style={{ width: `${user.credits.percentage}%` }}
+                    ></div>
                 </div>
-                <div className="credits-info">
-                    <div className={`plan-badge ${user.plan}`}>
+                <div className={styles.creditsInfo}>
+                    <div className={`${styles.planBadge} ${styles[user.plan]}`}>
                         {user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan
                     </div>
                     <div>{user.credits.total - user.credits.used} credits remaining this month</div>
                 </div>
             </div>
 
-            <div className="account-menu-actions">
-                <button className="account-menu-action" onClick={() => handleNavigation("/settings/account")}>
+            <div className={styles.accountMenuActions}>
+                <button className={styles.accountMenuAction} onClick={() => handleNavigation("/settings/account")}>
                     <User size={16} />
                     <span>My Account</span>
                 </button>
-                <button className="account-menu-action" onClick={() => handleNavigation("/billing")}>
+                <button className={styles.accountMenuAction} onClick={() => handleNavigation("/billing")}>
                     <CreditCard size={16} />
                     <span>Billing & Payments</span>
                 </button>
             </div>
 
-            <div className="account-menu-footer">
-                <button className="account-menu-upgrade" onClick={() => handleNavigation("/upgrade")}>
+            <div className={styles.accountMenuFooter}>
+                <button className={styles.accountMenuUpgrade} onClick={() => handleNavigation("/upgrade")}>
                     <span>Upgrade Plan</span>
                     <ExternalLink size={14} />
                 </button>
-                <button className="account-menu-logout" onClick={handleLogout}>
+                <button className={styles.accountMenuLogout} onClick={handleLogout}>
                     <span>Log Out</span>
                     <LogOut size={16} />
                 </button>

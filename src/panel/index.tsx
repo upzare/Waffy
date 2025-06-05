@@ -14,10 +14,12 @@ import { availableFunctions } from '../lib/tools';
 import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
 import Particles from './components/Particles';
+import styles from "css/panel/Root.module.css";
 
 const App = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isFirstMessage, setIsFirstMessage] = useState(true);
+    const [isChat, setIsChat] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState("");
     const [files, setFiles] = useState<File[]>([]);
@@ -30,7 +32,6 @@ const App = () => {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const homeSection = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController>(null);
 
     const db = useRef<IDBDatabase>(null);
@@ -366,7 +367,7 @@ const App = () => {
         abortControllerRef.current = new AbortController();
         const prompt_text = message.trim();
         if (isFirstMessage) {
-            homeSection.current?.classList.add("hidden");
+            setIsChat(true);
             setIsFirstMessage(false);
             initConversation(prompt_text);
         }
@@ -488,7 +489,7 @@ const App = () => {
         setCurrentTitle("New Chat");
         setMessage("");
         setFiles([]);
-        homeSection.current?.classList.remove("hidden");
+        setIsChat(false);
         textareaRef.current?.focus();
     };
 
@@ -506,7 +507,7 @@ const App = () => {
             setMessage("");
             setFiles([]);
             setCurrentTitle(conversation.title);
-            homeSection.current?.classList.add("hidden");
+            setIsChat(true);
             textareaRef.current?.focus();
         }
     };
@@ -531,7 +532,7 @@ const App = () => {
                 position="top-center"
                 reverseOrder={false}
             />
-            <Particles className="particles" quantity={150} />
+            <Particles quantity={150} />
             <HistorySidebar
                 currentConversationId={conversationID.current}
                 conversations={conversations}
@@ -539,14 +540,14 @@ const App = () => {
                 onSelectConversation={handleSelectConversation}
                 onRemoveConversation={handleItemRemove}
             />
-            <div className="container">
+            <div className={styles.container}>
                 <Header
                     currentConversationId={conversationID.current}
                     currentTitle={currentTitle}
                     onNewChat={handleNewChat}
                 />
                 <Hero
-                    homeSection={homeSection}
+                    hidden={isChat}
                     onPromptClick={handleNewChat}
                 />
                 <ChatContainer messages={messages} />

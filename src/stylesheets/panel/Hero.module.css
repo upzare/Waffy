@@ -1,0 +1,96 @@
+.hero-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0rem;
+    background: transparent;
+    position: relative;
+    overflow: hidden;
+    z-index: 2;
+    transition: all 0.5s ease-out;
+}
+
+.hero-section.hidden {
+    max-height: 0;
+    max-width: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0rem 0rem;
+}
+
+.hero-content {
+    text-align: center;
+    max-width: 700px;
+    margin-bottom: 2rem;
+}
+
+.hero-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+}
+
+.capabilities-container {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.capability-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.capability-icon {
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.capability-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    stroke: white;
+}
+
+.capability-item:hover .capability-icon {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.capability-label {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.suggested-prompts-container {
+    width: 100%;
+    max-width: 800px;
+    margin-top: 1rem;
+}
+
+.suggested-prompts-title {
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.suggested-prompts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+}
