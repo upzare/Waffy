@@ -13,10 +13,6 @@ node_modules/
 # testing
 coverage/
 
-# next.js
-.next/
-out/
-
 # python
 .venv
 __pycache__/
@@ -25,6 +21,7 @@ icon_detect/
 
 # production
 build
+.output
 
 # misc
 .DS_Store
@@ -37,9 +34,6 @@ yarn-error.log*
 
 # env files (can opt-in for commiting if needed)
 .env
-
-# vercel
-.vercel
 
 # typescript
 *.tsbuildinfo
