@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import RenderResponse from "../utils/RenderResponse";
 import { Copy, File, Repeat, User } from "lucide-react";
 import type { ChatContainerProps } from "../../types";
+import styles from "css/panel/ChatContainer.module.css";
 
 const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -13,36 +14,36 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
     }, [messages]);
 
     return (
-        <div className="chat-container" ref={chatContainerRef}>
+        <div className={styles.chatContainer} ref={chatContainerRef}>
             {messages.map(
                 (msg, index) =>
-                    <div key={index} className={`message ${msg.isError ? "error" : msg.isUser ? "user" : "assistant"}`}>
+                    <div key={index} className={`${styles.message} ${msg.isError ? styles.error : msg.isUser ? styles.user : styles.assistant}`}>
                         {!msg.isUser && !msg.isError && (
-                            <div className="message-actions-container">
-                                <div className="message-actions">
-                                    <button className="message-action-button" title="Retry">
+                            <div className={styles.messageActionsContainer}>
+                                <div className={styles.messageActions}>
+                                    <button className={styles.messageActionButton} title="Retry">
                                         <Repeat size={16} />
                                     </button>
-                                    <button className="message-action-button" title="Copy to clipboard">
+                                    <button className={styles.messageActionButton} title="Copy to clipboard">
                                         <Copy size={16} />
                                     </button>
                                 </div>
                             </div>
                         )}
                         {msg.isError ? (
-                            <div className="message-content">
+                            <div className={styles.messageContent}>
                                 <RenderResponse content={msg.content.text} error={true} />
                             </div>
                         ) : (
                             <>
-                                <div className="message-avatar">
+                                <div className={styles.messageAvatar}>
                                     {msg.isUser ? (
                                         <User />
                                     ) : (
-                                        <img src="/logo.svg" alt="Assistant Logo" />
+                                        <img src="/assets/logo.svg" alt="Assistant Logo" />
                                     )}
                                 </div>
-                                <div className="message-content">
+                                <div className={styles.messageContent}>
                                     {msg.isUser ? (
                                         <>
                                             {msg.content.text?.t0}
@@ -51,19 +52,19 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                                                     {msg.content.files.map((file: File, fileIndex: number) => (
                                                         <div
                                                             key={`${file.name}-${fileIndex}`}
-                                                            className="message-file-preview"
+                                                            className={styles.messageFilePreview}
                                                             onClick={() => window.open(URL.createObjectURL(file))}
                                                         >
                                                             {file.type.startsWith("image/") ? (
                                                                 <img
                                                                     src={URL.createObjectURL(file)}
-                                                                    className="message-file-thubmnail"
+                                                                    className={styles.messageFileThubmnail}
                                                                     alt={file.name}
                                                                 />
                                                             ) : (
                                                                 <File />
                                                             )}
-                                                            <span className="message-file-preview-name" title={file.name}>
+                                                            <span className={styles.messageFilePreviewName} title={file.name}>
                                                                 {file.name}
                                                             </span>
                                                         </div>
@@ -79,19 +80,19 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                                                     {msg.content.files.map((file: File, fileIndex: number) => (
                                                         <div
                                                             key={`${file.name}-${fileIndex}`}
-                                                            className="message-file-preview"
+                                                            className={styles.messageFilePreview}
                                                             onClick={() => window.open(URL.createObjectURL(file))}
                                                         >
                                                             {file.type.startsWith("image/") ? (
                                                                 <img
                                                                     src={URL.createObjectURL(file)}
-                                                                    className="message-file-thubmnail"
+                                                                    className={styles.messageFileThubmnail}
                                                                     alt={file.name}
                                                                 />
                                                             ) : (
                                                                 <File />
                                                             )}
-                                                            <span className="message-file-preview-name" title={file.name}>
+                                                            <span className={styles.messageFilePreviewName} title={file.name}>
                                                                 {file.name}
                                                             </span>
                                                         </div>

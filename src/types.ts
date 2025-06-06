@@ -18,7 +18,7 @@ export interface HeaderProps {
 }
 
 export interface HeroProps {
-    homeSection: React.RefObject<HTMLDivElement | null>;
+    hidden: boolean;
     onPromptClick: (prompt: string) => void;
 }
 
@@ -87,7 +87,6 @@ export interface DomMessage {
 }
 
 export interface ParticlesProps {
-    className?: string;
     quantity?: number;
     staticity?: number;
     ease?: number;

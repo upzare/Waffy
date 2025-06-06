@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import asyncio
@@ -12,6 +13,8 @@ import cloudinary
 import cloudinary.uploader
 from mistralai import Mistral
 from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
+from redis import Redis
+from supabase import create_client, Client
 
 DEBUG = True
 
@@ -22,7 +25,6 @@ config = {
     "device": detect_device(),
     "BOX_TRESHOLD": 0.05,
 }
-omniparser = Omniparser(config)
 
 cloudinary.config( 
     cloud_name = os.environ.get("CLOUDINARY_CLOUD_NAME"),
@@ -31,13 +33,20 @@ cloudinary.config(
     secure=True
 )
 
-mistral = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+omniparser = Omniparser(config)
+
+supabase_url: str = os.environ.get("SUPABASE_URL")
+supabase_key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+redis = Redis(host="localhost", port=6379)
 
 class CustomHandler(CustomLogger):
     def __init__(self):
         self.client_props = {}
         self.client_fc = {}
 
+    # Handle User -> LLM
     async def async_pre_call_hook(self, user_api_key_dict: UserAPIKeyAuth, cache: DualCache, data: dict, call_type: Literal[
             "completion",
             "text_completion",
@@ -69,10 +78,11 @@ class CustomHandler(CustomLogger):
                     data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
 
                 elif (data["handler"] == "t3"):
-                    data["model"] = "gpt-4.1"
+                    # data["model"] = "gpt-4.1"
+                    data["model"] = "gpt-4.1-mini"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
-                    data["temperature"] = 0.1
+                    data["temperature"] = 0
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -122,9 +132,10 @@ class CustomHandler(CustomLogger):
                                     content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
                         data["input"].append({ "role": "assistant", "content": content })
                     elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t3"):
+                        # Screenshot content
                         screenshot_req = True
                         parser_task = self.async_parse(messages["image"])
-                        ocr_task = self.async_ocr(messages['image'])
+                        ocr_task = self.async_ocr(messages["image"])
                         parser_tasks.append(parser_task)
                         ocr_tasks.append(ocr_task)
                         metadata[index] = messages["metadata"]
@@ -132,13 +143,20 @@ class CustomHandler(CustomLogger):
                         data["input"].append(messages)
 
                 if (screenshot_req):
-                    parser_content = await asyncio.gather(*[task for task in parser_tasks])
-                    ocr_content = await asyncio.gather(*[task for task in ocr_tasks])
+                    # Inject annotated screenshot + ocr
+                    start_time = time.perf_counter()
+                    print("Main Start:", start_time)
+                    results = await asyncio.gather(*parser_tasks, *ocr_tasks, return_exceptions=True)
+                    print("Main End:", time.perf_counter())
+                    print("Total Time:", time.perf_counter() - start_time)
+                    parser_content = results[:len(parser_tasks)]
+                    ocr_content = results[len(parser_tasks):]
                     for index, (image, props), ocr in zip(metadata, parser_content, ocr_content):
                         meta = metadata[index]
-                        print("IMAGE:", (await asyncio.gather(self.async_upload(image)))[0]) if DEBUG else None
+                        asyncio.gather(self.async_upload(image)) if DEBUG else None
                         self.client_props[data["metadata"]["client_id"]] = { "meta": messages["metadata"], "props": props }
-                        data["input"].append({
+                        # Consider system prompt while inserting
+                        data["input"].insert(index + 1, {
                             "role": "user",
                             "content": [
                                 {
@@ -151,6 +169,7 @@ class CustomHandler(CustomLogger):
                                 }
                             ]
                         })
+                
                 del data["data"]
                 
             if ("title" in data):
@@ -164,6 +183,7 @@ class CustomHandler(CustomLogger):
         
         return data
     
+    # Handle LLM -> User
     async def async_post_call_streaming_iterator_hook(self, user_api_key_dict, response, request_data):
         async for data in response:
             try:
@@ -204,15 +224,47 @@ class CustomHandler(CustomLogger):
                             fc_id = item_dict["id"]
                             if (fc_id in self.client_fc):
                                 data_dict["response"]["output"][index] = self.client_fc[fc_id]
+                    usage = data_dict["response"]["usage"]
+                    metadata = data_dict["response"]["metadata"]
+                    asyncio.gather(self.async_update_usage(metadata, usage))
                     yield type(data)(**data_dict)
                     continue
             except Exception as e:
                 print("POST-ERROR:", e)
-
+            
             yield data
-
+    
+    async def async_update_usage(self, metadata, usage):
+        def update_usage():
+            keymap = "keymap:" + metadata["account_id"] + ":" + metadata["client_id"]
+            session = redis.hget(keymap, "session").decode("utf-8")
+            user_id = redis.hget(keymap, "user_id").decode("utf-8")
+            # DB Update
+            db_data = supabase.from_("credits").select("*", count="exact").eq("user_id", user_id).execute().data[0]
+            used_tokens = db_data["used_tokens"]
+            new_used_tokens = int(used_tokens + usage.total_tokens)
+            used_credits = db_data["used_credits"]
+            new_used_credits = int(used_credits + (usage.total_tokens / 100))
+            current_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            supabase.from_("credits").update({"used_tokens": new_used_tokens, "used_credits": new_used_credits, "updated_at": current_time}).eq("user_id", user_id).execute()
+            # Redis Update
+            key = "session:" + session
+            redis_data = {
+                "active": True if db_data["linked_subscription"] else False,
+                "total_credits": db_data["total_credits"],
+                "used_credits": new_used_tokens,
+                "total_tokens": db_data["total_tokens"],
+                "used_tokens": new_used_credits,
+                "last_sync": 0 # Sync redis on next prompt
+            }
+            redis.hset(key, "credits", json.dumps(redis_data))
+            redis.expire(key, 604800)
+        
+        return await asyncio.to_thread(update_usage)
+    
     async def async_parse(self, image):
         def parse():
+            print("F1 started:", time.perf_counter())
             dino_labled_img, label_coordinates, parsed_content_list = omniparser.parse(image)
             item_props = []
             for i, (k, props) in enumerate(label_coordinates.items()):
@@ -227,19 +279,24 @@ class CustomHandler(CustomLogger):
                     "interactivity": parsed_content_list[i]["interactivity"]
                 })
             annotated_image = f"data:image/png;base64,{dino_labled_img}"
+            print("F1 ended:", time.perf_counter())
             return annotated_image, item_props
-        annotated_image, item_props = await asyncio.to_thread(parse)
-        return annotated_image, item_props
-    
+        
+        return await asyncio.to_thread(parse)
+
     async def async_ocr(self, image):
         image_uri = f"data:image/png;base64,{image}"
         def get_ocr():
-            return mistral.ocr.process(model="mistral-ocr-latest", document={
+            print("F2 started:", time.perf_counter())
+            mistral = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+            ocr =  mistral.ocr.process(model="mistral-ocr-latest", document={
                 "type": "image_url",
                 "image_url": image_uri,
-            })
-        ocr_response = await asyncio.to_thread(get_ocr)
-        return ocr_response.pages[0].markdown
+            }).pages[0].markdown
+            print("F2 ended:", time.perf_counter())
+            return ocr
+        
+        return await asyncio.to_thread(get_ocr)
     
     # For debugging purposes
     async def async_upload(self, image_uri):
@@ -249,7 +306,8 @@ class CustomHandler(CustomLogger):
                 public_id=f"waffy-inference-{time.time()}",
                 overwrite=True
             )["secure_url"]
+        
         imageUrl = await asyncio.to_thread(upload)
-        return imageUrl
+        print("IMAGE:", imageUrl)
 
 proxy_handler_instance = CustomHandler()

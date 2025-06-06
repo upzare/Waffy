@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { SuggestedPromptProps } from "../../types";
+import styles from "css/panel/SuggestedPromptButton.module.css"
 
-const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({ text, onClick }) => {
+const SuggestedPromptButton: React.FC<SuggestedPromptProps> = ({ text, onClick }) => {
     const buttonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
@@ -22,17 +23,17 @@ const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({ text, onClick }) => {
     }, []);
 
     return (
-        <button ref={buttonRef} type="button" className="suggested-prompt-button" onClick={onClick}>
-            <strong className="suggested-prompt-text">{text}</strong>
-            <div className="suggested-prompt-bg">
-                <div className="suggested-prompt-bg-stars"></div>
+        <button ref={buttonRef} type="button" className={styles.suggestedPromptButton} onClick={onClick}>
+            <strong className={styles.suggestedPromptText}>{text}</strong>
+            <div className={styles.suggestedPromptBg}>
+                <div className={styles.suggestedPromptBgStars}></div>
             </div>
-            <div className="suggested-prompt-glow">
-                <div className="suggested-prompt-circle"></div>
-                <div className="suggested-prompt-circle"></div>
+            <div className={styles.suggestedPromptGlow}>
+                <div className={styles.suggestedPromptCircle}></div>
+                <div className={styles.suggestedPromptCircle}></div>
             </div>
         </button>
     );
 }
 
-export default SuggestedPrompt;
+export default SuggestedPromptButton;
