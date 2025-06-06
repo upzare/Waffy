@@ -21,11 +21,11 @@ def sync_account(key, user_id):
     if db_data.count > 0:
         data = db_data.data[0]
         redis_data = {
-            "account_id": data["account_id"],
+            "account_id":  data["account_id"],
+            "name": data["name"],
             "email": data["email"],
-            "first_name": data["first_name"],
-            "last_name": data["last_name"],
             "phone_number": data["phone_number"],
+            "image": data["image"]
         }
         redis.hset(key, "account", json.dumps(redis_data))
         return redis_data
