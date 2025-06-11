@@ -15,6 +15,7 @@ const MANIFEST = JSON.parse(fs.readFileSync(path.join(process.cwd(), "./public",
 const PUBLIC_PATH = "/";
 
 const alias = {
+  "@": path.resolve(process.cwd(), "src"),
   css: path.resolve(process.cwd(), "src/stylesheets"),
 };
 

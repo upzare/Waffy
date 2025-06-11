@@ -78,8 +78,7 @@ class CustomHandler(CustomLogger):
                     data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
 
                 elif (data["handler"] == "t3"):
-                    # data["model"] = "gpt-4.1"
-                    data["model"] = "gpt-4.1-mini"
+                    data["model"] = "gpt-4.1"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
                     data["temperature"] = 0
@@ -125,11 +124,14 @@ class CustomHandler(CustomLogger):
                             if ("type" in msg and msg["type"] == "text"):
                                 content.append({ "type": "output_text", "text": msg["text"] })
                             elif ("type" in msg and msg["type"] == "file"):
-                                payload = msg["payload"]
-                                if payload["mimeType"].startswith("image"):
-                                    content.append({ "type": "output_image", "image_url": payload["url"] })
+                                file = msg["payload"]
+                                file_content = file["content"]
+                                mime_type = file["mimeType"]
+                                data_uri = f"data:{mime_type};base64,{file_content}"
+                                if file["mimeType"].startswith("image"):
+                                    content.append({ "type": "output_image", "image_url": data_uri })
                                 else:
-                                    content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
+                                    content.append({ "type": "output_file", "filename": file["name"], "file_data": data_uri })
                         data["input"].append({ "role": "assistant", "content": content })
                     elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t3"):
                         # Screenshot content
