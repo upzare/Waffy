@@ -2,18 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
-import { ai, generateTitle } from '../lib/agent';
+import { ai, generateTitle } from '@/lib/agent';
 import { Message, Conversation, ToolCall, FileFormat } from '../types';
+import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
 import InputContainer from './components/InputContainer';
 import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
 import { fileHandler } from './utils/FileHandler';
-import { availableFunctions } from '../lib/tools';
+import { availableFunctions } from '@/lib/tools';
 import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
 import Particles from './components/Particles';
+import { getLocalStorage } from '@/lib/client';
+import Loader from './components/loader';
 import styles from "css/panel/Root.module.css";
 
 const App = () => {
@@ -26,9 +29,11 @@ const App = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [isRecorded, setIsRecorded] = useState(false);
     const [sidebarHovered, setSidebarHovered] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [currentTitle, setCurrentTitle] = useState("New Chat");
+    const [signed, setSigned] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,6 +44,7 @@ const App = () => {
     const conversationID = useRef<string>(null);
 
     useEffect(() => {
+        initSigned();
         initDB();
         fetchConversations();
         Mousetrap.bind("ctrl+space", () => { speechRecognition() });
@@ -51,6 +57,10 @@ const App = () => {
                 setSidebarHovered(false);
             }
         }
+
+        setTimeout(() => {
+            setIsLoading(false);
+        }, 800);
 
         document.addEventListener("mousemove", handleMouseMove);
         return () => document.removeEventListener("mousemove", handleMouseMove);
@@ -81,6 +91,13 @@ const App = () => {
                 resolve();
             }
         });
+    };
+
+    const initSigned = async () => {
+        const localStorage: Record<string, any> = await getLocalStorage();
+        if (localStorage.data.signed) {
+            setSigned(true);
+        }
     };
 
     const initDB = () => {
@@ -526,13 +543,21 @@ const App = () => {
         }
     };
 
+    if (isLoading) {
+        return <Loader />
+    }
+
+    if (!signed) {
+        return <WelcomePage />
+    }
+
     return (
         <>
             <Toaster
                 position="top-center"
                 reverseOrder={false}
             />
-            <Particles quantity={150} />
+            <Particles quantity={100} />
             <HistorySidebar
                 currentConversationId={conversationID.current}
                 conversations={conversations}
@@ -569,7 +594,7 @@ const App = () => {
     );
 };
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById('_app')!).render(
     <React.StrictMode>
         <App />
     </React.StrictMode>
