@@ -110,10 +110,10 @@ export interface DomProps {
 }
 
 export interface ToolCall {
+    id: string;
+    type: string;
     arguments: string;
     call_id: string;
-    id?: string;
     name: string;
-    status?: string;
-    type?: string;
+    status: string;
 }

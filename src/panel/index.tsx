@@ -12,11 +12,11 @@ import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
 import { fileHandler } from './utils/FileHandler';
 import { availableFunctions } from '@/lib/tools';
+import { getLocalStorage } from '@/lib/client';
 import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
 import Particles from './components/Particles';
-import { getLocalStorage } from '@/lib/client';
-import Loader from './components/loader';
+import Loader from './components/Loader';
 import styles from "css/panel/Root.module.css";
 
 const App = () => {
@@ -467,12 +467,12 @@ const App = () => {
                     }
                 });
             });
+            setMessages(prev => {
+                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
+                updateConversationsDB(update);
+                return update;
+            });
             if (abortControllerRef.current?.signal.aborted) {
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
                 setMessages(prev => {
                     const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: "*User interupted while processing.*" } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
                     updateConversationsDB(update);
