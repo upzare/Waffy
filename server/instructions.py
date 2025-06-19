@@ -233,20 +233,21 @@ T3_PROMPT = """You are the Execution Model in a multi-agent AI assistant, operat
 
 **3. INPUT HANDLING**
 1. **Field Identification**:
-    - List all input fields.
-    - Identify the type of the input fields (e.g., text, dropdown, checkbox, query).
+    - Identify the type of the input field (e.g., text, dropdown, checkbox, typeahead).
     - Use `click()` to focus on the input field and then use `fetchScreen()` to understand what type of input is expected. Whether to use a text input or a click operation. (IMPORTANT)
+    - After clicking, If any suggestions appear on the input field, then it is a typeahead input field (like a search bar). (IMPORTANT)
 2. **Data Entry**:
-    - For text: Use `typeText()` to input the text. After that use `fetchScreen()` to check for updates on the screen. If any suggestions appear on the input, then it is a dynamic input field (like a search field). You have to identify the suggestions and click on the most relevant one.
+    - For text: Use `typeText()` to input the text.
+    - For typeahead: Use `typeText()` to input the text. After typing use `fetchScreen()` to check for all available suggestions. You have to identify the suggestions and click on the most relevant one. (IMPORTANT)
     - For dropdowns: Use `getOption()` to list options, then `setOption()`.
     - For checkboxes: Toggle using `click()`.
     - For clearing values: Use `clearValue()`. Only use this tool, when you find any existing data inside the input field before typing.
-3. **Validation**:
-    - Confirm entered values persist in fields.
+3. **After Data Entry**:
+    - If it is a typeahead field, then click on the most relevant suggestion.
+    - If it is a normal text field, then proceed to the next step.
+4. **Validation**:
+    - Confirm entered values persist in field.
     - Check if the values are correct.
-4. **Submission**:
-    - Click the submit button.
-    - Verify success messages or redirects.
 
 **4. SCROLLING**
 **When to Use:**
@@ -379,7 +380,7 @@ T3_PROMPT = """You are the Execution Model in a multi-agent AI assistant, operat
 Your goal is to execute steps provided by the user step by step with maximum accuracy and reliability. Always verify and communicate your tools clearly, handle the output and errors carefully. And also give a clear description of the result of each step.
 """
 
-T4_PROMPT = """You are the Summary Generator in a multi-agent AI system. Your sole responsibility is to transform technical execution logs into clear, non-technical user summaries.
+T4_PROMPT = """You are the Output Generator in a multi-agent AI system. Your sole responsibility is to transform technical execution logs into clear, non-technical user output.
 
 **INPUT STRUCTURE**
 
@@ -413,18 +414,6 @@ You will receive:
 [Data points/outcomes]
 [Completed steps/Errors encountered]
 
-**EXAMPLES**
-
-**Task:** Find cheapest wireless headphones on amazon.com
-**Steps:** 1. Navigate to amazon.com\n2. Search for "wireless headphones"\n3. Sort by price low-to-high\n4. Select first item
-**Output:** Prices extracted from Amazon
-**Summary:** Searched for "wireless headphones" on amazon and sorted by lowest price.\n\n- Found 15 options under $50\n- Best deal: SoundCore Life Q20 at $39.99\n\nTask Completed ✅
-
-**Task:** Summarize current page
-**Steps:** 1. Fetch screen content\n2. Extract visible text
-**Output:** Extracted 500-word article
-**Summary:** Analyzed the current webpage and extracted key information\n\n- Discusses AI's impact on healthcare diagnostics\n- Highlights 3 case studies from 2024\n- Predicts 40%\ adoption rate by 2026\n\nTask Completed ✅
-
 **CRITICAL RULES**
 
 1. **Never expose**:
@@ -440,9 +429,14 @@ You will receive:
 3. **Handle errors gracefully**:
     - "Couldn't complete [action] due to [simple reason]"
     - Never show retry counts or technical fallbacks
+
+**IMPORTANT: ALWAYS GIVE A BREIF DESCRIPTION OF THE OUTPUT FROM THE EXECUTION MODEL. IF THE EXECUTION MODEL FAILS TO COMPLETE THE TASK, THEN ALWAYS RETURN THE ERROR MESSAGE.**
 """
 
 T1_TOOLS = [
+    {
+        "type": "web_search"
+    },
     {
         "type": "function",
         "name": "proceed",
@@ -463,6 +457,9 @@ T1_TOOLS = [
 ]
 
 T2_TOOLS = [
+    {
+        "type": "web_search"
+    },
     {
         "type": "function",
         "name": "missing",
@@ -542,7 +539,7 @@ T3_TOOLS = [
             "properties": {
                 "elementId": {
                     "type": "number",
-                    "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+                    "description": "The ID of the text that you want to clear. DO NOT USE ANY RANDOM ID."
                 },
             },
             "required": ["elementId"],

@@ -58,10 +58,12 @@ class CustomHandler(CustomLogger):
         try:
             if ("handler" in data):
                 if (data["handler"] == "t1"):
+                    # data["model"] = "o3-pro"
                     data["model"] = "gpt-4.1"
                     data["tools"] = T1_TOOLS
                     data["stream"] = True
                     data["temperature"] = 0.5
+                    # data["reasoning"] = {"effort": "low", "summary": "detailed"}
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -78,10 +80,12 @@ class CustomHandler(CustomLogger):
                     data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
 
                 elif (data["handler"] == "t3"):
+                    # data["model"] = "o3-pro"
                     data["model"] = "gpt-4.1"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
                     data["temperature"] = 0
+                    # data["reasoning"] = {"effort": "high", "summary": "detailed"}
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -163,7 +167,7 @@ class CustomHandler(CustomLogger):
                             "content": [
                                 {
                                     "type": "input_text",
-                                    "text": f"<PAGE_METDATA><URL>{meta['url']}</URL><TITLE>{meta['title']}</TITLE><LOADING_STATUS>{meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
+                                    "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, the ocr content, and the annotated image. You can use this information to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{meta['url']}</URL><TITLE>{meta['title']}</TITLE><LOADING_STATUS>{meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
                                 },
                                 {
                                     "type": "input_image",

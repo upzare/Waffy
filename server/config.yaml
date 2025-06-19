@@ -47,6 +47,12 @@ model_list:
       api_base: https://api.openai.com/v1
       api_key: "os.environ/OPENAI_API_KEY"
       rpm: 6
+  - model_name: o3-pro
+    litellm_params:
+      model: openai/o3-pro
+      api_base: https://api.openai.com/v1
+      api_key: "os.environ/OPENAI_API_KEY"
+      rpm: 6
   
   # Use this if you want to make requests to `claude-3-haiku-20240307`,`claude-3-opus-20240229`,`claude-2.1` without defining them on the config.yaml
   # Default models
