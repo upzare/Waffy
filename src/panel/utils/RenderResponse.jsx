@@ -3,20 +3,21 @@ import Markdown from "react-markdown";
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { funky } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2 } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, CircleX } from 'lucide-react';
 import styles from "css/panel/RenderResponse.module.css";
 
 const RenderResponse = ({
     content,
     isInitial = false,
-    isPlanning = false,
     isExecuting = false,
+    isValidating = false,
     isSummary = false,
+    taskOK = false,
     error = false
 }) => {
     const [CopyIcon, setCopyIcon] = useState(Copy);
-    const [isPlannningExpanded, setIsPlannningExpanded] = useState(false);
     const [isExecutingExpanded, setIsExecutingExpanded] = useState(false);
+    const [isValidatingExpanded, setIsValidatingExpanded] = useState(false);
 
     const handleClick = (code) => {
         navigator.clipboard.writeText(code);
@@ -47,12 +48,12 @@ const RenderResponse = ({
         );
     }
 
-    const togglePlannning = () => {
-        setIsPlannningExpanded(!isPlannningExpanded);
-    };
-
     const toggleExecuting = () => {
         setIsExecutingExpanded(!isExecutingExpanded);
+    };
+
+    const toggleValidating = () => {
+        setIsValidatingExpanded(!isValidatingExpanded);
     };
 
     if (error) {
@@ -137,82 +138,8 @@ const RenderResponse = ({
                 </Markdown>
             </div>
 
-            {/* Rendering Steps */}
-            {(content.t2 || isPlanning) && (
-                <div className={styles.dropdownContainer}>
-                    <div
-                        className={styles.dropdownHeader}
-                        onClick={togglePlannning}
-                    >
-                        <div className={styles.dropdownHeaderLeft}>
-                            {isPlanning ? (
-                                <>
-                                    <Loader2 size={16} className={styles.dropdownLoadingIcon} />
-                                    <span className={styles.dropdownLabel}>Calculating Steps</span>
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle2 size={16} className={styles.dropdownCompleteIcon} />
-                                    <span className={styles.dropdownLabel}>Steps Calculated</span>
-                                </>
-                            )}
-                        </div>
-                        <div className={styles.dropdownToggle}>
-                            {isPlannningExpanded ? (
-                                <ChevronUp size={16} />
-                            ) : (
-                                <ChevronDown size={16} />
-                            )}
-                        </div>
-                    </div>
-
-                    {isPlannningExpanded && (
-                        <div className={styles.dropdownContent}>
-                            <div className={styles.dropdownMarkdown}>
-                                <Markdown
-                                    remarkPlugins={[remarkGfm]}
-                                    components={{
-                                        pre: Pre,
-                                        code({ node, inline, className = "code", children, ...props }) {
-                                            const match = /language-(\w+)/.exec(className || "")
-                                            return !inline && match ? (
-                                                <SyntaxHighlighter
-                                                    style={funky}
-                                                    language={match[1]}
-                                                    PreTag="div"
-                                                    className="syntax-highlighter"
-                                                    {...props}
-                                                >
-                                                    {String(children).replace(/\n$/, "")}
-                                                </SyntaxHighlighter>
-                                            ) : (
-                                                <code className={className} {...props}>
-                                                    {children}
-                                                </code>
-                                            )
-                                        }
-                                    }}
-                                >
-                                    {content.t2 || ""}
-                                </Markdown>
-                            </div>
-
-                            {isPlanning && (
-                                <div className={styles.dropdownLoading}>
-                                    <div className={styles.dropdownLoadingDots}>
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* Rendering Execution */}
-            {(content.t3 || isExecuting) && (
+            {(content.t2 || isExecuting) && (
                 <div className={styles.dropdownContainer}>
                     <div
                         className={styles.dropdownHeader}
@@ -267,11 +194,90 @@ const RenderResponse = ({
                                         }
                                     }}
                                 >
-                                    {content.t3 || ""}
+                                    {content.t2 || ""}
                                 </Markdown>
                             </div>
 
                             {isExecuting && (
+                                <div className={styles.dropdownLoading}>
+                                    <div className={styles.dropdownLoadingDots}>
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Rendering Validation */}
+            {(content.t3 || isValidating) && (
+                <div className={styles.dropdownContainer}>
+                    <div
+                        className={styles.dropdownHeader}
+                        onClick={toggleValidating}
+                    >
+                        <div className={styles.dropdownHeaderLeft}>
+                            {isValidating ? (
+                                <>
+                                    <Loader2 size={16} className={styles.dropdownLoadingIcon} />
+                                    <span className={styles.dropdownLabel}>Validating Task</span>
+                                </>
+                            ) : taskOK ? (
+                                <>
+                                    <CheckCircle2 size={16} className={styles.dropdownCompleteIcon} />
+                                    <span className={styles.dropdownLabel}>Task Completed</span>
+                                </>
+                            ) : (
+                                <>
+                                    <CircleX size={16} className={styles.dropdownCompleteIcon} />
+                                    <span className={styles.dropdownLabel}>Task Failed</span>
+                                </>
+                            )}
+                        </div>
+                        <div className={styles.dropdownToggle}>
+                            {isValidatingExpanded ? (
+                                <ChevronUp size={16} />
+                            ) : (
+                                <ChevronDown size={16} />
+                            )}
+                        </div>
+                    </div>
+
+                    {isValidatingExpanded && (
+                        <div className={styles.dropdownContent}>
+                            <div className={styles.dropdownMarkdown}>
+                                <Markdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        pre: Pre,
+                                        code({ node, inline, className = "code", children, ...props }) {
+                                            const match = /language-(\w+)/.exec(className || "")
+                                            return !inline && match ? (
+                                                <SyntaxHighlighter
+                                                    style={funky}
+                                                    language={match[1]}
+                                                    PreTag="div"
+                                                    className="syntax-highlighter"
+                                                    {...props}
+                                                >
+                                                    {String(children).replace(/\n$/, "")}
+                                                </SyntaxHighlighter>
+                                            ) : (
+                                                <code className={className} {...props}>
+                                                    {children}
+                                                </code>
+                                            )
+                                        }
+                                    }}
+                                >
+                                    {content.t3 || ""}
+                                </Markdown>
+                            </div>
+
+                            {isValidating && (
                                 <div className={styles.dropdownLoading}>
                                     <div className={styles.dropdownLoadingDots}>
                                         <span></span>

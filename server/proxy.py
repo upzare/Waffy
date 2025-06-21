@@ -70,22 +70,22 @@ class CustomHandler(CustomLogger):
                     data["input"] = [{'role': 'system', 'content': T1_PROMPT}]
 
                 elif (data["handler"] == "t2"):
-                    data["model"] = "gpt-4.1-mini"
+                    # data["model"] = "o3-pro"
+                    data["model"] = "gpt-4.1"
                     data["tools"] = T2_TOOLS
                     data["stream"] = True
-                    data["temperature"] = 0.1
+                    data["temperature"] = 0
+                    # data["reasoning"] = {"effort": "high", "summary": "detailed"}
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
                     data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
 
                 elif (data["handler"] == "t3"):
-                    # data["model"] = "o3-pro"
                     data["model"] = "gpt-4.1"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
-                    data["temperature"] = 0
-                    # data["reasoning"] = {"effort": "high", "summary": "detailed"}
+                    data["temperature"] = 0.1
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -137,7 +137,7 @@ class CustomHandler(CustomLogger):
                                 else:
                                     content.append({ "type": "output_file", "filename": file["name"], "file_data": data_uri })
                         data["input"].append({ "role": "assistant", "content": content })
-                    elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t3"):
+                    elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t2"):
                         # Screenshot content
                         screenshot_req = True
                         parser_task = self.async_parse(messages["image"])
