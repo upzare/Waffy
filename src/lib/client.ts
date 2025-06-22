@@ -26,10 +26,9 @@ export const initSettings = async () => {
                 enableNotifications: true,
             }),
             data: JSON.stringify({
-                waffyAPI: "1234",
                 signed: true,
                 account: {
-                    account_id: "c9c20661-a918-4ef5-b805-d7273ccb79f6",
+                    account_id: "",
                     email: "",
                     name: "",
                     phone_number: "",
