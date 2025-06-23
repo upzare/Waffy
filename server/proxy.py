@@ -58,31 +58,34 @@ class CustomHandler(CustomLogger):
         try:
             if ("handler" in data):
                 if (data["handler"] == "t1"):
+                    # data["model"] = "o3-pro"
                     data["model"] = "gpt-4.1"
                     data["tools"] = T1_TOOLS
                     data["stream"] = True
                     data["temperature"] = 0.5
+                    # data["reasoning"] = {"effort": "low", "summary": "detailed"}
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
                     data["input"] = [{'role': 'system', 'content': T1_PROMPT}]
 
                 elif (data["handler"] == "t2"):
-                    data["model"] = "gpt-4.1-mini"
+                    # data["model"] = "o3-pro"
+                    data["model"] = "gpt-4.1"
                     data["tools"] = T2_TOOLS
                     data["stream"] = True
-                    data["temperature"] = 0.1
+                    data["temperature"] = 0
+                    # data["reasoning"] = {"effort": "high", "summary": "detailed"}
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
                     data["input"] = [{'role': 'system', 'content': T2_PROMPT}]
 
                 elif (data["handler"] == "t3"):
-                    # data["model"] = "gpt-4.1"
-                    data["model"] = "gpt-4.1-mini"
+                    data["model"] = "gpt-4.1"
                     data["tools"] = T3_TOOLS
                     data["stream"] = True
-                    data["temperature"] = 0
+                    data["temperature"] = 0.1
                     data["parallel_tool_calls"] = False
                     data["tool_choice"] = "auto"
                     data["truncation"] = "auto"
@@ -125,13 +128,16 @@ class CustomHandler(CustomLogger):
                             if ("type" in msg and msg["type"] == "text"):
                                 content.append({ "type": "output_text", "text": msg["text"] })
                             elif ("type" in msg and msg["type"] == "file"):
-                                payload = msg["payload"]
-                                if payload["mimeType"].startswith("image"):
-                                    content.append({ "type": "output_image", "image_url": payload["url"] })
+                                file = msg["payload"]
+                                file_content = file["content"]
+                                mime_type = file["mimeType"]
+                                data_uri = f"data:{mime_type};base64,{file_content}"
+                                if file["mimeType"].startswith("image"):
+                                    content.append({ "type": "output_image", "image_url": data_uri })
                                 else:
-                                    content.append({ "type": "output_file", "data": payload["url"], "mimeType": payload["mimeType"] })
+                                    content.append({ "type": "output_file", "filename": file["name"], "file_data": data_uri })
                         data["input"].append({ "role": "assistant", "content": content })
-                    elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t3"):
+                    elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t2"):
                         # Screenshot content
                         screenshot_req = True
                         parser_task = self.async_parse(messages["image"])
@@ -161,7 +167,7 @@ class CustomHandler(CustomLogger):
                             "content": [
                                 {
                                     "type": "input_text",
-                                    "text": f"<PAGE_METDATA><URL>{meta['url']}</URL><TITLE>{meta['title']}</TITLE><LOADING_STATUS>{meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
+                                    "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, the ocr content, and the annotated image. You can use this information to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{meta['url']}</URL><TITLE>{meta['title']}</TITLE><LOADING_STATUS>{meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
                                 },
                                 {
                                     "type": "input_image",

@@ -42,7 +42,8 @@
     "sidePanel",
     "activeTab",
     "tabs",
-    "debugger"
+    "debugger",
+    "cookies"
   ],
   "host_permissions": [
     "http://*/*",

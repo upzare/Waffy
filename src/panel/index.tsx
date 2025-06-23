@@ -2,18 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
-import { ai, generateTitle } from '../lib/agent';
+import { ai, generateTitle } from '@/lib/agent';
 import { Message, Conversation, ToolCall, FileFormat } from '../types';
+import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
 import InputContainer from './components/InputContainer';
 import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
 import { fileHandler } from './utils/FileHandler';
-import { availableFunctions } from '../lib/tools';
+import { availableFunctions } from '@/lib/tools';
+import { getLocalStorage } from '@/lib/client';
 import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
 import Particles from './components/Particles';
+import Loader from './components/Loader';
 import styles from "css/panel/Root.module.css";
 
 const App = () => {
@@ -26,9 +29,11 @@ const App = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [isRecorded, setIsRecorded] = useState(false);
     const [sidebarHovered, setSidebarHovered] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [currentTitle, setCurrentTitle] = useState("New Chat");
+    const [signed, setSigned] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,6 +44,7 @@ const App = () => {
     const conversationID = useRef<string>(null);
 
     useEffect(() => {
+        initSigned();
         initDB();
         fetchConversations();
         Mousetrap.bind("ctrl+space", () => { speechRecognition() });
@@ -51,6 +57,10 @@ const App = () => {
                 setSidebarHovered(false);
             }
         }
+
+        setTimeout(() => {
+            setIsLoading(false);
+        }, 800);
 
         document.addEventListener("mousemove", handleMouseMove);
         return () => document.removeEventListener("mousemove", handleMouseMove);
@@ -81,6 +91,13 @@ const App = () => {
                 resolve();
             }
         });
+    };
+
+    const initSigned = async () => {
+        const localStorage: Record<string, any> = await getLocalStorage();
+        if (localStorage.data.signed) {
+            setSigned(true);
+        }
     };
 
     const initDB = () => {
@@ -172,7 +189,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 response += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t1: response }, files: [...(msg.content.files || [])] } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t1: response } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -192,12 +209,7 @@ const App = () => {
             const toolArgs = JSON.parse(toolCall.arguments);
             if (toolName === "proceed") {
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text }, files: [...(msg.content.files || [])] }, task: toolArgs.task } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: true } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, task: toolArgs.task }, streaming: { ...msg.streaming, t2: true } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -208,69 +220,16 @@ const App = () => {
     }
 
     const t2Handler = async (messageId: string, task: string, previousTask: any, prompt_files: FileFormat[]) => {
-        const t2Prompt = previousTask;
-        t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
-        const stepsModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
-        let instructionSteps = "";
-        const planningToolCalls: Record<string, ToolCall> = {};
-        for await (const res of stepsModelStream) {
-            if (res.type === "response.output_item.done" && res.item.type === "function_call") {
-                planningToolCalls[res.output_index] = res.item as ToolCall;
-            }
-            if (res.type === "response.output_text.delta") {
-                instructionSteps += res.delta;
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t2: instructionSteps }, files: [...(msg.content.files || [])] } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
-            }
-            if (res.type === "error") {
-                throw new Error(res.message);
-            }
-        }
-        setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: false } } : msg);
-            updateConversationsDB(update);
-            return update;
-        });
-        for await (const [index, toolCall] of Object.entries(planningToolCalls)) {
-            const toolName = toolCall.name;
-            const toolArgs = JSON.parse(toolCall.arguments);
-            if (toolName === "missing") {
-                // setMessages(prev => {
-                //     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t2: "Insufficient information to perform task." }, files: [...(msg.content.files || [])] } } : msg);
-                //     updateConversationsDB(update);
-                //     return update;
-                // });
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { t1: toolArgs.message }, files: [...(msg.content.files || [])] } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
-                return false;
-            }
-        }
-        setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t3: true } } : msg);
-            updateConversationsDB(update);
-            return update;
-        });
-        console.log("planning handler", instructionSteps);
-        return instructionSteps;
-    }
-
-    const t3Handler = async (messageId: string, instructionSteps: string, prompt_files: FileFormat[]) => {
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
         let executionResponse = "";
-        const t3Prompt = [];
-        t3Prompt.push({ type: "prompt", content: [{ type: "text", text: instructionSteps }, ...prompt_files] });
+        const t2Prompt = previousTask;
+        t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
         while (!finish || functionExecState) {
-            console.log("t3Prompt:", t3Prompt);
+            console.log("t2Prompt:", t2Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
-            const executionModelStream = ai(t3Prompt, "t3", abortControllerRef?.current?.signal);
+            const executionModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
             for await (const res of executionModelStream) {
                 if (res.type === "response.output_item.done" && res.item.type === "function_call") {
                     executionToolCalls[res.output_index] = res.item as ToolCall;
@@ -279,7 +238,7 @@ const App = () => {
                 if (res.type === "response.output_text.delta") {
                     executionResponse += res.delta;
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t3: executionResponse }, files: [...(msg.content.files || [])] } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t2: executionResponse } } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
@@ -291,25 +250,25 @@ const App = () => {
                     throw new Error(res.message);
                 }
             }
-            t3Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
+            t2Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
             functionExecState = false;
             for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
                 const toolName = toolCall.name;
                 const toolArgs = JSON.parse(toolCall.arguments);
                 const toolCallResult = await availableFunctions[toolName](toolArgs);
                 console.log("tsresult", toolCallResult)
-                t3Prompt.push(toolCall);
-                t3Prompt.push({
+                t2Prompt.push(toolCall);
+                t2Prompt.push({
                     type: "function_call_output",
                     call_id: toolCall.call_id,
                     output: toolCallResult.message
                 });
                 if (toolName === "fetchScreen") {
                     if (domContentIndex) {
-                        t3Prompt.splice(domContentIndex, 1);
+                        t2Prompt.splice(domContentIndex, 1);
                     }
-                    domContentIndex = t3Prompt.length;
-                    t3Prompt.push(toolCallResult.data);
+                    domContentIndex = t2Prompt.length;
+                    t2Prompt.push(toolCallResult.data);
                 }
                 functionExecState = true;
             }
@@ -319,21 +278,60 @@ const App = () => {
 
         }
         setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t3: false } } : msg);
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: false, t3: true } } : msg);
             updateConversationsDB(update);
             return update;
         });
-        console.log("t3response", executionResponse);
-        setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t4: true } } : msg);
-            updateConversationsDB(update);
-            return update;
-        });
+        console.log("t2response", executionResponse);
         return executionResponse;
     }
 
-    const t4Handler = async (messageId: string, task: string, instructionSteps: string, executionResponse: string) => {
-        const prompt = `**Task:**\n${task}\n\n**Steps:**\n${instructionSteps}\n\n**Output:**\n${executionResponse}`;
+    const t3Handler = async (messageId: string, task: string, executionOutput: string) => {
+        const prompt = `**Task:**\n${task}\n\n**Output:**\n${executionOutput}`;
+        const t3Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
+        const summaryModelStream = ai(t3Prompt, "t3", abortControllerRef?.current?.signal);
+        const toolCalls: Record<string, ToolCall> = {};
+        let validationResponse = "";
+        for await (const res of summaryModelStream) {
+            if (res.type === "response.output_item.done" && res.item.type === "function_call") {
+                toolCalls[res.output_index] = res.item as ToolCall;
+            }
+            if (res.type === "response.output_text.delta") {
+                validationResponse += res.delta;
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t3: validationResponse } } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+            }
+            if (res.type === "error") {
+                throw new Error(res.message);
+            }
+        }
+        for await (const [index, toolCall] of Object.entries(toolCalls)) {
+            const toolName = toolCall.name;
+            const toolArgs = JSON.parse(toolCall.arguments);
+            if (toolName === "success") {
+                console.log("Validation Success");
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskOK: true }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+            } else if (toolName === "failed") {
+                console.log("Validation Failed");
+                setMessages(prev => {
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskOK: false }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                    updateConversationsDB(update);
+                    return update;
+                });
+            }
+        }
+        return validationResponse;
+    }
+
+    const t4Handler = async (messageId: string, task: string, executionOutput: string) => {
+        const prompt = `**Task:**\n${task}\n\n**Output:**\n${executionOutput}`;
         const t4Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
         const summaryModelStream = ai(t4Prompt, "t4", abortControllerRef?.current?.signal);
         let summary = "";
@@ -341,7 +339,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 summary += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { text: { ...msg.content.text, t4: summary }, files: [...(msg.content.files || [])] } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t4: summary } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -382,20 +380,24 @@ const App = () => {
         });
         const previousPrompt = [];
         const previousTask = [];
+        const userFiles: File[][] = [];
         for await (const msg of messages) {
             if (!msg.isError) {
                 if (msg.isUser) {
                     previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files || [])] });
+                    userFiles.push(msg.content.files || []);
                 } else {
-                    const assistantPrompt = `${msg.content.text?.t1}\n\n**Steps:**\n${msg.content.text?.t2}\n\n**Output:**\n${msg.content.text?.t4}`;
-                    previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }] });
+                    const assistantPrompt = `${msg.content.text?.t4 ? msg.content.text?.t4 : msg.content.text?.t1}`;
+                    previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, ...await fileHandler(msg.content.files || [])] });
                     if (msg.content?.task) {
-                        previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task, ...await fileHandler(msg.content.files || []) }] });
-                        previousTask.push({ type: "response", content: [{ type: "text", text: `**Steps:**\n${msg.content.text?.t2}\n\n**Output:**\n${msg.content.text?.t4}` }] });
+                        previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, ...await fileHandler(userFiles[userFiles.length - 1] || [])] });
+                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.t2 }, ...await fileHandler(msg.content.files || [])] });
                     }
+                    userFiles.pop();
                 }
             } else {
                 previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.t0}` }] });
+                userFiles.pop();
             }
         };
         const prompt_files = await fileHandler(files);
@@ -413,20 +415,15 @@ const App = () => {
             });
             const task = await t1Handler(messageId, previousPrompt, prompt_text, prompt_files);
             if (task) {
-                const instructionSteps = await t2Handler(messageId, task, previousTask, prompt_files);
-                if (instructionSteps) {
-                    const executionResponse = await t3Handler(messageId, instructionSteps, prompt_files);
-                    if (executionResponse) await t4Handler(messageId, task, instructionSteps, executionResponse);
+                const executionOutput = await t2Handler(messageId, task, previousTask, prompt_files);
+                if (executionOutput) {
+                    await t3Handler(messageId, task, executionOutput);
+                    await t4Handler(messageId, task, executionOutput);
                 }
             }
         } catch (error) {
             setMessages(prev => {
                 const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
-                updateConversationsDB(update);
-                return update;
-            });
-            setMessages(prev => {
-                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
                 updateConversationsDB(update);
                 return update;
             });
@@ -450,12 +447,12 @@ const App = () => {
                     }
                 });
             });
+            setMessages(prev => {
+                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
+                updateConversationsDB(update);
+                return update;
+            });
             if (abortControllerRef.current?.signal.aborted) {
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
                 setMessages(prev => {
                     const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: "*User interupted while processing.*" } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
                     updateConversationsDB(update);
@@ -526,13 +523,21 @@ const App = () => {
         }
     };
 
+    if (isLoading) {
+        return <Loader />
+    }
+
+    if (!signed) {
+        return <WelcomePage />
+    }
+
     return (
         <>
             <Toaster
                 position="top-center"
                 reverseOrder={false}
             />
-            <Particles quantity={150} />
+            <Particles quantity={100} />
             <HistorySidebar
                 currentConversationId={conversationID.current}
                 conversations={conversations}
@@ -569,7 +574,7 @@ const App = () => {
     );
 };
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById('_app')!).render(
     <React.StrictMode>
         <App />
     </React.StrictMode>

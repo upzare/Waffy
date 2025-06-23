@@ -55,10 +55,11 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: { t0?: string, t1?: string, t2?: string, t3?: string, t4?: string }, files?: File[], task?: string };
+    content: { text?: { t0?: string, t1?: string, t2?: string, t3?: string, t4?: string }, files?: File[], task?: string, taskOK?: boolean };
     streaming?: { t1?: boolean, t2?: boolean, t3?: boolean, t4?: boolean };
     isUser: boolean;
     isError?: boolean;
+    task?: string;
 }
 
 export interface FileFormat {
@@ -110,10 +111,10 @@ export interface DomProps {
 }
 
 export interface ToolCall {
+    id: string;
+    type: string;
     arguments: string;
     call_id: string;
-    id: string;
     name: string;
     status: string;
-    type: string;
 }
