@@ -199,12 +199,8 @@ const RenderResponse = ({
                             </div>
 
                             {isExecuting && (
-                                <div className={styles.dropdownLoading}>
-                                    <div className={styles.dropdownLoadingDots}>
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
+                                <div className={styles.loaderContainer}>
+                                    <div className={styles.loader} />
                                 </div>
                             )}
                         </div>
@@ -278,12 +274,8 @@ const RenderResponse = ({
                             </div>
 
                             {isValidating && (
-                                <div className={styles.dropdownLoading}>
-                                    <div className={styles.dropdownLoadingDots}>
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
+                                <div className={styles.loaderContainer}>
+                                    <div className={styles.loader} />
                                 </div>
                             )}
                         </div>
@@ -331,9 +323,9 @@ const RenderResponse = ({
 
             {(isInitial || isSummary) && (
                 <div className={styles.loadingIndicator}>
-                    <span></span>
-                    <span></span>
-                    <span></span>
+                    <div className={styles.loadingIndicatorDot}></div>
+                    <div className={styles.loadingIndicatorDot}></div>
+                    <div className={styles.loadingIndicatorDot}></div>
                 </div>
             )}
         </div>

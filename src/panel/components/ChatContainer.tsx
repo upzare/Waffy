@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import RenderResponse from "../utils/RenderResponse";
+import RenderResponse from "./RenderResponse";
 import { Copy, File, Repeat, User } from "lucide-react";
 import type { ChatContainerProps } from "../../types";
 import styles from "css/panel/ChatContainer.module.css";
@@ -36,13 +36,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                             </div>
                         ) : (
                             <>
-                                <div className={styles.messageAvatar}>
+                                {/* <div className={styles.messageAvatar}>
                                     {msg.isUser ? (
                                         <User />
                                     ) : (
                                         <img src="/assets/logo.svg" alt="Assistant Logo" />
                                     )}
-                                </div>
+                                </div> */}
                                 <div className={styles.messageContent}>
                                     {msg.isUser ? (
                                         <>
