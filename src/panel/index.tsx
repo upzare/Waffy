@@ -311,20 +311,33 @@ const App = () => {
         for await (const [index, toolCall] of Object.entries(toolCalls)) {
             const toolName = toolCall.name;
             const toolArgs = JSON.parse(toolCall.arguments);
-            if (toolName === "success") {
-                console.log("Validation Success");
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskOK: true }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
-            } else if (toolName === "failed") {
-                console.log("Validation Failed");
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskOK: false }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
+            switch (toolName) {
+                case "success":
+                    console.log("Validation Success");
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "success" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    break;
+                case "failed":
+                    console.log("Validation Failed");
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "failed" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    break;
+                case "suspended":
+                    console.log("Validation Suspended");
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "suspended" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    break;
+                default:
+                    break;
             }
         }
         return validationResponse;

@@ -74,7 +74,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
                                         </>
                                     ) : (
                                         <>
-                                            <RenderResponse content={msg.content.text} isInitial={msg.streaming?.t1} isExecuting={msg.streaming?.t2} isValidating={msg.streaming?.t3} isSummary={msg.streaming?.t4} taskOK={msg.content?.taskOK} />
+                                            <RenderResponse content={msg.content.text} isInitial={msg.streaming?.t1} isExecuting={msg.streaming?.t2} isValidating={msg.streaming?.t3} isSummary={msg.streaming?.t4} taskStatus={msg.content?.taskStatus} />
                                             {msg.content.files && msg.content.files.length > 0 && (
                                                 <>
                                                     {msg.content.files.map((file: File, fileIndex: number) => (
