@@ -9,6 +9,7 @@ from litellm.proxy.proxy_server import UserAPIKeyAuth, DualCache
 from typing import Optional, Literal
 from util.omniparser import Omniparser
 from util.utils import detect_device
+from util.grider import Grider
 import cloudinary
 import cloudinary.uploader
 from mistralai import Mistral
@@ -34,6 +35,7 @@ cloudinary.config(
 )
 
 omniparser = Omniparser(config)
+grider = Grider()
 
 supabase_url: str = os.environ.get("SUPABASE_URL")
 supabase_key: str = os.environ.get("SUPABASE_KEY")
@@ -57,6 +59,8 @@ class CustomHandler(CustomLogger):
         ]):
         try:
             if ("handler" in data):
+                client_id = data["metadata"]["client_id"]
+                
                 if (data["handler"] == "t1"):
                     # data["model"] = "o3-pro"
                     data["model"] = "gpt-4.1"
@@ -100,10 +104,11 @@ class CustomHandler(CustomLogger):
                     data["truncation"] = "auto"
                     data["input"] = [{'role': 'system', 'content': T4_PROMPT}]
 
-                screenshot_req = False
+                request_type = None
                 parser_tasks = []
                 ocr_tasks = []
                 metadata = {}
+                grider_tasks = []
 
                 for index, messages in enumerate(data["data"]):
                     messages = dict(messages)
@@ -138,17 +143,25 @@ class CustomHandler(CustomLogger):
                                     content.append({ "type": "output_file", "filename": file["name"], "file_data": data_uri })
                         data["input"].append({ "role": "assistant", "content": content })
                     elif ("type" in messages and messages["type"] == "screenshot" and data["handler"] == "t2"):
-                        # Screenshot content
-                        screenshot_req = True
-                        parser_task = self.async_parse(messages["image"])
-                        ocr_task = self.async_ocr(messages["image"])
-                        parser_tasks.append(parser_task)
-                        ocr_tasks.append(ocr_task)
-                        metadata[index] = messages["metadata"]
+                        if ("parser" in messages and messages["parser"] == 1):
+                            # Screenshot content
+                            request_type = "screenshot"
+                            parser_task = self.async_screenshot_parse(messages["image"])
+                            ocr_task = self.async_ocr(messages["image"])
+                            parser_tasks.append(parser_task)
+                            ocr_tasks.append(ocr_task)
+                            metadata[index] = messages["metadata"]
+                        elif ("parser" in messages and messages["parser"] == 2):
+                            # Scroll content
+                            request_type = "scroll"
+                            grider_task = self.async_grid_parse(messages["image"])
+                            grider_tasks.append(grider_task)
+                            metadata[index] = messages["metadata"]
                     else:
                         data["input"].append(messages)
 
-                if (screenshot_req):
+                print("REQUEST_TYPE:", request_type)
+                if (request_type == "screenshot"):
                     # Inject annotated screenshot + ocr
                     start_time = time.perf_counter()
                     print("Main Start:", start_time)
@@ -158,16 +171,17 @@ class CustomHandler(CustomLogger):
                     parser_content = results[:len(parser_tasks)]
                     ocr_content = results[len(parser_tasks):]
                     for index, (image, props), ocr in zip(metadata, parser_content, ocr_content):
-                        meta = metadata[index]
+                        print("Screenindex:", index)
+                        page_meta = metadata[index]
                         asyncio.gather(self.async_upload(image)) if DEBUG else None
-                        self.client_props[data["metadata"]["client_id"]] = { "meta": messages["metadata"], "props": props }
+                        self.client_props[client_id] = {**self.client_props.get(client_id, {}), "metadata": page_meta, "fetch_props": props}
                         # Consider system prompt while inserting
                         data["input"].insert(index + 1, {
                             "role": "user",
                             "content": [
                                 {
                                     "type": "input_text",
-                                    "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, the ocr content, and the annotated image. You can use this information to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{meta['url']}</URL><TITLE>{meta['title']}</TITLE><LOADING_STATUS>{meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
+                                    "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, the ocr content, and the annotated image. You can use this information to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{page_meta['url']}</URL><TITLE>{page_meta['title']}</TITLE><LOADING_STATUS>{page_meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
                                 },
                                 {
                                     "type": "input_image",
@@ -175,7 +189,32 @@ class CustomHandler(CustomLogger):
                                 }
                             ]
                         })
-                
+                elif (request_type == "scroll"):
+                    # Inject annotated screenshot
+                    start_time = time.perf_counter()
+                    print("Main Start:", start_time)
+                    results = await asyncio.gather(*grider_tasks, return_exceptions=True)
+                    for index, (image, props) in zip(metadata, results):
+                        page_meta = metadata[index]
+                        asyncio.gather(self.async_upload(image)) if DEBUG else None
+                        self.client_props[client_id] = {**self.client_props.get(client_id, {}), "metadata": page_meta, "scroll_props": props}
+                        # Consider system prompt while inserting
+                        data["input"].insert(index + 1, {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": f"<SYSTEM>This is the output of the `getScrollPortions()` tool call. It contains the annotated image of the current page with a grid overlay highlighting the scrollable portions with a unique ID. You can use this ID to scroll the desired portion.</SYSTEM>"
+                                },
+                                {
+                                    "type": "input_image",
+                                    "image_url": image
+                                }
+                            ]
+                        })
+                    print("Main End:", time.perf_counter())
+                    print("Total Time:", time.perf_counter() - start_time)
+
                 del data["data"]
                 
             if ("title" in data):
@@ -184,10 +223,11 @@ class CustomHandler(CustomLogger):
                 data["input"] = [{'role': 'system', 'content': TITLE_PROMPT}, { "role": "user", "content": data["title"] }]
                 del data["title"]
         
+            return data
+        
         except Exception as e:
             print("PRE-ERROR:", e)
         
-        return data
     
     # Handle LLM -> User
     async def async_post_call_streaming_iterator_hook(self, user_api_key_dict, response, request_data):
@@ -199,21 +239,31 @@ class CustomHandler(CustomLogger):
                     if ("type" in item and item["type"] == "function_call"):
                         toolName = item["name"]
                         toolArgs = json.loads(item["arguments"])
+                        print("TOOL_ARGS:", toolArgs)
                         if ("elementId" in toolArgs):
                             element_id = toolArgs["elementId"]
-                            props = self.client_props[request_data["metadata"]["client_id"]]["props"]
-                            print("CONVERTING ID:", element_id) if DEBUG else None
-                            target = list(filter(lambda e: e["id"] == str(element_id), props))[0] if props else None
-                            devicePixelRatio = self.client_props[request_data["metadata"]["client_id"]]["meta"]["pixelRatio"]
-                            if target:
-                                x = target["x"]
-                                y = target["y"]
-                                click_cords_x = (x + target["width"] / 2) / devicePixelRatio
-                                click_cords_y = (y + target["height"] / 2) / devicePixelRatio
+                            props = self.client_props[request_data["metadata"]["client_id"]]["fetch_props"]
+                            coords = self.id_to_coords(element_id, props, request_data["metadata"]["client_id"])
+                            if coords:
                                 toolArgs.pop("elementId")
                                 item["arguments"] = json.dumps({
-                                    "x": click_cords_x,
-                                    "y": click_cords_y,
+                                    "x": coords["x"],
+                                    "y": coords["y"],
+                                    **toolArgs
+                                })
+                                self.client_fc[item["id"]] = item
+                                data_dict["item"] = item
+                                yield type(data)(**data_dict)
+                                continue
+                        elif ("portionId" in toolArgs):
+                            portion_id = toolArgs["portionId"]
+                            props = self.client_props[request_data["metadata"]["client_id"]]["scroll_props"]
+                            coords = self.id_to_coords(portion_id, props, request_data["metadata"]["client_id"])
+                            if coords:
+                                toolArgs.pop("portionId")
+                                item["arguments"] = json.dumps({
+                                    "x": coords["x"],
+                                    "y": coords["y"],
                                     **toolArgs
                                 })
                                 self.client_fc[item["id"]] = item
@@ -235,10 +285,22 @@ class CustomHandler(CustomLogger):
                     asyncio.gather(self.async_update_usage(metadata, usage))
                     yield type(data)(**data_dict)
                     continue
+
+                yield data
+            
             except Exception as e:
                 print("POST-ERROR:", e)
-            
-            yield data
+    
+    def id_to_coords(self, id, props, client_id):
+        target = list(filter(lambda e: e["id"] == id, props))[0] if props else None
+        devicePixelRatio = self.client_props[client_id]["metadata"]["pixelRatio"]
+        if target:
+            coords_x = (target["x"] + target["width"] / 2) / devicePixelRatio
+            coords_y = (target["y"] + target["height"] / 2) / devicePixelRatio
+            print("CONVERTING ID:", id, "  X:", coords_x, "  Y:", coords_y) if DEBUG else None
+            return {"x": coords_x, "y": coords_y}
+        else:
+            return False
     
     async def async_update_usage(self, metadata, usage):
         def update_usage():
@@ -268,14 +330,14 @@ class CustomHandler(CustomLogger):
         
         return await asyncio.to_thread(update_usage)
     
-    async def async_parse(self, image):
+    async def async_screenshot_parse(self, image):
         def parse():
             print("F1 started:", time.perf_counter())
             dino_labled_img, label_coordinates, parsed_content_list = omniparser.parse(image)
             item_props = []
             for i, (k, props) in enumerate(label_coordinates.items()):
                 item_props.append({
-                    "id": k,
+                    "id": int(k),
                     "x": float(props[0]),
                     "y": float(props[1]),
                     "width": float(props[2]),
@@ -287,6 +349,16 @@ class CustomHandler(CustomLogger):
             annotated_image = f"data:image/png;base64,{dino_labled_img}"
             print("F1 ended:", time.perf_counter())
             return annotated_image, item_props
+        
+        return await asyncio.to_thread(parse)
+
+    async def async_grid_parse(self, image):
+        def parse():
+            print("P1 started:", time.perf_counter())
+            annotated_base64, grid_props = grider.parse(image)
+            annotated_image = f"data:image/png;base64,{annotated_base64}"
+            print("P1 ended:", time.perf_counter())
+            return annotated_image, grid_props
         
         return await asyncio.to_thread(parse)
 

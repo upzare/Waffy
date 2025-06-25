@@ -158,6 +158,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ status: "error", value: "Invalid function name" });
                 break;
         }
+    } else if ((message as DomMessage).type === 'GET_DEVICE_PIXEL_RATIO') {
+        const ratio = window.devicePixelRatio;
+        sendResponse({ status: "success", value: ratio });
     }
     return true;
 });

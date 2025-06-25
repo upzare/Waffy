@@ -263,7 +263,7 @@ const App = () => {
                     call_id: toolCall.call_id,
                     output: toolCallResult.message
                 });
-                if (toolName === "fetchScreen") {
+                if (toolName === "fetchScreen" || toolName === "getScrollPortions") {
                     if (domContentIndex) {
                         t2Prompt.splice(domContentIndex, 1);
                     }
@@ -275,7 +275,6 @@ const App = () => {
             if (abortControllerRef.current?.signal.aborted) {
                 return false;
             }
-
         }
         setMessages(prev => {
             const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: false, t3: true } } : msg);
@@ -400,7 +399,7 @@ const App = () => {
                     previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files || [])] });
                     userFiles.push(msg.content.files || []);
                 } else {
-                    const assistantPrompt = `${msg.content.text?.t4 ? msg.content.text?.t4 : msg.content.text?.t1}`;
+                    const assistantPrompt = `${msg.content.text?.t4 ? `${msg.content.text?.t4}\n\n**Validation Output**:\n${msg.content.text?.t3}` : msg.content.text?.t1}`;
                     previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, ...await fileHandler(msg.content.files || [])] });
                     if (msg.content?.task) {
                         previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, ...await fileHandler(userFiles[userFiles.length - 1] || [])] });
