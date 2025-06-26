@@ -6,79 +6,6 @@ chrome.runtime.sendMessage({ action: 'GET_TAB_ID' }, (response) => {
     console.log("TAB ID: ", tabId);
 });
 
-function scroll(direction: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const initialX = window.scrollX;
-        const initialY = window.scrollY;
-
-        const onScroll = () => {
-            if (window.scrollX !== initialX || window.scrollY !== initialY) {
-                window.removeEventListener("scroll", onScroll);
-                let outputMessage = "";
-                if (direction === "up" || direction === "down") {
-                    // if (y != 0) {
-                    const scrollTop = window.scrollY;
-                    const maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
-                    const percentage = maxScrollTop > 0 ? Math.min(100, Math.round((scrollTop / maxScrollTop) * 100)) : 100;
-                    outputMessage = `Scrollbar at ${percentage}% on the y-axis`;
-                }
-                if (direction === "left" || direction === "right") {
-                    // if (x != 0) {
-                    const scrollLeft = window.scrollX;
-                    const maxScrollLeft = document.documentElement.scrollWidth - window.innerWidth;
-                    const percentage = maxScrollLeft > 0 ? Math.min(100, Math.round((scrollLeft / maxScrollLeft) * 100)) : 100;
-                    outputMessage = `Scrollbar at ${percentage}% on the x-axis`;
-                }
-                resolve(outputMessage);
-            }
-        };
-
-        window.addEventListener("scroll", onScroll);
-        let targetX = window.scrollX;
-        let targetY = window.scrollY;
-        switch (direction) {
-            case "up":
-                targetY = Math.max(0, window.scrollY - window.innerHeight);
-                break;
-            case "down":
-                targetY = window.scrollY + window.innerHeight;
-                break;
-            case "left":
-                targetX = Math.max(0, window.scrollX - window.innerWidth);
-                break;
-            case "right":
-                targetX = window.scrollX + window.innerWidth;
-                break;
-        }
-        window.scrollTo(targetX, targetY);
-        setTimeout(() => {
-            window.removeEventListener("scroll", onScroll);
-            reject("No scrollbar movement happened");
-        }, 500);
-    });
-}
-
-function checkScrollbar() {
-    const hasVerticalScroll = document.documentElement.scrollHeight > window.innerHeight;
-    const hasHorizontalScroll = document.documentElement.scrollWidth > window.innerWidth;
-    let scrollPosition = "";
-    if (!hasVerticalScroll && !hasHorizontalScroll) {
-        scrollPosition = "This page does not have any scrollbars";
-    }
-    else if (!hasVerticalScroll) {
-        scrollPosition = "This page does not have a vertical scrollbar. " +
-            `Horizontal scrollbar is at ${window.scrollX}px on the x-axis.`;
-    }
-    else if (!hasHorizontalScroll) {
-        scrollPosition = "This page does not have a horizontal scrollbar. " +
-            `Vertical scrollbar is at ${window.scrollY}px on the y-axis.`;
-    }
-    else {
-        scrollPosition = `Scrollbar at ${window.scrollX}px on the x-axis and ${window.scrollY}px on the y-axis`;
-    }
-    return scrollPosition;
-}
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if ((message as DomMessage).type === 'INTERACT_DOM') {
         const name = message.name;
@@ -120,24 +47,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 } else {
                     sendResponse({ status: "error", value: "Element is not a select element" });
                 }
-                break;
-            }
-            case "SCROLL": {
-                const direction = args.direction;
-                // const x = args.x;
-                // const y = args.y;
-                (async () => {
-                    await scroll(direction).then(res => {
-                        sendResponse({ status: "success", value: res });
-                    }).catch(err => {
-                        sendResponse({ status: "error", value: err });
-                    });
-                })();
-                break;
-            }
-            case "CHECK_SCROLLBAR": {
-                const scrollPosition = checkScrollbar();
-                sendResponse({ status: "success", value: scrollPosition });
                 break;
             }
             case "HIGHLIGHT_ELEMENT": {
