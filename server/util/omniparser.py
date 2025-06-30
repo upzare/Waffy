@@ -19,12 +19,11 @@ class Omniparser(object):
         image = Image.open(io.BytesIO(image_bytes))
         print('image size:', image.size)
         
-        box_overlay_ratio = max(image.size) / 3200
         draw_bbox_config = {
-            'text_scale': box_overlay_ratio,
-            'text_thickness': max(int(3 * box_overlay_ratio), 1),
-            'text_padding': max(int(5 * box_overlay_ratio), 1),
-            'thickness': max(int(4 * box_overlay_ratio), 1),
+            'text_scale': 0.8,
+            'text_thickness': 2,
+            'text_padding': 2,
+            'thickness': 2,
         }
 
         (text, ocr_bbox), _ = check_ocr_box(image, display_img=False, output_bb_format='xyxy', easyocr_args={'text_threshold': 0.8}, use_paddleocr=False)
