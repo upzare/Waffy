@@ -13,7 +13,7 @@
     display: flex;
     gap: 1rem;
     font-size: 0.9rem;
-    padding: 1.5rem;
+    padding: 1rem 1.5rem;
     border-radius: 8px;
     animation: fadeIn 0.3s ease-in;
     width: 80%;
@@ -22,15 +22,15 @@
 }
 
 .message.user {
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 255, 70, 0.03);
+    border: 1px solid rgba(0, 255, 70, 0.08);
     backdrop-filter: blur(2px);
 }
 
-/* .message.user:hover {
+.message.user:hover {
     box-shadow: 0 0px 10px 1px #ffffff20;
     backdrop-filter: blur(3px);
-} */
+}
 
 .message.assistant {
     background: rgba(255, 255, 255, 0.05);
@@ -105,24 +105,6 @@
 
 .message-action-button:active {
     transform: scale(0.95);
-}
-
-.message-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.1);
-    flex-shrink: 0;
-}
-
-.message-avatar svg,
-.message-avatar img {
-    width: 1.5rem;
-    height: auto;
-    stroke: white;
 }
 
 .message-content {

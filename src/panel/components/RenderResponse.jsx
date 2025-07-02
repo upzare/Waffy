@@ -3,16 +3,16 @@ import Markdown from "react-markdown";
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { funky } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, CircleX } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, CircleX, CirclePause } from 'lucide-react';
 import styles from "css/panel/RenderResponse.module.css";
 
 const RenderResponse = ({
     content,
+    taskStatus = "",
     isInitial = false,
     isExecuting = false,
     isValidating = false,
     isSummary = false,
-    taskOK = false,
     error = false
 }) => {
     const [CopyIcon, setCopyIcon] = useState(Copy);
@@ -199,12 +199,8 @@ const RenderResponse = ({
                             </div>
 
                             {isExecuting && (
-                                <div className={styles.dropdownLoading}>
-                                    <div className={styles.dropdownLoadingDots}>
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
+                                <div className={styles.loaderContainer}>
+                                    <div className={styles.loader} />
                                 </div>
                             )}
                         </div>
@@ -225,10 +221,15 @@ const RenderResponse = ({
                                     <Loader2 size={16} className={styles.dropdownLoadingIcon} />
                                     <span className={styles.dropdownLabel}>Validating Task</span>
                                 </>
-                            ) : taskOK ? (
+                            ) : taskStatus === "success" ? (
                                 <>
                                     <CheckCircle2 size={16} className={styles.dropdownCompleteIcon} />
                                     <span className={styles.dropdownLabel}>Task Completed</span>
+                                </>
+                            ) : taskStatus === "suspended" ? (
+                                <>
+                                    <CirclePause size={16} className={styles.dropdownCompleteIcon} />
+                                    <span className={styles.dropdownLabel}>Task Suspended</span>
                                 </>
                             ) : (
                                 <>
@@ -278,12 +279,8 @@ const RenderResponse = ({
                             </div>
 
                             {isValidating && (
-                                <div className={styles.dropdownLoading}>
-                                    <div className={styles.dropdownLoadingDots}>
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
+                                <div className={styles.loaderContainer}>
+                                    <div className={styles.loader} />
                                 </div>
                             )}
                         </div>
@@ -331,9 +328,9 @@ const RenderResponse = ({
 
             {(isInitial || isSummary) && (
                 <div className={styles.loadingIndicator}>
-                    <span></span>
-                    <span></span>
-                    <span></span>
+                    <div className={styles.loadingIndicatorDot}></div>
+                    <div className={styles.loadingIndicatorDot}></div>
+                    <div className={styles.loadingIndicatorDot}></div>
                 </div>
             )}
         </div>

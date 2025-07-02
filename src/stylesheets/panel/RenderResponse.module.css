@@ -113,7 +113,7 @@
 }
 
 .dropdown-content {
-    padding: 0.5rem;
+    padding: 0.7rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     animation: expandContent 0.3s ease-out;
 }
@@ -121,56 +121,6 @@
 .dropdown-markdown {
     word-break: break-word;
     width: 100%;
-}
-
-.dropdown-loading {
-    display: flex;
-    justify-content: center;
-    padding: 1rem 0;
-}
-
-.dropdown-loading-dots {
-    display: flex;
-    gap: 4px;
-}
-
-.dropdown-loading-dots span {
-    width: 8px;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 50%;
-    animation: bounce 1.4s infinite ease-in-out;
-}
-
-.dropdown-loading-dots span:nth-child(1) {
-    animation-delay: -0.32s;
-}
-
-.dropdown-loading-dots span:nth-child(2) {
-    animation-delay: -0.16s;
-}
-
-.loading-indicator {
-    display: flex;
-    gap: 4px;
-    padding: 4px 0;
-    margin-top: 4px;
-}
-
-.loading-indicator span {
-    width: 8px;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 50%;
-    animation: bounce 1.4s infinite ease-in-out;
-}
-
-.loading-indicator span:nth-child(1) {
-    animation-delay: -0.32s;
-}
-
-.loading-indicator span:nth-child(2) {
-    animation-delay: -0.16s;
 }
 
 @keyframes expandContent {
@@ -185,6 +135,137 @@
     }
 }
 
+.loader-container {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem;
+}
+
+.loader {
+    width: 32px;
+    aspect-ratio: 2;
+    --dots: no-repeat radial-gradient(circle closest-side, rgb(0, 200, 83) 90%, transparent);
+    background:
+        var(--dots) 0% 50%,
+        var(--dots) 50% 50%,
+        var(--dots) 100% 50%;
+    background-size: calc(100%/3) 50%;
+    animation: dots 1s infinite linear;
+}
+
+@keyframes dots {
+    20% {
+        background-position: 0% 0%, 50% 50%, 100% 50%
+    }
+
+    40% {
+        background-position: 0% 100%, 50% 0%, 100% 50%
+    }
+
+    60% {
+        background-position: 0% 50%, 50% 100%, 100% 0%
+    }
+
+    80% {
+        background-position: 0% 50%, 50% 50%, 100% 100%
+    }
+}
+
+.loading-indicator {
+    --dot-size: 25px;
+    --dot-speed: 0.8s;
+    --dot-color: rgb(0, 200, 83);
+    position: relative;
+    display: inline-block;
+    margin: 5px;
+    height: var(--dot-size);
+    width: var(--dot-size);
+    animation: spin calc(var(--dot-speed) * 2.5) infinite linear;
+}
+
+.loading-indicator-dot {
+    position: absolute;
+    height: 100%;
+    width: 30%;
+}
+
+.loading-indicator-dot:after {
+    content: '';
+    position: absolute;
+    height: 0%;
+    width: 100%;
+    padding-bottom: 100%;
+    background-color: var(--dot-color);
+    border-radius: 50%;
+}
+
+.loading-indicator-dot:nth-child(1) {
+    bottom: 5%;
+    left: 0;
+    transform: rotate(60deg);
+    transform-origin: 50% 85%;
+}
+
+.loading-indicator-dot:nth-child(1)::after {
+    bottom: 0;
+    left: 0;
+    animation: wobble1 var(--dot-speed) infinite ease-in-out;
+    animation-delay: calc(var(--dot-speed) * -0.3);
+}
+
+.loading-indicator-dot:nth-child(2) {
+    bottom: 5%;
+    right: 0;
+    transform: rotate(-60deg);
+    transform-origin: 50% 85%;
+}
+
+.loading-indicator-dot:nth-child(2)::after {
+    bottom: 0;
+    left: 0;
+    animation: wobble1 var(--dot-speed) infinite calc(var(--dot-speed) * -0.15) ease-in-out;
+}
+
+.loading-indicator-dot:nth-child(3) {
+    bottom: -5%;
+    left: 0;
+    transform: translateX(116.666%);
+}
+
+.loading-indicator-dot:nth-child(3)::after {
+    top: 0;
+    left: 0;
+    animation: wobble2 var(--dot-speed) infinite ease-in-out;
+}
+
+@keyframes wobble1 {
+
+    0%,
+    100% {
+        transform: translateY(0%) scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: translateY(-66%) scale(0.70);
+        opacity: 0.8;
+    }
+}
+
+@keyframes wobble2 {
+
+    0%,
+    100% {
+        transform: translateY(0%) scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: translateY(66%) scale(0.70);
+        opacity: 0.8;
+    }
+}
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);
@@ -192,17 +273,5 @@
 
     100% {
         transform: rotate(360deg);
-    }
-}
-
-@keyframes bounce {
-    0%,
-    80%,
-    100% {
-        transform: scale(0);
-    }
-
-    40% {
-        transform: scale(1);
     }
 }

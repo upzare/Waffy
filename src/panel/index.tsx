@@ -263,7 +263,7 @@ const App = () => {
                     call_id: toolCall.call_id,
                     output: toolCallResult.message
                 });
-                if (toolName === "fetchScreen") {
+                if (toolName === "fetchScreen" || toolName === "getScrollPortions") {
                     if (domContentIndex) {
                         t2Prompt.splice(domContentIndex, 1);
                     }
@@ -275,7 +275,6 @@ const App = () => {
             if (abortControllerRef.current?.signal.aborted) {
                 return false;
             }
-
         }
         setMessages(prev => {
             const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: false, t3: true } } : msg);
@@ -311,20 +310,33 @@ const App = () => {
         for await (const [index, toolCall] of Object.entries(toolCalls)) {
             const toolName = toolCall.name;
             const toolArgs = JSON.parse(toolCall.arguments);
-            if (toolName === "success") {
-                console.log("Validation Success");
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskOK: true }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
-            } else if (toolName === "failed") {
-                console.log("Validation Failed");
-                setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskOK: false }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
-                    updateConversationsDB(update);
-                    return update;
-                });
+            switch (toolName) {
+                case "success":
+                    console.log("Validation Success");
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "success" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    break;
+                case "failed":
+                    console.log("Validation Failed");
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "failed" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    break;
+                case "suspended":
+                    console.log("Validation Suspended");
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "suspended" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
+                    break;
+                default:
+                    break;
             }
         }
         return validationResponse;
@@ -387,7 +399,7 @@ const App = () => {
                     previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files || [])] });
                     userFiles.push(msg.content.files || []);
                 } else {
-                    const assistantPrompt = `${msg.content.text?.t4 ? msg.content.text?.t4 : msg.content.text?.t1}`;
+                    const assistantPrompt = `${msg.content.text?.t4 ? `${msg.content.text?.t4}\n\n**Validation Output**:\n${msg.content.text?.t3}` : msg.content.text?.t1}`;
                     previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, ...await fileHandler(msg.content.files || [])] });
                     if (msg.content?.task) {
                         previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, ...await fileHandler(userFiles[userFiles.length - 1] || [])] });

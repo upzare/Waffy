@@ -21,26 +21,27 @@ export async function sleep(ms: number) {
 
 export const fetchScreen = async () => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
+            const devicePixelRatio = await chrome.tabs.sendMessage(tabs[0].id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
             const meta = {
                 url: tabs[0].url,
                 title: tabs[0].title,
-                pixelRatio: window.devicePixelRatio,
+                pixelRatio: devicePixelRatio,
                 loading_status: tabs[0].status
             }
             chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
                 const base64Image = dataUrl.split(',')[1];
                 resolve({ meta, base64Image });
             }).catch((error) => {
-                reject("Failed to capture DOM");
+                reject("Failed to capture DOM image");
             });
         });
     }).then((data) => {
         const { meta, base64Image } = data as { meta: Record<string, string>, base64Image: string };
-        return { status: "success", message: "Success: Screen fetched", data: { type: "screenshot", metadata: meta, image: base64Image } };
+        return { status: "success", message: "Success: Screen fetched", data: { type: "screenshot", metadata: meta, image: base64Image, parser: 1 } };
     }).catch((error) => {
         return { status: "error", message: "Error: " + error };
     });
@@ -351,22 +352,23 @@ export const reload = async () => {
     });
 }
 
-export const scroll = async ({ direction }: { direction: string }) => {
+export const scroll = async ({ x, y, xDistance, yDistance }: { x: number, y: number, xDistance: number, yDistance: number }) => {
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "SCROLL", args: { direction } })
-                .then((res) => {
-                    if (res.status === "success")
-                        resolve(res.value);
-                    else
-                        reject(res.value);
-                })
-                .catch((error) => {
-                    reject(error);
-                });
+            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.synthesizeScrollGesture', {
+                x,
+                y,
+                xDistance: -xDistance,
+                yDistance: -yDistance,
+            });
+            if (chrome.runtime.lastError) {
+                reject("Failed to scroll");
+            } else {
+                resolve("Scroll initiated");
+            }
         });
     }).then((res) => {
         return { status: "success", message: "Success: " + res };;
@@ -375,22 +377,29 @@ export const scroll = async ({ direction }: { direction: string }) => {
     });
 }
 
-export const checkScrollbar = async () => {
+export const getScrollPortions = async () => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "CHECK_SCROLLBAR", args: {} })
-                .then((res) => {
-                    resolve(res.value);
-                })
-                .catch((error) => {
-                    reject(error.value);
-                });
+            const devicePixelRatio = await chrome.tabs.sendMessage(tabs[0].id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
+            const meta = {
+                url: tabs[0].url,
+                title: tabs[0].title,
+                pixelRatio: devicePixelRatio,
+                loading_status: tabs[0].status
+            }
+            chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
+                const base64Image = dataUrl.split(',')[1];
+                resolve({ meta, base64Image });
+            }).catch((error) => {
+                reject("Failed to capture DOM image");
+            });
         });
-    }).then((res) => {
-        return { status: "success", message: "Success: " + res };;
+    }).then((data) => {
+        const { meta, base64Image } = data as { meta: Record<string, string>, base64Image: string };
+        return { status: "success", message: "Success: Scroll portions fetched", data: { type: "screenshot", metadata: meta, image: base64Image, parser: 2 } };
     }).catch((error) => {
         return { status: "error", message: "Error: " + error };
     });
@@ -425,7 +434,7 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<any> } 
     "open": open,
     "close": close,
     "reload": reload,
-    "checkScrollbar": checkScrollbar,
+    "getScrollPortions": getScrollPortions,
     "scroll": scroll,
     "wait": wait,
 };
