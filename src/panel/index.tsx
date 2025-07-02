@@ -24,6 +24,7 @@ const App = () => {
     const [isFirstMessage, setIsFirstMessage] = useState(true);
     const [isChat, setIsChat] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [statusText, setStatusText] = useState("");
     const [message, setMessage] = useState("");
     const [files, setFiles] = useState<File[]>([]);
     const [isRecording, setIsRecording] = useState(false);
@@ -177,6 +178,7 @@ const App = () => {
     };
 
     const t1Handler = async (messageId: string, previousPrompt: any, prompt_text: string, prompt_files: FileFormat[]) => {
+        setStatusText("GENERATING");
         const t1Prompt = previousPrompt;
         t1Prompt.push({ type: "prompt", content: [{ type: "text", text: prompt_text }, ...prompt_files] });
         const responseStream = ai(t1Prompt, "t1", abortControllerRef?.current?.signal);
@@ -220,6 +222,7 @@ const App = () => {
     }
 
     const t2Handler = async (messageId: string, task: string, previousTask: any, prompt_files: FileFormat[]) => {
+        setStatusText("EXECUTING");
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
@@ -286,6 +289,7 @@ const App = () => {
     }
 
     const t3Handler = async (messageId: string, task: string, executionOutput: string) => {
+        setStatusText("VALIDATING");
         const prompt = `**Task:**\n${task}\n\n**Output:**\n${executionOutput}`;
         const t3Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
         const summaryModelStream = ai(t3Prompt, "t3", abortControllerRef?.current?.signal);
@@ -343,6 +347,7 @@ const App = () => {
     }
 
     const t4Handler = async (messageId: string, task: string, executionOutput: string) => {
+        setStatusText("FINALIZING");
         const prompt = `**Task:**\n${task}\n\n**Output:**\n${executionOutput}`;
         const t4Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
         const summaryModelStream = ai(t4Prompt, "t4", abortControllerRef?.current?.signal);
@@ -371,6 +376,7 @@ const App = () => {
         if ((!message.trim() && files.length === 0) || isGenerating) return;
         const messageId = Date.now().toString();
         setIsGenerating(true);
+        setStatusText("INITIALIZING");
         if (textareaRef.current) {
             textareaRef.current.style.color = "#909090";
         }
@@ -472,6 +478,7 @@ const App = () => {
                 });
             }
             setIsGenerating(false);
+            setStatusText("");
             setMessage("");
             setFiles([]);
             if (textareaRef.current) {
@@ -567,7 +574,7 @@ const App = () => {
                     hidden={isChat}
                     onPromptClick={handleNewChat}
                 />
-                <ChatContainer messages={messages} />
+                <ChatContainer messages={messages} isGenerating={isGenerating} statusText={statusText} />
                 <InputContainer
                     isGenerating={isGenerating}
                     isRecording={isRecording}
