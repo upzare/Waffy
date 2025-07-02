@@ -4,7 +4,7 @@ import { Copy, File, Repeat } from "lucide-react";
 import type { ChatContainerProps } from "../../types";
 import styles from "css/panel/ChatContainer.module.css";
 
-const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
+const ChatContainer: React.FC<ChatContainerProps> = ({ messages, isGenerating, statusText }) => {
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -14,7 +14,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages }) => {
     }, [messages]);
 
     return (
-        <div className={styles.chatContainer} ref={chatContainerRef}>
+        <div className={styles.chatContainer} ref={chatContainerRef} style={{ paddingTop: isGenerating ? 0 : "1rem" }}>
+            {isGenerating && (
+                <div className={styles.statusBar}>
+                    <div className={styles.statusIcon}></div>
+                    <span className={styles.statusText}>{statusText}</span>
+                </div>
+            )}
             {messages.map(
                 (msg, index) =>
                     <div key={index} className={`${styles.message} ${msg.isError ? styles.error : msg.isUser ? styles.user : styles.assistant}`}>
