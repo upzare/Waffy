@@ -50,5 +50,15 @@
     "https://*/*",
     "<all_urls>"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "shared/cursor.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
   "author": "Waffy Inc"
 }

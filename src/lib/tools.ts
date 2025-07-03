@@ -15,8 +15,26 @@ const KEY_CODES = {
 
 type KEY_TYPES = keyof typeof KEY_CODES;
 
-export async function sleep(ms: number) {
+const sleep = async (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const _click = async ({ x, y, tabId }: { x: number, y: number, tabId: number }) => {
+    chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+        type: 'mousePressed',
+        x,
+        y,
+        button: 'left',
+        clickCount: 1,
+    });
+    await sleep(50);
+    chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+        type: 'mouseReleased',
+        x,
+        y,
+        button: 'left',
+        clickCount: 1,
+    });
 }
 
 export const fetchScreen = async () => {
@@ -47,29 +65,15 @@ export const fetchScreen = async () => {
     });
 }
 
-export const click = async ({ x, y, highlight = true }: { x: number, y: number, highlight?: boolean }) => {
+export const click = async ({ x, y }: { x: number, y: number }) => {
     console.log("CLICK: ", x, y);
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Input.dispatchMouseEvent", {
-                type: 'mousePressed',
-                x,
-                y,
-                button: 'left',
-                clickCount: 1,
-            });
-            sleep(50);
-            if (highlight) chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: {} });
-            chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Input.dispatchMouseEvent", {
-                type: 'mouseReleased',
-                x,
-                y,
-                button: 'left',
-                clickCount: 1,
-            });
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await _click({ x, y, tabId: tabs[0].id });
             if (chrome.runtime.lastError) {
                 reject("Failed to click on coordinates");
             } else {
@@ -98,7 +102,6 @@ export const keyPress = async ({ key }: { key: KEY_TYPES }) => {
                 text: '\r',
             });
             sleep(50);
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: {} });
             await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
                 type: 'keyUp',
                 windowsVirtualKeyCode: KEY_CODES[key],
@@ -126,8 +129,8 @@ export const typeText = async ({ x, y, text }: { x: number, y: number, text: str
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await click({ x, y, highlight: false });
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "HIGHLIGHT_ELEMENT", args: { timeout: text.length * 150 + 300 } });
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y, timeout: text.length * 150 + 500 } })
+            await _click({ x, y, tabId: tabs[0].id });
             await sleep(300);
             for await (const char of text) {
                 if (char === '\n') {
@@ -165,7 +168,8 @@ export const clearValue = async ({ x, y }: { x: number, y: number }) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await click({ x, y });
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await _click({ x, y, tabId: tabs[0].id });
             await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "CLEAR_VALUE", args: {} })
                 .then((res) => {
                     if (res.status === "success")
@@ -184,14 +188,15 @@ export const clearValue = async ({ x, y }: { x: number, y: number }) => {
     });
 }
 
-export const getOption = async ({ x, y }: { x: number, y: number, }) => {
+export const getOption = async ({ x, y }: { x: number, y: number }) => {
     console.log("GETOPTION: ", x, y);
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await click({ x, y });
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await _click({ x, y, tabId: tabs[0].id });
             await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "GET_OPTION", args: {} })
                 .then((res) => {
                     if (res.status === "success")
@@ -217,7 +222,8 @@ export const setOption = async ({ x, y, value }: { x: number, y: number, value: 
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            await click({ x, y });
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await _click({ x, y, tabId: tabs[0].id });
             await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "SET_OPTION", args: { value } })
                 .then((res) => {
                     if (res.status === "success")
@@ -352,31 +358,6 @@ export const reload = async () => {
     });
 }
 
-export const scroll = async ({ x, y, xDistance, yDistance }: { x: number, y: number, xDistance: number, yDistance: number }) => {
-    return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
-            }
-            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.synthesizeScrollGesture', {
-                x,
-                y,
-                xDistance: -xDistance,
-                yDistance: -yDistance,
-            });
-            if (chrome.runtime.lastError) {
-                reject("Failed to scroll");
-            } else {
-                resolve("Scroll initiated");
-            }
-        });
-    }).then((res) => {
-        return { status: "success", message: "Success: " + res };;
-    }).catch((error) => {
-        return { status: "error", message: "Error: " + error };
-    });
-}
-
 export const getScrollPortions = async () => {
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -405,6 +386,32 @@ export const getScrollPortions = async () => {
     });
 }
 
+export const scroll = async ({ x, y, xDistance, yDistance }: { x: number, y: number, xDistance: number, yDistance: number }) => {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+            if (!tabs || !tabs[0]?.id) {
+                return;
+            }
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.synthesizeScrollGesture', {
+                x,
+                y,
+                xDistance: -xDistance,
+                yDistance: -yDistance,
+            });
+            if (chrome.runtime.lastError) {
+                reject("Failed to scroll");
+            } else {
+                resolve("Scroll initiated");
+            }
+        });
+    }).then((res) => {
+        return { status: "success", message: "Success: " + res };;
+    }).catch((error) => {
+        return { status: "error", message: "Error: " + error };
+    });
+}
+
 export const wait = async ({ ms }: { ms: number }) => {
     return new Promise((resolve, reject) => {
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -418,6 +425,37 @@ export const wait = async ({ ms }: { ms: number }) => {
         return { status: "success", message: "Success: " + res };;
     }).catch((error) => {
         return { status: "error", message: "Error: " + error };
+    });
+}
+
+export const highlight = async (labels: any, timeout: number = 1000) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        if (!tabs || !tabs[0]?.id) {
+            return;
+        }
+        let color;
+        switch (labels.type) {
+            case "button":
+                color = { r: 255, g: 0, b: 0, a: 0.5 };
+                break;
+            case "text":
+                color = { r: 0, g: 255, b: 0, a: 0.5 };
+                break;
+            default:
+                color = { r: 0, g: 0, b: 255, a: 0.5 };
+                break;
+        }
+        console.log("HIGHLIGHT:", labels);
+        await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.highlightRect", {
+            x: Math.floor(labels.x / 2),
+            y: Math.floor(labels.y / 2),
+            width: Math.floor(labels.width / 2),
+            height: Math.floor(labels.height / 2),
+            // color: "rgba(255, 0, 0, 0.5)",
+            color: color
+        });
+        await sleep(timeout);
+        await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.hideHighlight");
     });
 }
 
