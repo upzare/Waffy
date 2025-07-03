@@ -58,20 +58,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     }
                     break;
                 }
-                // case "HIGHLIGHT_ELEMENT": {
-                //     (async () => {
-                //         const element = document.activeElement as HTMLElement;
-                //         const originalOutline = element.style.outline;
-                //         const originalOutlineOffset = element.style.outlineOffset;
-                //         element.style.outline = '3px solid red';
-                //         element.style.outlineOffset = '-1px';
-                //         await new Promise(resolve => setTimeout(resolve, args.timeout || 1000));
-                //         element.style.outline = originalOutline;
-                //         element.style.outlineOffset = originalOutlineOffset;
-                //         sendResponse({ status: "success", value: "Element Highlighted" });
-                //     })();
-                //     break;
-                // }
                 case "DISPLAY_POINTER": {
                     (async () => {
                         const { x, y, timeout } = args;

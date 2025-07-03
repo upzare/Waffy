@@ -428,37 +428,6 @@ export const wait = async ({ ms }: { ms: number }) => {
     });
 }
 
-export const highlight = async (labels: any, timeout: number = 1000) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-        if (!tabs || !tabs[0]?.id) {
-            return;
-        }
-        let color;
-        switch (labels.type) {
-            case "button":
-                color = { r: 255, g: 0, b: 0, a: 0.5 };
-                break;
-            case "text":
-                color = { r: 0, g: 255, b: 0, a: 0.5 };
-                break;
-            default:
-                color = { r: 0, g: 0, b: 255, a: 0.5 };
-                break;
-        }
-        console.log("HIGHLIGHT:", labels);
-        await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.highlightRect", {
-            x: Math.floor(labels.x / 2),
-            y: Math.floor(labels.y / 2),
-            width: Math.floor(labels.width / 2),
-            height: Math.floor(labels.height / 2),
-            // color: "rgba(255, 0, 0, 0.5)",
-            color: color
-        });
-        await sleep(timeout);
-        await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.hideHighlight");
-    });
-}
-
 export const availableFunctions: { [key: string]: (args: any) => Promise<any> } = {
     "fetchScreen": fetchScreen,
     "click": click,
