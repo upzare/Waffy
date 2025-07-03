@@ -16,6 +16,7 @@ from mistralai import Mistral
 from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
 from redis import Redis
 from supabase import create_client, Client
+import socketio
 
 DEBUG = True
 
@@ -33,6 +34,10 @@ cloudinary.config(
     api_secret = os.environ.get("CLOUDINARY_API_SECRET"),
     secure=True
 )
+
+sio = socketio.Client()
+
+sio.connect("http://localhost:8000", auth={"server": True})
 
 omniparser = Omniparser(config)
 grider = Grider()
@@ -173,7 +178,7 @@ class CustomHandler(CustomLogger):
                     for index, (image, props), ocr in zip(metadata, parser_content, ocr_content):
                         print("Screenindex:", index)
                         page_meta = metadata[index]
-                        asyncio.gather(self.async_upload(image)) if DEBUG else None
+                        await asyncio.gather(self.async_upload(image)) if DEBUG else None
                         self.client_props[client_id] = {**self.client_props.get(client_id, {}), "metadata": page_meta, "fetch_props": props}
                         # Consider system prompt while inserting
                         data["input"].insert(index + 1, {
@@ -196,7 +201,7 @@ class CustomHandler(CustomLogger):
                     results = await asyncio.gather(*grider_tasks, return_exceptions=True)
                     for index, (image, props) in zip(metadata, results):
                         page_meta = metadata[index]
-                        asyncio.gather(self.async_upload(image)) if DEBUG else None
+                        await asyncio.gather(self.async_upload(image)) if DEBUG else None
                         self.client_props[client_id] = {**self.client_props.get(client_id, {}), "metadata": page_meta, "scroll_props": props}
                         # Consider system prompt while inserting
                         data["input"].insert(index + 1, {

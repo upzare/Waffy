@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { ai, generateTitle } from '@/lib/agent';
+import { socket } from '@/lib/socket';
 import { Message, Conversation, ToolCall, FileFormat } from '../types';
 import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
@@ -40,6 +41,8 @@ const App = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const abortControllerRef = useRef<AbortController>(null);
 
+    const [isConnected, setIsConnected] = useState(socket.connected);
+
     const db = useRef<IDBDatabase>(null);
     const db_request = useRef<IDBOpenDBRequest>(null);
     const conversationID = useRef<string>(null);
@@ -47,6 +50,7 @@ const App = () => {
     useEffect(() => {
         initSigned();
         initDB();
+        initSocket();
         fetchConversations();
         Mousetrap.bind("ctrl+space", () => { speechRecognition() });
 
@@ -64,7 +68,10 @@ const App = () => {
         }, 800);
 
         document.addEventListener("mousemove", handleMouseMove);
-        return () => document.removeEventListener("mousemove", handleMouseMove);
+        return () => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            deinitSocket();
+        }
     }, []);
 
     useEffect(() => {
@@ -121,6 +128,24 @@ const App = () => {
         conversationDB?.add({ id: conversationID.current, title: "New Chat", timestamp: new Date(), messages: [] });
         await createTitle(prompt);
         fetchConversations();
+    }
+
+    const initSocket = () => {
+        socket.on("connect", socketOnConnect);
+        socket.on("disconnect", socketOnDisconnect);
+    }
+
+    const deinitSocket = () => {
+        socket.off("connect", socketOnConnect);
+        socket.off("disconnect", socketOnDisconnect);
+    }
+
+    const socketOnConnect = () => {
+        setIsConnected(true);
+    }
+
+    const socketOnDisconnect = () => {
+        setIsConnected(false);
     }
 
     const createTitle = async (prompt: string) => {
