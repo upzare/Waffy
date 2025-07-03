@@ -180,6 +180,11 @@ class CustomHandler(CustomLogger):
                         page_meta = metadata[index]
                         await asyncio.gather(self.async_upload(image)) if DEBUG else None
                         self.client_props[client_id] = {**self.client_props.get(client_id, {}), "metadata": page_meta, "fetch_props": props}
+                        # Emit highlight_client event
+                        # sio.emit("highlight_client", {
+                        #     "client_id": client_id,
+                        #     "data": self.client_props.get(client_id, {}).get("fetch_props", {})
+                        # })
                         # Consider system prompt while inserting
                         data["input"].insert(index + 1, {
                             "role": "user",

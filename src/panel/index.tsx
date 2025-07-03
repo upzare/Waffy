@@ -449,10 +449,12 @@ const App = () => {
                 if (!tabs || !tabs[0]?.id) {
                     return;
                 }
-                chrome.debugger.attach({ tabId: tabs[0].id }, "1.3", () => {
+                chrome.debugger.attach({ tabId: tabs[0].id }, "1.3", async () => {
                     if (chrome.runtime.lastError) {
                         console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
                     }
+                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.enable");
+                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.enable");
                     console.log(`Debugger attached to tab ${tabs[0].id}`);
                 });
             });
@@ -484,7 +486,9 @@ const App = () => {
                 if (!tabs || !tabs[0]?.id) {
                     return;
                 }
-                chrome.debugger.detach({ tabId: tabs[0].id }, () => {
+                chrome.debugger.detach({ tabId: tabs[0].id }, async () => {
+                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.disable");
+                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.disable");
                     if (chrome.runtime.lastError) {
                         console.error("Error detaching from tab:", chrome.runtime.lastError.message);
                     }
