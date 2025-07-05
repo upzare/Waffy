@@ -486,9 +486,9 @@ const App = () => {
                 if (!tabs || !tabs[0]?.id) {
                     return;
                 }
+                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.disable");
+                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.disable");
                 chrome.debugger.detach({ tabId: tabs[0].id }, async () => {
-                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.disable");
-                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.disable");
                     if (chrome.runtime.lastError) {
                         console.error("Error detaching from tab:", chrome.runtime.lastError.message);
                     }
