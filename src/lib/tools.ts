@@ -168,21 +168,35 @@ export const clearValue = async ({ x, y }: { x: number, y: number }) => {
             if (!tabs || !tabs[0]?.id) {
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } });
             await _click({ x, y, tabId: tabs[0].id });
-            await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "CLEAR_VALUE", args: {} })
-                .then((res) => {
-                    if (res.status === "success")
-                        resolve(res.value);
-                    else
-                        reject(res.value);
-                })
-                .catch((error) => {
-                    reject(error.value);
-                });
+            await sleep(100);
+            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+                type: 'char',
+                commands: ["SelectAll"]
+            });
+            await sleep(100);
+            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+                type: 'keyDown',
+                key: 'Backspace',
+                code: 'Backspace',
+                windowsVirtualKeyCode: 8,
+            });
+            await sleep(50);
+            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+                type: 'keyUp',
+                key: 'Backspace',
+                code: 'Backspace',
+                windowsVirtualKeyCode: 8,
+            });
+            if (chrome.runtime.lastError) {
+                reject("Failed to clear value");
+            } else {
+                resolve("Value cleared successfully");
+            }
         });
     }).then((res) => {
-        return { status: "success", message: "Success: " + res };;
+        return { status: "success", message: "Success: " + res };
     }).catch((error) => {
         return { status: "error", message: "Error: " + error };
     });
