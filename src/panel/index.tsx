@@ -248,6 +248,12 @@ const App = () => {
 
     const t2Handler = async (messageId: string, task: string, previousTask: any, prompt_files: FileFormat[]) => {
         setStatusText("EXECUTING");
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+            if (!tabs || !tabs[0]?.id) {
+                return;
+            }
+            await chrome.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: tabs[0].id });
+        });
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
@@ -310,6 +316,12 @@ const App = () => {
             return update;
         });
         console.log("t2response", executionResponse);
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+            if (!tabs || !tabs[0]?.id) {
+                return;
+            }
+            await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tabs[0].id });
+        });
         return executionResponse;
     }
 
@@ -486,6 +498,7 @@ const App = () => {
                 if (!tabs || !tabs[0]?.id) {
                     return;
                 }
+                await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tabs[0].id }); // force disable overlay
                 await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.disable");
                 await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.disable");
                 chrome.debugger.detach({ tabId: tabs[0].id }, async () => {
