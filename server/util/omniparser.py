@@ -23,7 +23,7 @@ class Omniparser(object):
             'text_scale': 0.8,
             'text_thickness': 2,
             'text_padding': 2,
-            'thickness': 2,
+            'thickness': 3,
         }
 
         (text, ocr_bbox), _ = check_ocr_box(image, display_img=False, output_bb_format='xyxy', easyocr_args={'text_threshold': 0.8}, use_paddleocr=False)
