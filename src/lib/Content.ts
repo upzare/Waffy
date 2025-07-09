@@ -6,6 +6,93 @@ chrome.runtime.sendMessage({ action: 'GET_TAB_ID' }, (response) => {
     console.log("TAB ID: ", tabId);
 });
 
+async function initOverlay() {
+    if (document.querySelector('.waffy-overlay')) {
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'waffy-overlay';
+    const style = document.createElement('style');
+    style.textContent = `
+        .waffy-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 2147483647;
+            border: 0px solid transparent;
+            box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
+                        inset 0 0 120px rgba(0, 255, 255, 0.3),
+                        inset 0 0 180px rgba(0, 255, 255, 0.2);
+            animation: waffyOverlayAnim 4s ease-in-out infinite;
+        }
+        
+        @keyframes waffyOverlayAnim {
+            0% {
+                box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
+                            inset 0 0 120px rgba(0, 255, 255, 0.3),
+                            inset 0 0 180px rgba(0, 255, 255, 0.2);
+            }
+            14% {
+                box-shadow: inset 0 0 70px rgba(0, 255, 200, 0.5),
+                            inset 0 0 140px rgba(0, 255, 200, 0.35),
+                            inset 0 0 210px rgba(0, 255, 200, 0.25);
+            }
+            28% {
+                box-shadow: inset 0 0 80px rgba(0, 255, 127, 0.55),
+                            inset 0 0 160px rgba(0, 255, 127, 0.4),
+                            inset 0 0 200px rgba(0, 255, 127, 0.3);
+            }
+            42% {
+                box-shadow: inset 0 0 75px rgba(144, 238, 144, 0.52),
+                            inset 0 0 150px rgba(144, 238, 144, 0.38),
+                            inset 0 0 195px rgba(144, 238, 144, 0.28);
+            }
+            56% {
+                box-shadow: inset 0 0 70px rgba(173, 216, 230, 0.48),
+                            inset 0 0 140px rgba(173, 216, 230, 0.34),
+                            inset 0 0 210px rgba(173, 216, 230, 0.24);
+            }
+            70% {
+                box-shadow: inset 0 0 75px rgba(221, 160, 221, 0.5),
+                            inset 0 0 150px rgba(221, 160, 221, 0.36),
+                            inset 0 0 225px rgba(221, 160, 221, 0.26);
+            }
+            84% {
+                box-shadow: inset 0 0 65px rgba(175, 238, 238, 0.46),
+                            inset 0 0 130px rgba(175, 238, 238, 0.32),
+                            inset 0 0 195px rgba(175, 238, 238, 0.22);
+            }
+            100% {
+                box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
+                            inset 0 0 120px rgba(0, 255, 255, 0.3),
+                            inset 0 0 180px rgba(0, 255, 255, 0.2);
+            }
+        }
+    `;
+    overlay.style.display = 'none';
+
+    document.head.appendChild(style);
+    document.body.appendChild(overlay);
+}
+
+function enableOverlay() {
+    const overlay = document.querySelector('.waffy-overlay') as HTMLElement | null;
+    if (overlay) {
+        overlay.style.display = 'block';
+    }
+}
+
+function disableOverlay() {
+    const overlay = document.querySelector('.waffy-overlay') as HTMLElement | null;
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch ((message as DomMessage).type) {
         case "GET_DEVICE_PIXEL_RATIO": {
@@ -17,20 +104,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const name = message.name;
             const args = message.args;
             switch (name) {
-                case "CLEAR_VALUE": {
-                    const element = document.activeElement as HTMLInputElement;
-                    const inputTags = ["input", "select", "textarea"];
-                    if (element && inputTags.includes(element.tagName.toLowerCase())) {
-                        element.value = "";
-                        sendResponse({ status: "success", value: "Value cleared successfully" });
-                    } else if (element && element.isContentEditable) {
-                        // @ts-ignore
-                        element.innerHTML = window.trustedTypes.emptyHTML;
-                    } else {
-                        sendResponse({ status: "error", value: "Element is not an input element" });
-                    }
-                    break;
-                }
                 case "GET_OPTION": {
                     const element = document.activeElement as HTMLSelectElement;
                     if (element && element.tagName.toLowerCase() === "select") {
@@ -78,6 +151,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     })();
                     break;
                 }
+                case "SHOW_OVERLAY": {
+                    enableOverlay();
+                    sendResponse({ status: "success", value: "Overlay Enabled" });
+                    break;
+                }
+                case "HIDE_OVERLAY": {
+                    disableOverlay();
+                    sendResponse({ status: "success", value: "Overlay Disabled" });
+                    break;
+                }
                 default:
                     sendResponse({ status: "error", value: "Invalid function name" });
                     break;
@@ -88,4 +171,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
 });
 
-export { };
+initOverlay().then(() => {
+    chrome.runtime.sendMessage({ action: "GET_OVERLAY_STATUS" }, (response) => {
+        if (response.status === "enabled") {
+            enableOverlay();
+        } else {
+            disableOverlay();
+        }
+    });
+});

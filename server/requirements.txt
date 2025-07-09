@@ -20,6 +20,5 @@ python-multipart
 cloudinary
 fastapi
 uvicorn
-mistralai
 prisma
 python-socketio[client]

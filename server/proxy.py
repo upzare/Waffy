@@ -12,7 +12,6 @@ from util.utils import detect_device
 from util.grider import Grider
 import cloudinary
 import cloudinary.uploader
-from mistralai import Mistral
 from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
 from redis import Redis
 from supabase import create_client, Client
@@ -111,7 +110,6 @@ class CustomHandler(CustomLogger):
 
                 request_type = None
                 parser_tasks = []
-                ocr_tasks = []
                 metadata = {}
                 grider_tasks = []
 
@@ -152,9 +150,7 @@ class CustomHandler(CustomLogger):
                             # Screenshot content
                             request_type = "screenshot"
                             parser_task = self.async_screenshot_parse(messages["image"])
-                            ocr_task = self.async_ocr(messages["image"])
                             parser_tasks.append(parser_task)
-                            ocr_tasks.append(ocr_task)
                             metadata[index] = messages["metadata"]
                         elif ("parser" in messages and messages["parser"] == 2):
                             # Scroll content
@@ -167,15 +163,13 @@ class CustomHandler(CustomLogger):
 
                 print("REQUEST_TYPE:", request_type)
                 if (request_type == "screenshot"):
-                    # Inject annotated screenshot + ocr
+                    # Inject annotated screenshot
                     start_time = time.perf_counter()
                     print("Main Start:", start_time)
-                    results = await asyncio.gather(*parser_tasks, *ocr_tasks, return_exceptions=True)
+                    parser_content = await asyncio.gather(*parser_tasks, return_exceptions=True)
                     print("Main End:", time.perf_counter())
                     print("Total Time:", time.perf_counter() - start_time)
-                    parser_content = results[:len(parser_tasks)]
-                    ocr_content = results[len(parser_tasks):]
-                    for index, (image, props), ocr in zip(metadata, parser_content, ocr_content):
+                    for index, (image, props) in zip(metadata, parser_content):
                         print("Screenindex:", index)
                         page_meta = metadata[index]
                         await asyncio.gather(self.async_upload(image)) if DEBUG else None
@@ -191,7 +185,7 @@ class CustomHandler(CustomLogger):
                             "content": [
                                 {
                                     "type": "input_text",
-                                    "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, the ocr content, and the annotated image. You can use this information to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{page_meta['url']}</URL><TITLE>{page_meta['title']}</TITLE><LOADING_STATUS>{page_meta['loading_status']}</LOADING_STATUS></PAGE_METDATA><PAGE_OCR_CONTENT>{ocr}</PAGE_OCR_CONTENT>"
+                                    "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, and the annotated image. You can use this information to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{page_meta['url']}</URL><TITLE>{page_meta['title']}</TITLE><LOADING_STATUS>{page_meta['loading_status']}</LOADING_STATUS></PAGE_METDATA>"
                                 },
                                 {
                                     "type": "input_image",
@@ -371,20 +365,6 @@ class CustomHandler(CustomLogger):
             return annotated_image, grid_props
         
         return await asyncio.to_thread(parse)
-
-    async def async_ocr(self, image):
-        image_uri = f"data:image/png;base64,{image}"
-        def get_ocr():
-            print("F2 started:", time.perf_counter())
-            mistral = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
-            ocr =  mistral.ocr.process(model="mistral-ocr-latest", document={
-                "type": "image_url",
-                "image_url": image_uri,
-            }).pages[0].markdown
-            print("F2 ended:", time.perf_counter())
-            return ocr
-        
-        return await asyncio.to_thread(get_ocr)
     
     # For debugging purposes
     async def async_upload(self, image_uri):
