@@ -17,7 +17,7 @@ from redis import Redis
 from supabase import create_client, Client
 import socketio
 
-DEBUG = True
+DEBUG = False
 
 config = {
     "som_model_path": "weights/icon_detect/model.pt",
@@ -276,6 +276,9 @@ class CustomHandler(CustomLogger):
                                 continue
                 elif ("type" in data_dict and data_dict["type"] == "response.function_call_arguments.delta" or data_dict["type"] == "response.function_call_arguments.done"):
                     continue
+                elif ("type" in data_dict and data_dict["type"] == "response.completed" and "response" in data_dict and "metadata" in data_dict["response"] and "mode" in data_dict["response"]["metadata"] and data_dict["response"]["metadata"]["mode"] == "t3"):
+                    # call stepgenerator
+                    yield type(data)(**data_dict)
                 elif ("type" in data_dict and data_dict["type"] == "response.completed"):
                     output = data_dict["response"]["output"]
                     for index, item in enumerate(output):

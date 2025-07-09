@@ -12,7 +12,7 @@ import InputContainer from './components/InputContainer';
 import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
 import { fileHandler } from './utils/FileHandler';
-import { availableFunctions } from '@/lib/tools';
+import { availableFunctions, updateOpenedTabs } from '@/lib/tools';
 import { getLocalStorage } from '@/lib/client';
 import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
@@ -202,6 +202,60 @@ const App = () => {
         }
     };
 
+    const attachController = async () => {
+        return new Promise<void>((resolve) => {
+            chrome.tabs.query({}, async (tabs) => {
+                for (let tab of tabs) {
+                    if (tab.url?.startsWith("chrome://")) {
+                        continue;
+                    }
+                    chrome.debugger.attach({ tabId: tab.id }, "1.3", async () => {
+                        if (chrome.runtime.lastError) {
+                            console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
+                        }
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.enable");
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.enable");
+                        console.log(`Debugger attached to tab ${tab.id}`);
+                    });
+                }
+                // Set current tab as active
+                chrome.tabs.query({ active: true, currentWindow: true }, async (currentTabs) => {
+                    if (!currentTabs || !currentTabs[0]?.id) {
+                        return;
+                    }
+                    await updateOpenedTabs();
+                    await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: currentTabs[0].id });
+                    await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: true });
+                });
+                resolve();
+            });
+        });
+    };
+
+    const detachController = async () => {
+        return new Promise<void>((resolve) => {
+            chrome.tabs.query({}, async (tabs) => {
+                for (let tab of tabs) {
+                    if (tab.url?.startsWith("chrome://")) {
+                        continue;
+                    }
+                    await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id }); // force disable overlay
+                    await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.disable");
+                    await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.disable");
+                    await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.disable");
+                    await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: false });
+                    chrome.debugger.detach({ tabId: tab.id }, async () => {
+                        if (chrome.runtime.lastError) {
+                            console.error("Error detaching from tab:", chrome.runtime.lastError.message);
+                        }
+                    });
+                }
+                resolve();
+            });
+        });
+    };
+
     const t1Handler = async (messageId: string, previousPrompt: any, prompt_text: string, prompt_files: FileFormat[]) => {
         setStatusText("GENERATING");
         const t1Prompt = previousPrompt;
@@ -248,11 +302,12 @@ const App = () => {
 
     const t2Handler = async (messageId: string, task: string, previousTask: any, prompt_files: FileFormat[]) => {
         setStatusText("EXECUTING");
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
+        await updateOpenedTabs();
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                throw new Error("Tab not found");
             }
-            await chrome.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: tabs[0].id });
+            await chrome.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: tab.id });
         });
         let finish = false;
         let functionExecState = false;
@@ -284,9 +339,10 @@ const App = () => {
                     throw new Error(res.message);
                 }
             }
-            t2Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
+            // t2Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
             functionExecState = false;
             for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
+                await updateOpenedTabs();
                 const toolName = toolCall.name;
                 const toolArgs = JSON.parse(toolCall.arguments);
                 const toolCallResult = await availableFunctions[toolName](toolArgs);
@@ -304,6 +360,8 @@ const App = () => {
                     domContentIndex = t2Prompt.length;
                     t2Prompt.push(toolCallResult.data);
                 }
+                if (toolName === "display") { }
+                // if (toolName === "getOpenedTabs" || toolName === "openTab" || toolName === "switchTab" || toolName === "closeTab") {}
                 functionExecState = true;
             }
             if (abortControllerRef.current?.signal.aborted) {
@@ -316,11 +374,11 @@ const App = () => {
             return update;
         });
         console.log("t2response", executionResponse);
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                throw new Error("Tab not found");
             }
-            await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tabs[0].id });
+            await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id });
         });
         return executionResponse;
     }
@@ -457,19 +515,7 @@ const App = () => {
         };
         const prompt_files = await fileHandler(files);
         try {
-            chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-                if (!tabs || !tabs[0]?.id) {
-                    return;
-                }
-                chrome.debugger.attach({ tabId: tabs[0].id }, "1.3", async () => {
-                    if (chrome.runtime.lastError) {
-                        console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
-                    }
-                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.enable");
-                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.enable");
-                    console.log(`Debugger attached to tab ${tabs[0].id}`);
-                });
-            });
+            await attachController();
             const task = await t1Handler(messageId, previousPrompt, prompt_text, prompt_files);
             if (task) {
                 const executionOutput = await t2Handler(messageId, task, previousTask, prompt_files);
@@ -494,19 +540,7 @@ const App = () => {
                 return update;
             });
         } finally {
-            chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-                if (!tabs || !tabs[0]?.id) {
-                    return;
-                }
-                await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tabs[0].id }); // force disable overlay
-                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.disable");
-                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.disable");
-                chrome.debugger.detach({ tabId: tabs[0].id }, async () => {
-                    if (chrome.runtime.lastError) {
-                        console.error("Error detaching from tab:", chrome.runtime.lastError.message);
-                    }
-                });
-            });
+            await detachController();
             setMessages(prev => {
                 const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
                 updateConversationsDB(update);

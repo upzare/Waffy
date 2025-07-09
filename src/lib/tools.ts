@@ -37,24 +37,41 @@ const _click = async ({ x, y, tabId }: { x: number, y: number, tabId: number }) 
     });
 }
 
-export const fetchScreen = async () => {
-    return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+export const updateOpenedTabs = () => {
+    return new Promise<void>((resolve) => {
+        chrome.tabs.query({}, (tabs) => {
+            if (chrome.runtime.lastError) {
+                resolve();
                 return;
             }
-            const devicePixelRatio = await chrome.tabs.sendMessage(tabs[0].id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
-            const meta = {
-                url: tabs[0].url,
-                title: tabs[0].title,
-                pixelRatio: devicePixelRatio,
-                loading_status: tabs[0].status
+            chrome.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs }, () => {
+                resolve();
+            });
+        });
+    });
+};
+
+export const fetchScreen = async () => {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
+                return;
             }
-            chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
-                const base64Image = dataUrl.split(',')[1];
+            const devicePixelRatio = await chrome.tabs.sendMessage(tab.id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
+            const meta = {
+                url: tab.url,
+                title: tab.title,
+                pixelRatio: devicePixelRatio,
+                loading_status: tab.status
+            }
+            chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "png" }, (response?: { data?: string }) => {
+                if (chrome.runtime.lastError) {
+                    reject("Failed to capture DOM image");
+                    return;
+                }
+                const base64Image = response?.data;
                 resolve({ meta, base64Image });
-            }).catch((error) => {
-                reject("Failed to capture DOM image");
             });
         });
     }).then((data) => {
@@ -68,12 +85,13 @@ export const fetchScreen = async () => {
 export const click = async ({ x, y }: { x: number, y: number }) => {
     console.log("CLICK: ", x, y);
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
-            await _click({ x, y, tabId: tabs[0].id });
+            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await _click({ x, y, tabId: tab.id });
             if (chrome.runtime.lastError) {
                 reject("Failed to click on coordinates");
             } else {
@@ -90,11 +108,12 @@ export const click = async ({ x, y }: { x: number, y: number }) => {
 export const keyPress = async ({ key }: { key: KEY_TYPES }) => {
     console.log("KEYPRESS: ", key);
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                 type: 'keyDown',
                 windowsVirtualKeyCode: KEY_CODES[key],
                 key: key,
@@ -102,7 +121,7 @@ export const keyPress = async ({ key }: { key: KEY_TYPES }) => {
                 text: '\r',
             });
             sleep(50);
-            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                 type: 'keyUp',
                 windowsVirtualKeyCode: KEY_CODES[key],
                 key: key,
@@ -125,24 +144,25 @@ export const keyPress = async ({ key }: { key: KEY_TYPES }) => {
 export const typeText = async ({ x, y, text }: { x: number, y: number, text: string }) => {
     console.log("TYPETEXT: ", x, y, text);
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y, timeout: text.length * 150 + 500 } })
-            await _click({ x, y, tabId: tabs[0].id });
+            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y, timeout: text.length * 150 + 500 } })
+            await _click({ x, y, tabId: tab.id });
             await sleep(300);
             for await (const char of text) {
                 if (char === '\n') {
                     keyPress({ key: "Enter" });
                     continue;
                 }
-                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+                await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                     type: 'keyDown',
                     text: char,
                 });
                 await sleep(50);
-                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+                await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                     type: 'keyUp',
                     text: char,
                 });
@@ -164,26 +184,27 @@ export const typeText = async ({ x, y, text }: { x: number, y: number, text: str
 export const clearValue = async ({ x, y }: { x: number, y: number }) => {
     console.log("CLEARVALUE: ", x, y);
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } });
-            await _click({ x, y, tabId: tabs[0].id });
+            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } });
+            await _click({ x, y, tabId: tab.id });
             await sleep(100);
-            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                 type: 'char',
                 commands: ["SelectAll"]
             });
             await sleep(100);
-            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                 type: 'keyDown',
                 key: 'Backspace',
                 code: 'Backspace',
                 windowsVirtualKeyCode: 8,
             });
             await sleep(50);
-            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.dispatchKeyEvent', {
+            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                 type: 'keyUp',
                 key: 'Backspace',
                 code: 'Backspace',
@@ -205,13 +226,14 @@ export const clearValue = async ({ x, y }: { x: number, y: number }) => {
 export const getOption = async ({ x, y }: { x: number, y: number }) => {
     console.log("GETOPTION: ", x, y);
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
-            await _click({ x, y, tabId: tabs[0].id });
-            await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "GET_OPTION", args: {} })
+            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await _click({ x, y, tabId: tab.id });
+            await chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "GET_OPTION", args: {} })
                 .then((res) => {
                     if (res.status === "success")
                         resolve(res.value);
@@ -232,13 +254,14 @@ export const getOption = async ({ x, y }: { x: number, y: number }) => {
 export const setOption = async ({ x, y, value }: { x: number, y: number, value: string }) => {
     console.log("SETOPTION: ", x, y, value);
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
-            await _click({ x, y, tabId: tabs[0].id });
-            await chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "SET_OPTION", args: { value } })
+            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await _click({ x, y, tabId: tab.id });
+            await chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "SET_OPTION", args: { value } })
                 .then((res) => {
                     if (res.status === "success")
                         resolve(res.value);
@@ -258,12 +281,13 @@ export const setOption = async ({ x, y, value }: { x: number, y: number, value: 
 
 export const loadingState = async () => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
             chrome.debugger.sendCommand(
-                { tabId: tabs[0].id },
+                { tabId: tab.id },
                 "Runtime.evaluate",
                 { expression: "document.readyState" },
                 (result?: { result?: { value: string } }) => {
@@ -290,11 +314,12 @@ export const loadingState = async () => {
 
 export const goto = async ({ url }: { url: string }) => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.update(tabs[0].id, { url: url }, (updatedTab) => {
+            chrome.tabs.update(tab.id, { url: url }, (updatedTab) => {
                 if (chrome.runtime.lastError) {
                     reject("Failed to navigating to URL");
                 } else {
@@ -309,19 +334,39 @@ export const goto = async ({ url }: { url: string }) => {
     });
 }
 
-export const open = async ({ url }: { url: string }) => {
+export const getOpenedTabs = async () => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.tabs.query({}, async (tabs) => {
+            if (chrome.runtime.lastError) {
+                reject("Failed to get the open tabs");
                 return;
             }
-            chrome.tabs.create({ url: url }, (tab) => {
-                if (chrome.runtime.lastError) {
-                    reject("Failed to open the URL");
-                } else {
-                    resolve("URL opened in new tab successfully");
-                }
-            });
+            await chrome.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs });
+            const result = tabs.map(tab => ({
+                id: tab.id,
+                title: tab.title,
+                url: tab.url,
+                active: tab.active,
+            }));
+            resolve(result);
+        });
+    }).then((tabs) => {
+        return { status: "success", message: JSON.stringify(tabs) };
+    }).catch((error) => {
+        return { status: "error", message: "Error: " + error };
+    });
+}
+
+export const openTab = async ({ url }: { url: string }) => {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.create({ url: url }, async (tab) => {
+            await updateOpenedTabs();
+            await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
+            if (chrome.runtime.lastError) {
+                reject("Failed to open the URL");
+            } else {
+                resolve("URL opened in new tab successfully");
+            }
         });
     }).then((res) => {
         return { status: "success", message: "Success: " + res };;
@@ -330,19 +375,32 @@ export const open = async ({ url }: { url: string }) => {
     });
 }
 
-export const close = async () => {
+export const switchTab = async ({ tabId }: { tabId: number }) => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
+        chrome.tabs.update(tabId, { active: true }, async (tab) => {
+            await updateOpenedTabs();
+            await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
+            if (chrome.runtime.lastError) {
+                reject("Failed to switch tab");
+            } else {
+                resolve("Tab switched successfully");
             }
-            chrome.tabs.remove(tabs[0].id, () => {
-                if (chrome.runtime.lastError) {
-                    reject("Failed to close the page");
-                } else {
-                    resolve("Page closed successfully");
-                }
-            });
+        });
+    }).then((res) => {
+        return { status: "success", message: "Success: " + res };;
+    }).catch((error) => {
+        return { status: "error", message: "Error: " + error };
+    });
+}
+
+export const closeTab = async ({ tabId }: { tabId: number }) => {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.remove(tabId, () => {
+            if (chrome.runtime.lastError) {
+                reject("Failed to close the tab");
+            } else {
+                resolve("Tab closed successfully");
+            }
         });
     }).then((res) => {
         return { status: "success", message: "Success: " + res };;
@@ -353,11 +411,12 @@ export const close = async () => {
 
 export const reload = async () => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.reload(tabs[0].id, () => {
+            chrome.tabs.reload(tab.id, () => {
                 if (chrome.runtime.lastError) {
                     reject("Failed to reload the page");
                 } else {
@@ -374,16 +433,17 @@ export const reload = async () => {
 
 export const getScrollPortions = async () => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            const devicePixelRatio = await chrome.tabs.sendMessage(tabs[0].id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
+            const devicePixelRatio = await chrome.tabs.sendMessage(tab.id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
             const meta = {
-                url: tabs[0].url,
-                title: tabs[0].title,
+                url: tab.url,
+                title: tab.title,
                 pixelRatio: devicePixelRatio,
-                loading_status: tabs[0].status
+                loading_status: tab.status
             }
             chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
                 const base64Image = dataUrl.split(',')[1];
@@ -402,12 +462,13 @@ export const getScrollPortions = async () => {
 
 export const scroll = async ({ x, y, xDistance, yDistance }: { x: number, y: number, xDistance: number, yDistance: number }) => {
     return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
                 return;
             }
-            chrome.tabs.sendMessage(tabs[0].id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
-            await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Input.synthesizeScrollGesture', {
+            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.synthesizeScrollGesture', {
                 x,
                 y,
                 xDistance: -xDistance,
@@ -427,14 +488,8 @@ export const scroll = async ({ x, y, xDistance, yDistance }: { x: number, y: num
 }
 
 export const wait = async ({ ms }: { ms: number }) => {
-    return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
-            }
-            await new Promise(r => setTimeout(r, ms));
-            resolve(`Waited for ${ms} milliseconds`);
-        });
+    return new Promise((resolve) => {
+        setTimeout(() => resolve(`Waited for ${ms} milliseconds`), ms);
     }).then((res) => {
         return { status: "success", message: "Success: " + res };;
     }).catch((error) => {
@@ -452,8 +507,10 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<any> } 
     "setOption": setOption,
     "loadingState": loadingState,
     "goto": goto,
-    "open": open,
-    "close": close,
+    "getOpenedTabs": getOpenedTabs,
+    "openTab": openTab,
+    "switchTab": switchTab,
+    "closeTab": closeTab,
     "reload": reload,
     "getScrollPortions": getScrollPortions,
     "scroll": scroll,

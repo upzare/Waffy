@@ -43,6 +43,7 @@
     "activeTab",
     "tabs",
     "debugger",
+    "webNavigation",
     "cookies"
   ],
   "host_permissions": [
