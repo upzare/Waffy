@@ -169,10 +169,10 @@ This mandatory script **must be written out in your response** every time you ne
 5.  **Verify Selection:** `fetchScreen()` one last time to confirm the input field is now populated with the selected suggestion.
 
 **Scrolling Protocol:**
-1.  If an element is not visible, call `getScrollPortions()`.
-2.  `scroll()` the main portion of the page.
+1.  If an element is not visible or partially visible, call `getScrollPortions()`.
+2.  Use `scroll()` tool call, and scroll until the element is fully visible.
 3.  **Immediately `fetchScreen()`**.
-4.  Repeat this scroll-and-fetch cycle until the element is found or the page end is reached.
+4.  Repeat this scroll-and-fetch cycle until the element is found or the page end is reached. Do not take inputs from partially visible elements.
 
 ### **F. Error Handling and Recovery**
 
