@@ -1,11 +1,5 @@
 import { DomMessage } from '../types';
 
-let tabId: number;
-chrome.runtime.sendMessage({ action: 'GET_TAB_ID' }, (response) => {
-    tabId = response.tabId;
-    console.log("TAB ID: ", tabId);
-});
-
 async function initOverlay() {
     if (document.querySelector('.waffy-overlay')) {
         return;

@@ -12,7 +12,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
     case "SET_TAB": {
       const tab = openedTabs.find(tab => tab.id === request.tabId);
-      console.log("SET_TAB:", tab, request);
       if (tab) {
         activeTabId = tab.id;
         sendResponse({ status: "success", value: "Tab set successfully" });
@@ -22,21 +21,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
     }
     case "GET_TAB": {
-      // const tab = activeTabIndex !== null ? openedTabs[activeTabIndex] : openedTabs.find(tab => tab.active === true);
       const tab = openedTabs.find(tab => tab.id === activeTabId);
-      console.log("GET_TAB:", tab, request);
       sendResponse(tab);
       break;
     }
     case "SET_OPENED_TABS": {
       openedTabs = request.tabs;
-      console.log("SET_OPENED_TABS:", openedTabs, request);
       sendResponse({ status: "success", value: "Tabs updated successfully" });
       break;
     }
     case "SET_ACTIVE": {
       active = request.active;
-      console.log("SET_ACTIVE:", active, request);
       sendResponse({ status: "success", value: "State updated successfully" });
       break;
     }
@@ -73,7 +68,7 @@ chrome.webNavigation.onCommitted.addListener((e) => {
       if (isAttached) return;
       chrome.debugger.attach({ tabId: e.tabId }, "1.3", async () => {
         if (chrome.runtime.lastError) {
-          console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
+          throw new Error("Debugger attach failed");
         }
         await chrome.debugger.sendCommand({ tabId: e.tabId }, "Page.enable");
         await chrome.debugger.sendCommand({ tabId: e.tabId }, "DOM.enable");

@@ -360,8 +360,6 @@ const App = () => {
                     domContentIndex = t2Prompt.length;
                     t2Prompt.push(toolCallResult.data);
                 }
-                if (toolName === "display") { }
-                // if (toolName === "getOpenedTabs" || toolName === "openTab" || toolName === "switchTab" || toolName === "closeTab") {}
                 functionExecState = true;
             }
             if (abortControllerRef.current?.signal.aborted) {
