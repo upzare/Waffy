@@ -57,8 +57,8 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: { t0?: string, t1?: string, t2?: string, t3?: string, t4?: string }, files?: File[], task?: string, taskStatus?: string };
-    streaming?: { t1?: boolean, t2?: boolean, t3?: boolean, t4?: boolean };
+    content: { text?: { prompt?: string, response?: string, execution?: ExecutionStep[], validation?: string, output?: string }, files?: File[], task?: string, taskStatus?: string };
+    streaming?: { response?: boolean, execution?: boolean, validation?: boolean, output?: boolean };
     isUser: boolean;
     isError?: boolean;
     task?: string;
@@ -78,6 +78,12 @@ export interface TextMessage {
     type: string;
     value: string;
 }
+
+export interface ExecutionStep {
+    id: number;
+    text: string;
+    executing: boolean;
+};
 
 export interface ToggleMessage {
     type: string;

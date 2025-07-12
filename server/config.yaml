@@ -53,9 +53,9 @@ model_list:
       api_base: https://api.openai.com/v1
       api_key: "os.environ/OPENAI_API_KEY"
       rpm: 6
-  - model_name: llama3-70b-8192
+  - model_name: llama-3.3-70b-versatile
     litellm_params:
-      model: groq/llama3-70b-8192
+      model: groq/llama-3.3-70b-versatile
       api_key: "os.environ/GROQ_API_KEY"
       rpm: 6
   

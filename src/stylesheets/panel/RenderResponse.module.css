@@ -113,7 +113,7 @@
 }
 
 .dropdown-content {
-    padding: 0.7rem;
+    padding: 0rem 0.7rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     animation: expandContent 0.3s ease-out;
 }

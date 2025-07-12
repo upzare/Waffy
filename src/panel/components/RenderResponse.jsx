@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Markdown from "react-markdown";
+import { DropdownSteps } from "../components/DropdownSteps";
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { funky } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -92,7 +93,7 @@ const RenderResponse = ({
                             }
                         }}
                     >
-                        {content.t0}
+                        {content.prompt}
                     </Markdown>
                 </div>
             </div>
@@ -134,12 +135,12 @@ const RenderResponse = ({
                         }
                     }}
                 >
-                    {content.t1}
+                    {content.response}
                 </Markdown>
             </div>
 
             {/* Rendering Execution */}
-            {(content.t2 || isExecuting) && (
+            {(content.execution || isExecuting) && (
                 <div className={styles.dropdownContainer}>
                     <div
                         className={styles.dropdownHeader}
@@ -168,48 +169,13 @@ const RenderResponse = ({
                     </div>
 
                     {isExecutingExpanded && (
-                        <div className={styles.dropdownContent}>
-                            <div className={styles.dropdownMarkdown}>
-                                <Markdown
-                                    remarkPlugins={[remarkGfm]}
-                                    components={{
-                                        pre: Pre,
-                                        code({ node, inline, className = "code", children, ...props }) {
-                                            const match = /language-(\w+)/.exec(className || "")
-                                            return !inline && match ? (
-                                                <SyntaxHighlighter
-                                                    style={funky}
-                                                    language={match[1]}
-                                                    PreTag="div"
-                                                    className="syntax-highlighter"
-                                                    {...props}
-                                                >
-                                                    {String(children).replace(/\n$/, "")}
-                                                </SyntaxHighlighter>
-                                            ) : (
-                                                <code className={className} {...props}>
-                                                    {children}
-                                                </code>
-                                            )
-                                        }
-                                    }}
-                                >
-                                    {content.t2 || ""}
-                                </Markdown>
-                            </div>
-
-                            {isExecuting && (
-                                <div className={styles.loaderContainer}>
-                                    <div className={styles.loader} />
-                                </div>
-                            )}
-                        </div>
+                        <DropdownSteps steps={content.execution || []} />
                     )}
                 </div>
             )}
 
             {/* Rendering Validation */}
-            {(content.t3 || isValidating) && (
+            {(content.validation || isValidating) && (
                 <div className={styles.dropdownContainer}>
                     <div
                         className={styles.dropdownHeader}
@@ -274,7 +240,7 @@ const RenderResponse = ({
                                         }
                                     }}
                                 >
-                                    {content.t3 || ""}
+                                    {content.validation || ""}
                                 </Markdown>
                             </div>
 
@@ -288,7 +254,7 @@ const RenderResponse = ({
                 </div>
             )}
 
-            {(content.t4 || isSummary) && (
+            {(content.output || isSummary) && (
                 <div className={styles.markdownContent}>
                     <Markdown
                         remarkPlugins={[remarkGfm]}
@@ -321,7 +287,7 @@ const RenderResponse = ({
                             }
                         }}
                     >
-                        {content.t4}
+                        {content.output}
                     </Markdown>
                 </div>
             )}
