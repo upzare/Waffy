@@ -1,4 +1,4 @@
-import { DomMessage } from '../types';
+import type { DomMessage } from '../types';
 
 async function initOverlay() {
     if (document.querySelector('.waffy-overlay')) {

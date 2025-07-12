@@ -4,7 +4,6 @@ import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { ai, generateTitle } from '@/lib/agent';
 import { socket } from '@/lib/socket';
-import { Message, Conversation, ToolCall, FileFormat } from '../types';
 import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
@@ -18,6 +17,7 @@ import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
 import Particles from './components/Particles';
 import Loader from './components/Loader';
+import type { Message, Conversation, ToolCall, FileFormat, ExecutionStep } from '../types';
 import styles from "css/panel/Root.module.css";
 
 const App = () => {
@@ -270,7 +270,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 response += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t1: response } } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, response: response } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -280,7 +280,7 @@ const App = () => {
             }
         }
         setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t1: false } } : msg);
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, response: false } } : msg);
             updateConversationsDB(update);
             return update;
         });
@@ -290,7 +290,7 @@ const App = () => {
             const toolArgs = JSON.parse(toolCall.arguments);
             if (toolName === "proceed") {
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, task: toolArgs.task }, streaming: { ...msg.streaming, t2: true } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, task: toolArgs.task }, streaming: { ...msg.streaming, execution: true } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -312,7 +312,7 @@ const App = () => {
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
-        let executionResponse = "";
+        let executionResponse: ExecutionStep[] = [{ id: 0, text: "Initializing", executing: true }];
         const t2Prompt = previousTask;
         t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
         while (!finish || functionExecState) {
@@ -320,19 +320,30 @@ const App = () => {
             const executionToolCalls: Record<string, ToolCall> = {};
             const executionModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
             for await (const res of executionModelStream) {
+                // console.log("MODEL_RESPONSE:", res);
                 if (res.type === "response.output_item.done" && res.item.type === "function_call") {
                     executionToolCalls[res.output_index] = res.item as ToolCall;
                     console.log("ToolCall:", executionToolCalls);
                 }
-                if (res.type === "response.output_text.delta") {
-                    executionResponse += res.delta;
+                // @ts-ignore
+                if (res.object === "chat.completion") {
+                    if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
+                    // @ts-ignore
+                    executionResponse.push({ id: executionResponse.length, text: res.output[0].content[0].text, executing: true });
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t2: executionResponse } } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
                 }
                 if (res.type === "response.completed" && !functionExecState) {
+                    if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
+                    executionResponse.push({ id: executionResponse.length, text: "Finished", executing: true });
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
                     finish = true;
                 }
                 if (res.type === "error") {
@@ -366,8 +377,9 @@ const App = () => {
                 return false;
             }
         }
+        if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
         setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: false, t3: true } } : msg);
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, execution: false, validation: true } } : msg);
             updateConversationsDB(update);
             return update;
         });
@@ -395,7 +407,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 validationResponse += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t3: validationResponse } } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, validation: validationResponse } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -411,7 +423,7 @@ const App = () => {
                 case "success":
                     console.log("Validation Success");
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "success" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "success" }, streaming: { ...msg.streaming, validation: false, output: true } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
@@ -419,7 +431,7 @@ const App = () => {
                 case "failed":
                     console.log("Validation Failed");
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "failed" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "failed" }, streaming: { ...msg.streaming, validation: false, output: true } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
@@ -427,7 +439,7 @@ const App = () => {
                 case "suspended":
                     console.log("Validation Suspended");
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "suspended" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "suspended" }, streaming: { ...msg.streaming, validation: false, output: true } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
@@ -449,7 +461,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 summary += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t4: summary } } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, output: summary } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -459,7 +471,7 @@ const App = () => {
             }
         }
         setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t4: false } } : msg);
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, output: false } } : msg);
             updateConversationsDB(update);
             return update;
         });
@@ -483,8 +495,8 @@ const App = () => {
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: { t0: prompt_text }, files: files }, isUser: true, isError: false },
-                { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { t1: true, t2: false, t3: false, t4: false }, isUser: false, isError: false }
+                { id: `user-${messageId}`, content: { text: { prompt: prompt_text }, files: files }, isUser: true, isError: false },
+                { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { response: true, execution: false, validation: false, output: false }, isUser: false, isError: false }
             ];
             updateConversationsDB(update);
             return update;
@@ -495,19 +507,19 @@ const App = () => {
         for await (const msg of messages) {
             if (!msg.isError) {
                 if (msg.isUser) {
-                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files || [])] });
+                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.prompt }, ...await fileHandler(msg.content.files || [])] });
                     userFiles.push(msg.content.files || []);
                 } else {
-                    const assistantPrompt = `${msg.content.text?.t4 ? `${msg.content.text?.t4}\n\n**Validation Output**:\n${msg.content.text?.t3}` : msg.content.text?.t1}`;
+                    const assistantPrompt = `${msg.content.text?.output ? `${msg.content.text?.output}\n\n**Validation Output**:\n${msg.content.text?.validation}` : msg.content.text?.response}`;
                     previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, ...await fileHandler(msg.content.files || [])] });
                     if (msg.content?.task) {
                         previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, ...await fileHandler(userFiles[userFiles.length - 1] || [])] });
-                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.t2 }, ...await fileHandler(msg.content.files || [])] });
+                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.execution }, ...await fileHandler(msg.content.files || [])] });
                     }
                     userFiles.pop();
                 }
             } else {
-                previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.t0}` }] });
+                previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.prompt}` }] });
                 userFiles.pop();
             }
         };
@@ -518,8 +530,8 @@ const App = () => {
             if (task) {
                 const executionOutput = await t2Handler(messageId, task, previousTask, prompt_files);
                 if (executionOutput) {
-                    await t3Handler(messageId, task, executionOutput);
-                    await t4Handler(messageId, task, executionOutput);
+                    await t3Handler(messageId, task, executionOutput.join("\n"));
+                    await t4Handler(messageId, task, executionOutput.join("\n"));
                 }
             }
         } catch (error) {
@@ -533,20 +545,20 @@ const App = () => {
                 errorMessage = (error as any).message;
             }
             setMessages(prev => {
-                const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${errorMessage}*` } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
+                const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: `*${errorMessage}*` } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
                 updateConversationsDB(update);
                 return update;
             });
         } finally {
             await detachController();
             setMessages(prev => {
-                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
+                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { response: false, execution: false, validation: false, output: false } } : msg);
                 updateConversationsDB(update);
                 return update;
             });
             if (abortControllerRef.current?.signal.aborted) {
                 setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: "*User interupted while processing.*" } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: "*User interupted while processing.*" } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
                     updateConversationsDB(update);
                     return update;
                 });

@@ -12,6 +12,7 @@ export async function* ai(messages: any[], handler: string, signal?: AbortSignal
         metadata: {
             client_id: localStorage.client.client_id,
             account_id: localStorage.data.account.account_id,
+            mode: handler,
         },
     });
 
