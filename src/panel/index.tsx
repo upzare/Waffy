@@ -4,7 +4,6 @@ import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { ai, generateTitle } from '@/lib/agent';
 import { socket } from '@/lib/socket';
-import { Message, Conversation, ToolCall, FileFormat } from '../types';
 import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
@@ -12,12 +11,13 @@ import InputContainer from './components/InputContainer';
 import Mousetrap from 'mousetrap';
 import Speech from './utils/Speech';
 import { fileHandler } from './utils/FileHandler';
-import { availableFunctions } from '@/lib/tools';
+import { availableFunctions, updateOpenedTabs } from '@/lib/tools';
 import { getLocalStorage } from '@/lib/client';
 import HistorySidebar from './components/HistorySidebar';
 import Hero from './components/Hero';
 import Particles from './components/Particles';
 import Loader from './components/Loader';
+import type { Message, Conversation, ToolCall, FileFormat, ExecutionStep } from '../types';
 import styles from "css/panel/Root.module.css";
 
 const App = () => {
@@ -202,6 +202,60 @@ const App = () => {
         }
     };
 
+    const attachController = async () => {
+        return new Promise<void>((resolve) => {
+            chrome.tabs.query({}, async (tabs) => {
+                for (let tab of tabs) {
+                    if (tab.url?.startsWith("chrome://")) {
+                        continue;
+                    }
+                    chrome.debugger.attach({ tabId: tab.id }, "1.3", async () => {
+                        if (chrome.runtime.lastError) {
+                            console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
+                        }
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.enable");
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.enable");
+                        console.log(`Debugger attached to tab ${tab.id}`);
+                    });
+                }
+                // Set current tab as active
+                chrome.tabs.query({ active: true, currentWindow: true }, async (currentTabs) => {
+                    if (!currentTabs || !currentTabs[0]?.id) {
+                        return;
+                    }
+                    await updateOpenedTabs();
+                    await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: currentTabs[0].id });
+                    await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: true });
+                });
+                resolve();
+            });
+        });
+    };
+
+    const detachController = async () => {
+        return new Promise<void>((resolve) => {
+            chrome.tabs.query({}, async (tabs) => {
+                for (let tab of tabs) {
+                    if (tab.url?.startsWith("chrome://")) {
+                        continue;
+                    }
+                    await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id }); // force disable overlay
+                    await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.disable");
+                    await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.disable");
+                    await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.disable");
+                    await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: false });
+                    chrome.debugger.detach({ tabId: tab.id }, async () => {
+                        if (chrome.runtime.lastError) {
+                            console.error("Error detaching from tab:", chrome.runtime.lastError.message);
+                        }
+                    });
+                }
+                resolve();
+            });
+        });
+    };
+
     const t1Handler = async (messageId: string, previousPrompt: any, prompt_text: string, prompt_files: FileFormat[]) => {
         setStatusText("GENERATING");
         const t1Prompt = previousPrompt;
@@ -216,7 +270,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 response += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t1: response } } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, response: response } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -226,7 +280,7 @@ const App = () => {
             }
         }
         setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t1: false } } : msg);
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, response: false } } : msg);
             updateConversationsDB(update);
             return update;
         });
@@ -236,7 +290,7 @@ const App = () => {
             const toolArgs = JSON.parse(toolCall.arguments);
             if (toolName === "proceed") {
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, task: toolArgs.task }, streaming: { ...msg.streaming, t2: true } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, task: toolArgs.task }, streaming: { ...msg.streaming, execution: true } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -248,16 +302,17 @@ const App = () => {
 
     const t2Handler = async (messageId: string, task: string, previousTask: any, prompt_files: FileFormat[]) => {
         setStatusText("EXECUTING");
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
+        await updateOpenedTabs();
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                throw new Error("Tab not found");
             }
-            await chrome.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: tabs[0].id });
+            await chrome.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: tab.id });
         });
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
-        let executionResponse = "";
+        let executionResponse: ExecutionStep[] = [{ id: 0, text: "Initializing", executing: true }];
         const t2Prompt = previousTask;
         t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
         while (!finish || functionExecState) {
@@ -265,28 +320,40 @@ const App = () => {
             const executionToolCalls: Record<string, ToolCall> = {};
             const executionModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
             for await (const res of executionModelStream) {
+                // console.log("MODEL_RESPONSE:", res);
                 if (res.type === "response.output_item.done" && res.item.type === "function_call") {
                     executionToolCalls[res.output_index] = res.item as ToolCall;
                     console.log("ToolCall:", executionToolCalls);
                 }
-                if (res.type === "response.output_text.delta") {
-                    executionResponse += res.delta;
+                // @ts-ignore
+                if (res.object === "chat.completion") {
+                    if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
+                    // @ts-ignore
+                    executionResponse.push({ id: executionResponse.length, text: res.output[0].content[0].text, executing: true });
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t2: executionResponse } } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
                 }
                 if (res.type === "response.completed" && !functionExecState) {
+                    if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
+                    executionResponse.push({ id: executionResponse.length, text: "Finished", executing: true });
+                    setMessages(prev => {
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
+                        updateConversationsDB(update);
+                        return update;
+                    });
                     finish = true;
                 }
                 if (res.type === "error") {
                     throw new Error(res.message);
                 }
             }
-            t2Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
+            // t2Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
             functionExecState = false;
             for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
+                await updateOpenedTabs();
                 const toolName = toolCall.name;
                 const toolArgs = JSON.parse(toolCall.arguments);
                 const toolCallResult = await availableFunctions[toolName](toolArgs);
@@ -310,17 +377,18 @@ const App = () => {
                 return false;
             }
         }
+        if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
         setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t2: false, t3: true } } : msg);
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, execution: false, validation: true } } : msg);
             updateConversationsDB(update);
             return update;
         });
         console.log("t2response", executionResponse);
-        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-            if (!tabs || !tabs[0]?.id) {
-                return;
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                throw new Error("Tab not found");
             }
-            await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tabs[0].id });
+            await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id });
         });
         return executionResponse;
     }
@@ -339,7 +407,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 validationResponse += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t3: validationResponse } } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, validation: validationResponse } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -355,7 +423,7 @@ const App = () => {
                 case "success":
                     console.log("Validation Success");
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "success" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "success" }, streaming: { ...msg.streaming, validation: false, output: true } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
@@ -363,7 +431,7 @@ const App = () => {
                 case "failed":
                     console.log("Validation Failed");
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "failed" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "failed" }, streaming: { ...msg.streaming, validation: false, output: true } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
@@ -371,7 +439,7 @@ const App = () => {
                 case "suspended":
                     console.log("Validation Suspended");
                     setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "suspended" }, streaming: { ...msg.streaming, t3: false, t4: true } } : msg);
+                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, taskStatus: "suspended" }, streaming: { ...msg.streaming, validation: false, output: true } } : msg);
                         updateConversationsDB(update);
                         return update;
                     });
@@ -393,7 +461,7 @@ const App = () => {
             if (res.type === "response.output_text.delta") {
                 summary += res.delta;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, t4: summary } } } : msg);
+                    const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, output: summary } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
@@ -403,7 +471,7 @@ const App = () => {
             }
         }
         setMessages(prev => {
-            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, t4: false } } : msg);
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { ...msg.streaming, output: false } } : msg);
             updateConversationsDB(update);
             return update;
         });
@@ -427,8 +495,8 @@ const App = () => {
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: { t0: prompt_text }, files: files }, isUser: true, isError: false },
-                { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { t1: true, t2: false, t3: false, t4: false }, isUser: false, isError: false }
+                { id: `user-${messageId}`, content: { text: { prompt: prompt_text }, files: files }, isUser: true, isError: false },
+                { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { response: true, execution: false, validation: false, output: false }, isUser: false, isError: false }
             ];
             updateConversationsDB(update);
             return update;
@@ -439,43 +507,31 @@ const App = () => {
         for await (const msg of messages) {
             if (!msg.isError) {
                 if (msg.isUser) {
-                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.t0 }, ...await fileHandler(msg.content.files || [])] });
+                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.prompt }, ...await fileHandler(msg.content.files || [])] });
                     userFiles.push(msg.content.files || []);
                 } else {
-                    const assistantPrompt = `${msg.content.text?.t4 ? `${msg.content.text?.t4}\n\n**Validation Output**:\n${msg.content.text?.t3}` : msg.content.text?.t1}`;
+                    const assistantPrompt = `${msg.content.text?.output ? `${msg.content.text?.output}\n\n**Validation Output**:\n${msg.content.text?.validation}` : msg.content.text?.response}`;
                     previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, ...await fileHandler(msg.content.files || [])] });
                     if (msg.content?.task) {
                         previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, ...await fileHandler(userFiles[userFiles.length - 1] || [])] });
-                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.t2 }, ...await fileHandler(msg.content.files || [])] });
+                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.execution }, ...await fileHandler(msg.content.files || [])] });
                     }
                     userFiles.pop();
                 }
             } else {
-                previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.t0}` }] });
+                previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.prompt}` }] });
                 userFiles.pop();
             }
         };
         const prompt_files = await fileHandler(files);
         try {
-            chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-                if (!tabs || !tabs[0]?.id) {
-                    return;
-                }
-                chrome.debugger.attach({ tabId: tabs[0].id }, "1.3", async () => {
-                    if (chrome.runtime.lastError) {
-                        console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
-                    }
-                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.enable");
-                    await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.enable");
-                    console.log(`Debugger attached to tab ${tabs[0].id}`);
-                });
-            });
+            await attachController();
             const task = await t1Handler(messageId, previousPrompt, prompt_text, prompt_files);
             if (task) {
                 const executionOutput = await t2Handler(messageId, task, previousTask, prompt_files);
                 if (executionOutput) {
-                    await t3Handler(messageId, task, executionOutput);
-                    await t4Handler(messageId, task, executionOutput);
+                    await t3Handler(messageId, task, executionOutput.join("\n"));
+                    await t4Handler(messageId, task, executionOutput.join("\n"));
                 }
             }
         } catch (error) {
@@ -489,32 +545,20 @@ const App = () => {
                 errorMessage = (error as any).message;
             }
             setMessages(prev => {
-                const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: `*${errorMessage}*` } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
+                const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: `*${errorMessage}*` } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
                 updateConversationsDB(update);
                 return update;
             });
         } finally {
-            chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-                if (!tabs || !tabs[0]?.id) {
-                    return;
-                }
-                await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tabs[0].id }); // force disable overlay
-                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "DOM.disable");
-                await chrome.debugger.sendCommand({ tabId: tabs[0].id }, "Overlay.disable");
-                chrome.debugger.detach({ tabId: tabs[0].id }, async () => {
-                    if (chrome.runtime.lastError) {
-                        console.error("Error detaching from tab:", chrome.runtime.lastError.message);
-                    }
-                });
-            });
+            await detachController();
             setMessages(prev => {
-                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { t1: false, t2: false, t3: false, t4: false } } : msg);
+                const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { response: false, execution: false, validation: false, output: false } } : msg);
                 updateConversationsDB(update);
                 return update;
             });
             if (abortControllerRef.current?.signal.aborted) {
                 setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: { t0: "*User interupted while processing.*" } }, streaming: { t1: false, t2: false, t3: false, t4: false }, isUser: false, isError: true }];
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: "*User interupted while processing.*" } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
                     updateConversationsDB(update);
                     return update;
                 });

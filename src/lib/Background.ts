@@ -2,10 +2,37 @@ import { initClient, initSettings } from "./client";
 
 const overlayInfo: Record<number, boolean> = {};
 
+let openedTabs: Record<any, any>[] = [];
+
+let activeTabId: number | null = null;
+
+let active = false;
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
-    case "GET_TAB_ID": {
-      sendResponse({ tabId: sender?.tab?.id });
+    case "SET_TAB": {
+      const tab = openedTabs.find(tab => tab.id === request.tabId);
+      if (tab) {
+        activeTabId = tab.id;
+        sendResponse({ status: "success", value: "Tab set successfully" });
+      } else {
+        sendResponse({ status: "error", value: "Tab not found" });
+      }
+      break;
+    }
+    case "GET_TAB": {
+      const tab = openedTabs.find(tab => tab.id === activeTabId);
+      sendResponse(tab);
+      break;
+    }
+    case "SET_OPENED_TABS": {
+      openedTabs = request.tabs;
+      sendResponse({ status: "success", value: "Tabs updated successfully" });
+      break;
+    }
+    case "SET_ACTIVE": {
+      active = request.active;
+      sendResponse({ status: "success", value: "State updated successfully" });
       break;
     }
     case "ENABLE_OVERLAY": {
@@ -29,6 +56,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
   }
   return true;
+});
+
+chrome.webNavigation.onCommitted.addListener((e) => {
+  try {
+    if (!active || e.url?.startsWith("chrome://") || e.frameType !== "outermost_frame") return;
+    chrome.debugger.getTargets(async (targets) => {
+      const isAttached = targets.some(
+        (target) => target.tabId === e.tabId && target.attached
+      );
+      if (isAttached) return;
+      chrome.debugger.attach({ tabId: e.tabId }, "1.3", async () => {
+        if (chrome.runtime.lastError) {
+          throw new Error("Debugger attach failed");
+        }
+        await chrome.debugger.sendCommand({ tabId: e.tabId }, "Page.enable");
+        await chrome.debugger.sendCommand({ tabId: e.tabId }, "DOM.enable");
+        await chrome.debugger.sendCommand({ tabId: e.tabId }, "Overlay.enable");
+        console.log(`Debugger attached to tab ${e.tabId}`);
+      });
+    });
+  } catch (e) {
+    console.error("Error attaching controller:", e);
+  }
 });
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });

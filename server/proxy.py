@@ -3,6 +3,7 @@ import json
 import os
 import asyncio
 import time
+import litellm
 from litellm._logging import verbose_proxy_logger
 from litellm.integrations.custom_logger import CustomLogger
 from litellm.proxy.proxy_server import UserAPIKeyAuth, DualCache
@@ -12,12 +13,12 @@ from util.utils import detect_device
 from util.grider import Grider
 import cloudinary
 import cloudinary.uploader
-from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
+from instructions import T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T5_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT
 from redis import Redis
 from supabase import create_client, Client
 import socketio
 
-DEBUG = True
+DEBUG = False
 
 config = {
     "som_model_path": "weights/icon_detect/model.pt",
@@ -276,6 +277,22 @@ class CustomHandler(CustomLogger):
                                 continue
                 elif ("type" in data_dict and data_dict["type"] == "response.function_call_arguments.delta" or data_dict["type"] == "response.function_call_arguments.done"):
                     continue
+                elif ("type" in data_dict and data_dict["type"] == "response.output_text.delta" and "response" in data_dict and "metadata" in data_dict["response"] and "mode" in data_dict["response"]["metadata"] and data_dict["response"]["metadata"]["mode"] == "t2"):
+                    continue
+                elif ("type" in data_dict and data_dict["type"] == "response.completed" and "response" in data_dict and "metadata" in data_dict["response"] and "mode" in data_dict["response"]["metadata"] and data_dict["response"]["metadata"]["mode"] == "t2"):
+                    # call stepgenerator
+                    print("Executing step generator")
+                    if (data_dict["response"]["output"][0].type == "message"):
+                        t2_response = data_dict["response"]["output"][0].content[0].text
+                        response = litellm.responses(
+                            model="groq/llama-3.3-70b-versatile",
+                            instructions=T5_PROMPT,
+                            temperature=1,
+                            input=t2_response
+                        )
+                        print("RESPONSE:", response)
+                        # yield type(data)(response)
+                        yield response
                 elif ("type" in data_dict and data_dict["type"] == "response.completed"):
                     output = data_dict["response"]["output"]
                     for index, item in enumerate(output):
