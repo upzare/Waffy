@@ -263,7 +263,6 @@ const App = () => {
         t1Prompt.push({ type: "prompt", content: [{ type: "text", text: prompt_text }, ...prompt_files] });
         const responseStream = AI(conversationID.current, t1Prompt, "t1", mode, messageID.current, abortControllerRef?.current?.signal);
         let response = "";
-        console.log("RESPONSE STREAM:", responseStream);
         const toolCalls: Record<string, ToolCall> = {};
         let idx = 0;
         for await (const res of responseStream) {
@@ -338,7 +337,6 @@ const App = () => {
                     idx++;
                     console.log("ToolCall:", executionToolCalls);
                 }
-                // TODO
                 if (res.type === "response.completed") {
                     messageID.current = res.message_id;
                     if (res.step) {
@@ -352,21 +350,10 @@ const App = () => {
                     }
                     if (!functionExecState) finish = true;
                 }
-                // if (res.type === "response.completed" && !functionExecState) {
-                //     if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
-                //     executionResponse.push({ id: executionResponse.length, text: "Finished", executing: true });
-                //     setMessages(prev => {
-                //         const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
-                //         updateConversationsDB(update);
-                //         return update;
-                //     });
-                //     finish = true;
-                // }
                 if (res.type === "response.error") {
                     throw new Error(res.error);
                 }
             }
-            // t2Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
             functionExecState = false;
             for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
                 await updateOpenedTabs();
