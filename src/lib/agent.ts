@@ -60,6 +60,15 @@ export async function* AI(conversationID: string | null, messages: any[], handle
     AsyncGenerator<any> {
     const localStorage: Record<string, any> = await getLocalStorage();
 
+    const generateMetadata = () => {
+        const metadata: any = {}
+        if (localStorage.client.client_id) metadata.client_id = localStorage.client.client_id;
+        if (localStorage.data.account.account_id) metadata.account_id = localStorage.data.account.account_id;
+        if (handler) metadata.mode = handler;
+        if (messageID) metadata.message_id = messageID;
+        return metadata;
+    }
+
     // SSE handler
     let done = false;
     const queue: any[] = [];
@@ -88,12 +97,7 @@ export async function* AI(conversationID: string | null, messages: any[], handle
         body: JSON.stringify({
             id: conversationID,
             data: messages,
-            metadata: {
-                client_id: localStorage.client.client_id,
-                account_id: localStorage.data.account.account_id,
-                mode: handler,
-                message_id: messageID,
-            },
+            metadata: generateMetadata(),
         }),
         signal: signal,
         openWhenHidden: true,

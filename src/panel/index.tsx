@@ -495,10 +495,11 @@ const App = () => {
         }
         abortControllerRef.current = new AbortController();
         const prompt_text = message.trim();
+        const prompt_files = await fileHandler(files);
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: { prompt: prompt_text }, files: files }, isUser: true, isError: false },
+                { id: `user-${messageId}`, content: { text: { prompt: prompt_text }, files: prompt_files }, isUser: true, isError: false },
                 { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { response: true, execution: false, validation: false, output: false }, isUser: false, isError: false }
             ];
             updateConversationsDB(update);
@@ -513,18 +514,18 @@ const App = () => {
         }
         const previousPrompt = [];
         const previousTask = [];
-        const userFiles: File[][] = [];
+        const userFiles: FileFormat[][] = [];
         for await (const msg of messages) {
             if (!msg.isError) {
                 if (msg.isUser) {
-                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.prompt }, ...await fileHandler(msg.content.files || [])] });
+                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.prompt }, msg.content.files || []] });
                     userFiles.push(msg.content.files || []);
                 } else {
                     const assistantPrompt = `${msg.content.text?.output ? `${msg.content.text?.output}\n\n**Validation Output**:\n${msg.content.text?.validation}` : msg.content.text?.response}`;
-                    previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, ...await fileHandler(msg.content.files || [])] });
+                    previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, msg.content.files || []] });
                     if (msg.content?.task) {
-                        previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, ...await fileHandler(userFiles[userFiles.length - 1] || [])] });
-                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.execution }, ...await fileHandler(msg.content.files || [])] });
+                        previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, userFiles[userFiles.length - 1] || []] });
+                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.execution }, msg.content.files || []] });
                     }
                     userFiles.pop();
                 }
@@ -533,7 +534,6 @@ const App = () => {
                 userFiles.pop();
             }
         };
-        const prompt_files = await fileHandler(files);
         try {
             await attachController();
             const task = await t1Handler(messageId, previousPrompt, prompt_text, prompt_files);

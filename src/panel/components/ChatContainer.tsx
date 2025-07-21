@@ -1,11 +1,16 @@
 import { useEffect, useRef } from "react";
 import RenderResponse from "./RenderResponse";
 import { Copy, File, Repeat } from "lucide-react";
-import type { ChatContainerProps } from "../../types";
+import type { ChatContainerProps, FileFormat } from "../../types";
 import styles from "css/panel/ChatContainer.module.css";
 
 const ChatContainer: React.FC<ChatContainerProps> = ({ messages, isGenerating, statusText }) => {
     const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    const handleFileClick = async (file: FileFormat) => {
+        const response = await fetch(`data:${file.payload.mimeType};base64,${file.payload.content}`);
+        window.open(URL.createObjectURL(await response.blob()));
+    }
 
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -47,23 +52,23 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages, isGenerating, s
                                         {msg.content.text?.prompt}
                                         {msg.content.files && msg.content.files.length > 0 && (
                                             <>
-                                                {msg.content.files.map((file: File, fileIndex: number) => (
+                                                {msg.content.files.map((file: FileFormat, fileIndex: number) => (
                                                     <div
-                                                        key={`${file.name}-${fileIndex}`}
+                                                        key={`${file.payload.name}-${fileIndex}`}
                                                         className={styles.messageFilePreview}
-                                                        onClick={() => window.open(URL.createObjectURL(file))}
+                                                        onClick={() => handleFileClick(file)}
                                                     >
-                                                        {file.type.startsWith("image/") ? (
+                                                        {file.payload.mimeType.startsWith("image/") ? (
                                                             <img
-                                                                src={URL.createObjectURL(file)}
+                                                                src={`data:${file.payload.mimeType};base64,${file.payload.content}`}
                                                                 className={styles.messageFileThubmnail}
-                                                                alt={file.name}
+                                                                alt={file.payload.name}
                                                             />
                                                         ) : (
                                                             <File />
                                                         )}
-                                                        <span className={styles.messageFilePreviewName} title={file.name}>
-                                                            {file.name}
+                                                        <span className={styles.messageFilePreviewName} title={file.payload.name}>
+                                                            {file.payload.name}
                                                         </span>
                                                     </div>
                                                 ))}
@@ -75,23 +80,23 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages, isGenerating, s
                                         <RenderResponse content={msg.content.text} isInitial={msg.streaming?.response} isExecuting={msg.streaming?.execution} isValidating={msg.streaming?.validation} isSummary={msg.streaming?.output} taskStatus={msg.content?.taskStatus} />
                                         {msg.content.files && msg.content.files.length > 0 && (
                                             <>
-                                                {msg.content.files.map((file: File, fileIndex: number) => (
+                                                {msg.content.files.map((file: FileFormat, fileIndex: number) => (
                                                     <div
-                                                        key={`${file.name}-${fileIndex}`}
+                                                        key={`${file.payload.name}-${fileIndex}`}
                                                         className={styles.messageFilePreview}
-                                                        onClick={() => window.open(URL.createObjectURL(file))}
+                                                        onClick={() => handleFileClick(file)}
                                                     >
-                                                        {file.type.startsWith("image/") ? (
+                                                        {file.payload.mimeType.startsWith("image/") ? (
                                                             <img
-                                                                src={URL.createObjectURL(file)}
+                                                                src={`data:${file.payload.mimeType};base64,${file.payload.content}`}
                                                                 className={styles.messageFileThubmnail}
-                                                                alt={file.name}
+                                                                alt={file.payload.name}
                                                             />
                                                         ) : (
                                                             <File />
                                                         )}
-                                                        <span className={styles.messageFilePreviewName} title={file.name}>
-                                                            {file.name}
+                                                        <span className={styles.messageFilePreviewName} title={file.payload.name}>
+                                                            {file.payload.name}
                                                         </span>
                                                     </div>
                                                 ))}

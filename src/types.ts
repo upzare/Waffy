@@ -57,7 +57,7 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: { prompt?: string, response?: string, execution?: ExecutionStep[], validation?: string, output?: string }, files?: File[], task?: string, taskStatus?: string };
+    content: { text?: { prompt?: string, response?: string, execution?: ExecutionStep[], validation?: string, output?: string }, files?: FileFormat[], task?: string, taskStatus?: string };
     streaming?: { response?: boolean, execution?: boolean, validation?: boolean, output?: boolean };
     isUser: boolean;
     isError?: boolean;
@@ -66,7 +66,7 @@ export interface Message {
 
 export interface FileFormat {
     type: string,
-    payload: Record<string, any>
+    payload: { name: string, size: number, mimeType: string, content: string }
 };
 
 export interface StorageResult {
