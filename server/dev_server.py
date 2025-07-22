@@ -1,3 +1,4 @@
+import base64
 import datetime
 import json
 import time
@@ -7,7 +8,7 @@ from fastapi import Depends, FastAPI, Request, APIRouter, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 
 import litellm
@@ -69,7 +70,7 @@ class AutomateClientMetadata(BaseModel):
     client_id: str
     account_id: str
     mode: str
-    message_id: Optional[str]
+    message_id: Optional[str] = None
 
 class AutomateClient(BaseModel):
     id: str
@@ -111,6 +112,8 @@ class ConversationDB:
         self.conv_id = conv_id
         self.metadata = cast(BaseClientMetadata, metadata)
         self.supabase = self.state.supabase
+        self.bucket = "user-uploads"
+        self.bucket_folder = "waffy-extension"
     
     async def start_conversation(self):
         db_result = await self.supabase.from_("conversations").insert({
@@ -172,6 +175,49 @@ class ConversationDB:
         else:
             return None
     
+    async def upload_file(self, content, mime_type):
+        file_id = f"{self.id}:{str(uuid.uuid4())}"
+        file_path = f"{self.bucket_folder}/{file_id}"
+        file_data = base64.b64decode(content)
+        upload_task = self.supabase.storage.from_(self.bucket).upload(
+            file=file_data,
+            path=file_path,
+            file_options={"cache-control": "3600", "upsert": "false", "content-type": mime_type}
+        )
+        asyncio.create_task(upload_task)
+        return file_path
+    
+    async def download_file(self, file_path):
+        file_data = await self.supabase.storage.from_(self.bucket).download(file_path)
+        return base64.b64encode(file_data).decode("utf-8")
+    
+    async def get_previous_messages(self):
+        previous_prompt = []
+        previous_task = []
+        user_files = []
+        db_data = await self.supabase.from_("messages").select("*", count="exact").eq("conversation_id", self.id).order("created_at", desc=False).execute()
+        if (db_data.data):
+            for data in db_data.data:
+                if (data["role"] == "user"):
+                    # Download files from bucket
+                    for file in data["content"]["files"]:
+                        file["payload"]["content"] = await self.download_file(file["payload"]["content"])
+                    previous_prompt.append({ "type": "prompt", "content": [{ "type": "text", "text": data["content"]["text"]["prompt"] }, *data["content"]["files"]] })
+                    if user_files: user_files.append(*data["content"]["files"])
+                elif (data["role"] == "assistant"):
+                    # Download files from bucket
+                    for file in data["content"]["files"]:
+                        file["payload"]["content"] = await self.download_file(file["payload"]["content"])
+                    if (len(data["content"]["text"]["output"])):
+                        task_response = f'Validation status: {data["content"]["taskStatus"]}\n\nOutput: {data["content"]["text"]["output"]}'
+                        previous_task.append({ "type": "prompt", "content": [{ "type": "text", "text": data["content"]["task"] }, *user_files] })
+                        previous_task.append({ "type": "response", "content": [{ "type": "text", "text": task_response }, *data["content"]["files"]] })
+                    assistant_response = data["content"]["text"]["output"] if len(data["content"]["text"]["output"]) else data["content"]["text"]["response"]
+                    previous_prompt.append({ "type": "response", "content": [{ "type": "text", "text": assistant_response }, *data["content"]["files"]] })
+                    user_files = []
+        
+        return previous_prompt, previous_task
+
     async def get_task(self, message_id):
         msg_id = f"{self.id}:{message_id}"
         db_data = await self.supabase.from_("messages").select("*", count="exact").eq("id", msg_id).execute()
@@ -230,7 +276,7 @@ class Authentication:
         else:
             raise HTTPException(status_code=401, detail="Credits not found.")
 
-    async def authentication(self):
+    async def authenticate(self):
         metadata = self.client.metadata
         
         client_id = metadata.client_id
@@ -404,7 +450,23 @@ class AutomateRequest(RequestHandler):
         self.omniparser = self.state.omniparser
         self.grider = self.state.grider
         self.message_id = self.client.metadata.message_id
-
+        self.request_store = {
+            "text": {},
+            "files": []
+        }
+        self.response_store = {
+            "task": "",
+            "taskStatus": "",
+            "text": {
+                "response": "",
+                "execution": [],
+                "validation": "",
+                "output": ""
+            },
+            "files": [],
+            "t2_reasoning": "" # only on server
+        }
+    
     async def get_client_props(self):
         redis_client_props = await self.redis.hget(self.key, "client_props")
         if redis_client_props is not None:
@@ -464,38 +526,39 @@ class AutomateRequest(RequestHandler):
         yield "data: [DONE]"
 
     async def process(self):
+        request_params = await self.request_handler()
+        if (not request_params):
+            self.raise_sse_error("Failed to process.")
+            return
+
         if (self.client.metadata.mode == "t1" and self.client.data[-1]["type"] == "prompt"):
             # DB: Create user message
             content = self.client.data[-1]["content"]
-            self.request_store = {
-                "text": {},
-                "files": []
-            }
             for data in content:
                 if ("type" in data and data["type"] == "text"):
                     self.request_store["text"] = {**self.request_store["text"], "prompt": data["text"]}
                 elif ("type" in data and data["type"] == "file"):
-                    self.request_store["files"].append(data["payload"])
-
+                    # Upload to bucket
+                    file_name = data["payload"]["name"]
+                    file_size = data["payload"]["size"]
+                    file_type = data["payload"]["mimeType"]
+                    file_content = data["payload"]["content"]
+                    file_path = await self.conv_db.upload_file(file_content, file_type)
+                    self.request_store["files"].append({
+                        "type": "file",
+                        "payload": {
+                            "name": file_name,
+                            "size": file_size,
+                            "mimeType": file_type,
+                            "content": file_path
+                        }
+                    })
+            
             await self.conv_db.create_message(
                 role="user",
                 content=self.request_store
             )
-        
-        self.response_store = {
-            "task": "",
-            "taskStatus": "",
-            "text": {
-                "response": "",
-                "execution": [],
-                "validation": "",
-                "output": ""
-            },
-            "files": [],
-            "t2_reasoning": "" # only on server
-        }
-        
-        if (not self.message_id):
+
             # DB: Create assistant message
             create_result = await self.conv_db.create_message(
                 role="assistant",
@@ -508,7 +571,6 @@ class AutomateRequest(RequestHandler):
                 return
             print("MESSAGE ID:", self.message_id)
         
-        request_params = await self.request_handler()
         response = await litellm.aresponses(**request_params)
         async for chunk in response:
             if not isinstance(chunk, dict):
@@ -538,6 +600,24 @@ class AutomateRequest(RequestHandler):
         mode = self.client.metadata.mode
         
         if (mode == "t1"):
+            previous_prompt, _ = await self.conv_db.get_previous_messages()
+            self.client.data = previous_prompt + self.client.data
+        elif (mode == "t2"):
+            _, previous_task = await self.conv_db.get_previous_messages()
+            self.client.data = previous_task + self.client.data
+        elif (mode == "t3" or mode == "t4"):
+            if (not self.message_id):
+                return None
+            t2_reasoning_job = self.conv_db.get_t2_reasoning(message_id=self.message_id)
+            get_task_job = self.conv_db.get_task(message_id=self.message_id)
+            [t2_reasoning, task] = await asyncio.gather(t2_reasoning_job, get_task_job)
+            if (t2_reasoning and task):
+                prompt = f"**Task:**\n{task}\n\n**Output:**\n{t2_reasoning}"
+                self.client.data = [{ "type": "prompt", "content": [{ "type": "text", "text": prompt }] }]
+        else:
+            return None
+
+        if (mode == "t1"):
             model_params = {
                 "model": "openai/gpt-4.1",
                 # "model": "groq/llama-3.3-70b-versatile",
@@ -547,39 +627,43 @@ class AutomateRequest(RequestHandler):
                 "parallel_tool_calls": False,
                 "tool_choice": "auto",
                 "truncation": "auto",
-                "input": [{'role': 'system', 'content': T1_PROMPT}],
+                "instructions": T1_PROMPT,
+                "input": []
             }
         elif (mode == "t2"):
             model_params = {
-                    "model": "openai/gpt-4.1",
-                    "tools": T2_TOOLS,
-                    "stream": True,
-                    "temperature": 0,
-                    "parallel_tool_calls": False,
-                    "tool_choice": "auto",
-                    "truncation": "auto",
-                    "input": [{'role': 'system', 'content': T2_PROMPT}],
+                "model": "openai/gpt-4.1",
+                "tools": T2_TOOLS,
+                "stream": True,
+                "temperature": 0,
+                "parallel_tool_calls": False,
+                "tool_choice": "auto",
+                "truncation": "auto",
+                "instructions": T2_PROMPT,
+                "input": []
             }
         elif (mode == "t3"):
             model_params = {
-                    "model": "openai/gpt-4.1",
-                    "tools": T3_TOOLS,
-                    "stream": True,
-                    "temperature": 0.1,
-                    "parallel_tool_calls": False,
-                    "tool_choice": "auto",
-                    "truncation": "auto",
-                    "input": [{'role': 'system', 'content': T3_PROMPT}],
+                "model": "openai/gpt-4.1",
+                "tools": T3_TOOLS,
+                "stream": True,
+                "temperature": 0.1,
+                "parallel_tool_calls": False,
+                "tool_choice": "auto",
+                "truncation": "auto",
+                "instructions": T3_PROMPT,
+                "input": []
             }
         elif (mode == "t4"):
             model_params = {
-                    "model": "openai/gpt-4.1-nano",
-                    "stream": True,
-                    "temperature": 1,
-                    "parallel_tool_calls": False,
-                    "tool_choice": "auto",
-                    "truncation": "auto",
-                    "input": [{'role': 'system', 'content': T4_PROMPT}],
+                "model": "openai/gpt-4.1-nano",
+                "stream": True,
+                "temperature": 1,
+                "parallel_tool_calls": False,
+                "tool_choice": "auto",
+                "truncation": "auto",
+                "instructions": T4_PROMPT,
+                "input": []
             }
         
         request_type = None
@@ -678,14 +762,6 @@ class AutomateRequest(RequestHandler):
                         }
                     ]
                 })
-
-        if (mode == "t3" or mode == "t4"):
-            t2_reasoning_job = self.conv_db.get_t2_reasoning(message_id=self.message_id)
-            get_task_job = self.conv_db.get_task(message_id=self.message_id)
-            [t2_reasoning, task] = await asyncio.gather(t2_reasoning_job, get_task_job)
-            if (t2_reasoning and task):
-                prompt = f"**Task:**\n{task}\n\n**Output:**\n{t2_reasoning}"
-                model_params["input"].append({ "role": "user", "content": [{ "type": "input_text", "text": prompt }] })
         
         return model_params
 
@@ -736,7 +812,6 @@ class AutomateRequest(RequestHandler):
                         })
                         return chunk
             elif (chunk["type"] == "response.completed" and self.client.metadata.mode == "t2"):
-                print("Executing step generator:::", chunk["response"]["output"])
                 if (chunk["response"]["output"][0]["type"] == "message"):
                     t2_response = chunk["response"]["output"][0]["content"][0]["text"]
                     step_chunk = await litellm.aresponses(
@@ -839,7 +914,7 @@ class AutomateRequest(RequestHandler):
 async def start_endpoint(key: Annotated[str, Depends(validate_token)], request: Request, client: StartClient):
     # try:
         app_state = cast(State, request.app.state)
-        user_id = await Authentication(app_state, key, client).authentication()
+        user_id = await Authentication(app_state, key, client).authenticate()
         response_id = generate_unique_id()
         start_request = StartRequest(app_state, key, client, user_id, response_id)
         response = await start_request.start()
@@ -851,7 +926,7 @@ async def start_endpoint(key: Annotated[str, Depends(validate_token)], request: 
 async def meta_endpoint(key: Annotated[str, Depends(validate_token)], request: Request, client: MetaClient):
     # try:
         app_state = cast(State, request.app.state)
-        user_id = await Authentication(app_state, key, client).authentication()
+        user_id = await Authentication(app_state, key, client).authenticate()
         response_id = generate_unique_id()
         meta_request = MetaRequest(app_state, key, client, user_id, response_id)
         response = await meta_request.process()
@@ -871,7 +946,7 @@ async def think_endpoint(request: AutomateClient):
 async def automate_endpoint(key: Annotated[str, Depends(validate_token)], request: Request, client: AutomateClient):
     # try:
         app_state = cast(State, request.app.state)
-        user_id = await Authentication(app_state, key, client).authentication()
+        user_id = await Authentication(app_state, key, client).authenticate()
         response_id = generate_unique_id()
         automate_request = AutomateRequest(app_state, key, client, user_id, response_id)
         response = automate_request.process()
