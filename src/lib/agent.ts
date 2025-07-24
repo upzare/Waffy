@@ -25,7 +25,7 @@ export async function createConversation(conversationID: string | null) {
         }
         return data.id;
     } catch (error) {
-        throw new Error("Conversation Error");
+        throw new Error("Connection Failed");
     }
 }
 
@@ -52,11 +52,11 @@ export async function createTitle(conversationID: string | null, prompt: string)
         const title = data.title ?? "Untitled";
         return title;
     } catch (error) {
-        throw new Error("Title Error");
+        throw new Error("Title Generation Error");
     }
 }
 
-export async function* AI(conversationID: string | null, messages: any[], handler: string, mode: string, messageID: string | null, signal?: AbortSignal):
+export async function* AI(conversationID: string | null, messages: any[], handler: string, mode: string, messageID: string | null, abortController: AbortController | null, handleError: () => void):
     AsyncGenerator<any> {
     const localStorage: Record<string, any> = await getLocalStorage();
 
@@ -70,6 +70,7 @@ export async function* AI(conversationID: string | null, messages: any[], handle
     }
 
     // SSE handler
+    const abortSignal = abortController?.signal;
     let done = false;
     const queue: any[] = [];
     let resolveQueue: (() => void) | null = null;
@@ -88,6 +89,16 @@ export async function* AI(conversationID: string | null, messages: any[], handle
         });
     }
 
+    if (abortSignal) {
+        abortSignal.addEventListener("abort", () => {
+            done = true;
+            if (resolveQueue) {
+                resolveQueue();
+                resolveQueue = null;
+            }
+        });
+    }
+
     fetchEventSource(`http://localhost:4000/inference/${mode}`, {
         method: "POST",
         headers: {
@@ -99,7 +110,7 @@ export async function* AI(conversationID: string | null, messages: any[], handle
             data: messages,
             metadata: generateMetadata(),
         }),
-        signal: signal,
+        signal: abortController?.signal,
         openWhenHidden: true,
         onmessage(event) {
             pushEvent(JSON.parse(event.data));
@@ -109,9 +120,12 @@ export async function* AI(conversationID: string | null, messages: any[], handle
             if (resolveQueue) resolveQueue();
         },
         onerror(err) {
+            done = true;
+            if (resolveQueue) resolveQueue();
+            handleError();
             throw new Error(err);
         }
-    });
+    }).catch(() => { });
 
     while (!done || queue.length > 0) {
         if (queue.length === 0) {

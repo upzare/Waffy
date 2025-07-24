@@ -528,7 +528,8 @@ class AutomateRequest(RequestHandler):
     async def process(self):
         request_params = await self.request_handler()
         if (not request_params):
-            self.raise_sse_error("Failed to process.")
+            for err in self.raise_sse_error("Invalid request"):
+                yield err
             return
 
         if (self.client.metadata.mode == "t1" and self.client.data[-1]["type"] == "prompt"):
@@ -567,7 +568,8 @@ class AutomateRequest(RequestHandler):
             if (create_result):
                 self.message_id = create_result
             else:
-                self.raise_sse_error("Failed to create message.")
+                for err in self.raise_sse_error("Failed to process request"):
+                    yield err
                 return
             print("MESSAGE ID:", self.message_id)
         
@@ -584,7 +586,7 @@ class AutomateRequest(RequestHandler):
             if (response_params):
                 post_params = await self.post_handler(response_params, request_params)
                 if (post_params):
-                    yield f"data: {json.dumps(post_params)}\n\n"
+                        yield f"data: {json.dumps(post_params)}\n\n"
 
         # DB: Update assistant message
         update_result = await self.conv_db.update_message(
@@ -592,22 +594,23 @@ class AutomateRequest(RequestHandler):
             content=self.response_store,
         )
         if (not update_result):
-            self.raise_sse_error("Failed to update message.")
+            for err in self.raise_sse_error("Failed to process response"):
+                yield err
             return
         yield "data: [DONE]"
 
     async def request_handler(self):
         mode = self.client.metadata.mode
-        
+
         if (mode == "t1"):
             previous_prompt, _ = await self.conv_db.get_previous_messages()
             self.client.data = previous_prompt + self.client.data
         elif (mode == "t2"):
+            if (not self.message_id): return None
             _, previous_task = await self.conv_db.get_previous_messages()
             self.client.data = previous_task + self.client.data
         elif (mode == "t3" or mode == "t4"):
-            if (not self.message_id):
-                return None
+            if (not self.message_id): return None
             t2_reasoning_job = self.conv_db.get_t2_reasoning(message_id=self.message_id)
             get_task_job = self.conv_db.get_task(message_id=self.message_id)
             [t2_reasoning, task] = await asyncio.gather(t2_reasoning_job, get_task_job)
@@ -619,7 +622,7 @@ class AutomateRequest(RequestHandler):
 
         if (mode == "t1"):
             model_params = {
-                "model": "openai/gpt-4.1",
+                "model": "openai/gpt-4.1-mini",
                 # "model": "groq/llama-3.3-70b-versatile",
                 "tools": T1_TOOLS,
                 "stream": True,
