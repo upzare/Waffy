@@ -33,6 +33,13 @@ export interface ChatContainerProps {
     statusText: string;
 }
 
+export interface ModeSelectionProps {
+    className?: string;
+    modes: string[];
+    current_mode: string;
+    onModeChange?: (option: string) => void;
+}
+
 export interface InputContainerProps {
     isGenerating: boolean;
     isRecording: boolean;
@@ -40,8 +47,11 @@ export interface InputContainerProps {
     fileInputRef: React.RefObject<HTMLInputElement>;
     message: string;
     files: File[];
+    mode: string;
+    showModeSelection: boolean;
     setMessage: React.Dispatch<React.SetStateAction<string>>;
     setFiles: React.Dispatch<React.SetStateAction<File[]>>;
+    setMode: React.Dispatch<React.SetStateAction<string>>;
     onSpeechRecognition: () => Promise<void>;
     onSendMessage: () => Promise<void>;
     onStopGeneration: () => Promise<void>;

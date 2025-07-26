@@ -27,7 +27,8 @@ const App = () => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [statusText, setStatusText] = useState("");
     const [message, setMessage] = useState("");
-    const [mode, setMode] = useState("automate");
+    const [mode, setMode] = useState("search");
+    const [showModeSelection, setShowModeSelection] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [isRecorded, setIsRecorded] = useState(false);
@@ -82,6 +83,10 @@ const App = () => {
             setIsRecorded(false);
         }
     }, [message]);
+
+    useEffect(() => {
+        setShowModeSelection(isFirstMessage);
+    }, [isFirstMessage]);
 
     const speechRecognition = async () => {
         setIsRecording(true);
@@ -562,13 +567,6 @@ const App = () => {
                 updateConversationsDB(update);
                 return update;
             });
-            if (abortControllerRef.current?.signal.aborted) {
-                setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: "*User interupted while processing.*" } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
-                    updateConversationsDB(update);
-                    return update;
-                });
-            }
             setIsGenerating(false);
             setStatusText("");
             setMessage("");
@@ -675,8 +673,11 @@ const App = () => {
                     fileInputRef={fileInputRef as any}
                     message={message}
                     files={files}
+                    mode={mode}
+                    showModeSelection={showModeSelection}
                     setMessage={setMessage}
                     setFiles={setFiles}
+                    setMode={setMode}
                     onSpeechRecognition={speechRecognition}
                     onSendMessage={handleSendMessage}
                     onStopGeneration={handleStopGeneration}
