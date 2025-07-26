@@ -279,7 +279,7 @@ def get_optimal_label_pos(text_padding, text_width, text_height, x1, y1, x2, y2,
     text_background_y1 = y2
     text_background_x2 = x1 + 2 * text_padding + text_width
     text_background_y2 = y2 + 2 * text_padding + text_height
-    is_overlap = get_is_overlap(detections, text_background_x1, text_background_y1, text_background_x2, text_background_y2 + 10, image_size)
+    is_overlap = get_is_overlap(detections, text_background_x1, text_background_y1, text_background_x2, text_background_y2 + 15, image_size)
     if not is_overlap:
         return text_x, text_y, text_background_x1, text_background_y1, text_background_x2, text_background_y2
 
@@ -290,7 +290,7 @@ def get_optimal_label_pos(text_padding, text_width, text_height, x1, y1, x2, y2,
     text_background_y1 = y2
     text_background_x2 = x2
     text_background_y2 = y2 + 2 * text_padding + text_height
-    is_overlap = get_is_overlap(detections, text_background_x1, text_background_y1, text_background_x2, text_background_y2 + 10, image_size)
+    is_overlap = get_is_overlap(detections, text_background_x1, text_background_y1, text_background_x2, text_background_y2 + 15, image_size)
     if not is_overlap:
         return text_x, text_y, text_background_x1, text_background_y1, text_background_x2, text_background_y2
 

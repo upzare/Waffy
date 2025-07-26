@@ -20,7 +20,7 @@ class Omniparser(object):
         print('image size:', image.size)
         
         draw_bbox_config = {
-            'text_scale': 0.8,
+            'text_scale': 0.9,
             'text_thickness': 2,
             'text_padding': 2,
             'thickness': 3,
