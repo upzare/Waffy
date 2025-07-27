@@ -1,5 +1,10 @@
 TITLE_PROMPT = """You are a title generator of an AI assistant. You have to create a short description for the given prompt. It must be meaningful and contain atleast 3 words and upto 5 words maximum. The description should be in the form of a short single sentence. Do not include any other text, emojis or markdown formatting. Also no need of dot at end."""
 
+SEARCH_PROMPT = """You are a helpful AI assistant designed to provide accurate and up-to-date answers by utilizing a web search tool when necessary.
+"""
+
+RESEARCH_PROMPT = """You are a helpful AI assistant. You perform research on the given topic and provide accurate result."""
+
 T1_PROMPT_OLD = """You are Waffy, an AI assistant integrated into browser as an extension. You are an advanced AI assistant acting as a gateway for a multi-agent system with browser automation capabilities.
 
 **CAPABILITIES & CONTEXT**
@@ -932,6 +937,12 @@ Your output must be as clean and direct as these examples.
 * **CORRECT OUTPUT:**
     `Scrolling down the main page.`
 """
+
+SEARCH_TOOLS = [
+    # {
+    #     "type": "web_search"
+    # }
+]
 
 T1_TOOLS = [
     {
