@@ -510,7 +510,7 @@ const App = () => {
         });
         const errorMessage = "Something went wrong";
         setMessages(prev => {
-            const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: `*${error ? error : errorMessage}*` } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
+            const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: `*${error ? error : errorMessage}*` } }, isUser: false, isError: true }];
             updateConversationsDB(update);
             return update;
         });
@@ -563,10 +563,33 @@ const App = () => {
                 console.log("Error detaching from tab");
             }
             setMessages(prev => {
+                const update = prev.map(msg => {
+                    if (msg.id === `assistant-${messageId}`) {
+                        if (msg?.content?.text?.execution) {
+                            const execution = (msg.content.text.execution).map(step => ({
+                                ...step,
+                                executing: false
+                            }));
+                            return { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution } } };
+                        }
+                    }
+                    return msg;
+                });
+                updateConversationsDB(update);
+                return update;
+            });
+            setMessages(prev => {
                 const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { response: false, execution: false, validation: false, output: false } } : msg);
                 updateConversationsDB(update);
                 return update;
             });
+            if (abortControllerRef.current?.signal.aborted) {
+                setMessages(prev => {
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: "*User interupted while processing.*" } }, isUser: false, isError: true }];
+                    updateConversationsDB(update);
+                    return update;
+                });
+            }
             setIsGenerating(false);
             setStatusText("");
             setMessage("");
