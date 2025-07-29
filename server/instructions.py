@@ -885,57 +885,74 @@ You will receive:
 **IMPORTANT: ALWAYS GIVE A BREIF DESCRIPTION OF THE OUTPUT FROM THE EXECUTION MODEL. IF THE EXECUTION MODEL FAILS TO COMPLETE THE TASK, THEN ALWAYS RETURN THE ERROR MESSAGE.**
 """
 
-T5_PROMPT = """You are a specialized text-processing model. Your only function is to receive a technical log and convert it into a single, clean, concise sentence for a user interface.
+T5_PROMPT = """You are a specialized AI model within the Waffy automation system. Your sole function is to receive reasoning logs and a specific tool call from an Execution Model, and then generate a single, short, and contextually-aware description of the action for the user interface.
 
-### **Rules of Operation**
+### **Core Logic**
 
-1.  **Analyze the Log:** Read the input log to understand the primary action (e.g., clicking, typing, scrolling).
-2.  **Identify the Target:** Extract the simple, plain-text name of the element being interacted with (e.g., "Login button," "search bar," "main page").
-3.  **Abstract All Technical Data:** Your output **must not** contain any of the following:
-    * Element IDs, tool names, or any technical jargon.
-    * Internal reasoning concepts (e.g., "Cognitive Drill-Down").
-    * Metadata like colors or bounding boxes.
-4.  **Produce a Single, Short Sentence:**
-    * Your entire output **must** be a single sentence.
-    * The sentence length must be between **5 and 8 words**.
-    * Do **not** use any conversational phrases (like "Here is the output:").
-    * Do **not** wrap your output in backticks, quotes, or any other special characters.
+You will be given three inputs: `PREVIOUS REASONING`, `CURRENT REASONING`, and `TOOL CALL`.
 
----
+1.  **Identify the Action from `TOOL CALL`:** First, look at the `TOOL CALL` input to definitively identify the primary action being executed (e.g., `click`, `typeText`, `fetchScreen`).
+2.  **Understand Intent from `CURRENT REASONING`:** Analyze the `CURRENT REASONING` to understand the purpose and the plain-text description of the target for this action.
+3.  **Establish Context from `PREVIOUS REASONING`:** Review the log of past actions to understand the overall sequence of the task. For example, if the previous action was entering a username, the current `typeText` action is likely for the password.
+4.  **Synthesize and Generate:** Combine all three pieces of information to generate a meaningful and precise description that reflects the logical step in the task.
 
-### **Mandatory Transformation Examples**
+### **Strict Output Rules**
 
-Your output must be as clean and direct as these examples.
+Your output **must** adhere to all of the following rules:
 
-**Example 1: Clicking an Element**
-
-* **INPUT LOG:** (A long log detailing the identification of a 'Login' button with elementId `55`).
-* **CORRECT OUTPUT:**
-    `Clicking the 'Login' button.`
+* It must be a single, short phrase.
+* It must **not** contain any special characters, including periods (`.`), commas (`,`), quotes (`"`), or backticks (`` ` ``).
+* It must accurately describe the operation in plain language.
+* It must be clean, direct, and ready for immediate display in a UI.
 
 ---
 
-**Example 2: Typing into a Field**
+### **Transformation Examples**
 
-* **INPUT LOG:** (A log about clearing and typing "testuser" into an input field labeled "Username").
-* **CORRECT OUTPUT:**
-    `Entering text into the username field.`
+These examples show how to use all three inputs to generate the correct output.
 
----
+**Example 1: Login Sequence**
 
-**Example 3: Switching Tabs**
-
-* **INPUT LOG:** (A log detailing the use of `getOpenedTabs` and `switch` to move to a tab titled 'Search Results').
-* **CORRECT OUTPUT:**
-    `Switching to the 'Search Results' tab.`
+* **PREVIOUS REASONING:** `...My target is the 'Username' input field... I will type 'test_user'...`
+* **CURRENT REASONING:** `...My target is an input field with no label, next to the username field... I will type the password now...`
+* **TOOL CALL:** `typeText(elementId=38, text="p@ssword")`
+* **CORRECT OUTPUT:** `Entering the password`
 
 ---
 
-**Example 4: Scrolling the Page**
+**Example 2: Selecting a Search Suggestion**
 
-* **INPUT LOG:** (A log explaining that an element is not visible and the `scroll` tool must be used).
-* **CORRECT OUTPUT:**
-    `Scrolling down the main page.`
+* **PREVIOUS REASONING:** `...I will now type 'laptops' into the search bar...`
+* **CURRENT REASONING:** `...A list of suggestions has appeared. My target is the element with text 'laptops in electronics'...`
+* **TOOL CALL:** `click(elementId=45)`
+* **CORRECT OUTPUT:** `Selecting a suggestion`
+
+---
+
+**Example 3: Adding to Cart**
+
+* **PREVIOUS REASONING:** `...I have selected the 'Large' size option for the t-shirt...`
+* **CURRENT REASONING:** `...Now that the size is selected, my goal is to click the 'Add to Cart' button...`
+* **TOOL CALL:** `click(elementId=92)`
+* **CORRECT OUTPUT:** `Adding item to the cart`
+
+---
+
+**Example 4: Fetching the Screen for Verification**
+
+* **PREVIOUS REASONING:** `...The task is to see more details. I will click the 'Show More Info' button...`
+* **CURRENT REASONING:** `The button has been clicked. Now I need to see if the new information has appeared on the page. I will fetch the screen to analyze the updated content.`
+* **TOOL CALL:** `fetchScreen()`
+* **CORRECT OUTPUT:** `Analyzing page results`
+
+---
+
+**Example 5: First Action in a Task**
+
+* **PREVIOUS REASONING:** `(empty)`
+* **CURRENT REASONING:** `My goal is to click the 'Login' button on the homepage...`
+* **TOOL CALL:** `click(elementId=15)`
+* **CORRECT OUTPUT:** `Clicking the login button`
 """
 
 SEARCH_TOOLS = [
@@ -945,303 +962,339 @@ SEARCH_TOOLS = [
 ]
 
 T1_TOOLS = [
-    {
-        "type": "web_search"
-    },
+    # {
+    #     "type": "web_search"
+    # },
     {
         "type": "function",
-        "name": "proceed",
-        "description": "Proceed to execution model.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "task": {
-                    "type": "string",
-                    "description": "Generated task.",
+        "function": {
+            "name": "proceed",
+            "description": "Proceed to execution model.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "Generated task.",
+                    },
                 },
-            },
-            "required": ["task"],
-            "additionalProperties": False
-        }
-    },
+                "required": ["task"],
+                "additionalProperties": False
+            }
+        },
+    }
 ]
 
 T2_TOOLS = [
     {
         "type": "function",
-        "name": "fetchScreen",
-        "description": "Get the current page screenshot as annotated image.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
+        "function": {
+            "name": "fetchScreen",
+            "description": "Get the current page screenshot as annotated image.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "click",
-        "description": "Simulate a click on the specified DOM element.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "elementId": {
-                    "type": "number",
-                    "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
-                }
-            },
-            "required": ["elementId"],
-            "additionalProperties": False
-        }
-    },
-    {
-        "type": "function",
-        "name": "typeText",
-        "description": "Type text into the specified element.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "elementId": {
-                    "type": "number",
-                    "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+        "function": {
+            "name": "click",
+            "description": "Simulate a click on the specified DOM element.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+                    }
                 },
-                "text": {
-                    "type": "string",
-                    "description": "The text to type"
-                }
-            },
-            "required": ["elementId", "text"],
-            "additionalProperties": False
+                "required": ["elementId"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "clearValue",
-        "description": "Clears the value in the specified input element.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "elementId": {
-                    "type": "number",
-                    "description": "The ID of the text that you want to clear. DO NOT USE ANY RANDOM ID."
+        "function": {
+            "name": "typeText",
+            "description": "Type text into the specified element.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "The text to type"
+                    }
                 },
-            },
-            "required": ["elementId"],
-            "additionalProperties": False
+                "required": ["elementId", "text"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "keyPress",
-        "description": "Send key press to the page.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string",
-                    "enum": ["Enter", "Backspace", "Delete", "Tab", "Escape", "Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown"],
-                    "description": "The key to press"
-                }
-            },
-            "required": ["key"],
-            "additionalProperties": False
-        }
-    },
-    {
-        "type": "function",
-        "name": "getOption",
-        "description": "Get all available options for the specified select element.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "elementId": {
-                    "type": "number",
-                    "description": "The ID of the specific element. DO NOT USE ANY RANDOM ID."
-                }
-            },
-            "required": ["elementId"],
-            "additionalProperties": False
-        }
-    },
-    {
-        "type": "function",
-        "name": "setOption",
-        "description": "Set the value of a specified select element. Before setting the value, fetch the available options first.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "elementId": {
-                    "type": "number",
-                    "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+        "function": {
+            "name": "clearValue",
+            "description": "Clears the value in the specified input element.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the text that you want to clear. DO NOT USE ANY RANDOM ID."
+                    },
                 },
-                "value": {
-                    "type": "string",
-                    "description": "The value to set. USE THE VALUES RETURNED BY getOptions TOOL."
-                }
-            },
-            "required": ["elementId", "value"],
-            "additionalProperties": False
+                "required": ["elementId"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "getScrollPortions",
-        "description": "Get an image of the current page with a grid overlay highlighting the scrollable portions with a unique ID.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
-        }
-    },
-    {
-        "type": "function",
-        "name": "scroll",
-        "description": "Scrolls the portion of the page in the specified x and y distance. Use `getScrollPortions()` to get the portion ID.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "portionId": {
-                    "type": "number",
-                    "description": "The ID of the portion. DO NOT USE ANY RANDOM ID. USE THE ID FROM `getScrollPortions()` TOOL."
+        "function": {
+            "name": "keyPress",
+            "description": "Send key press to the page.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "enum": ["Enter", "Backspace", "Delete", "Tab", "Escape", "Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown"],
+                        "description": "The key to press"
+                    }
                 },
-                "xDistance": {
-                    "type": "number",
-                    "description": "The distance to scroll along the X axis (pixels)."
+                "required": ["key"],
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "getOption",
+            "description": "Get all available options for the specified select element.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the specific element. DO NOT USE ANY RANDOM ID."
+                    }
                 },
-                "yDistance": {
-                    "type": "number",
-                    "description": "The distance to scroll along the Y axis (pixels)."
-                }
-            },
-            "required": ["portionId", "xDistance", "yDistance"],
-            "additionalProperties": False
+                "required": ["elementId"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "loadingState",
-        "description": "Check whether the page is loading or not.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
+        "function": {
+            "name": "setOption",
+            "description": "Set the value of a specified select element. Before setting the value, fetch the available options first.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "elementId": {
+                        "type": "number",
+                        "description": "The ID of the input element. DO NOT USE ANY RANDOM ID."
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "The value to set. USE THE VALUES RETURNED BY getOptions TOOL."
+                    }
+                },
+                "required": ["elementId", "value"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "goto",
-        "description": "Navigate to a given URL in current tab.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "The URL to navigate to."
-                }
-            },
-            "required": ["url"],
-            "additionalProperties": False
+        "function": {
+            "name": "getScrollPortions",
+            "description": "Get an image of the current page with a grid overlay highlighting the scrollable portions with a unique ID.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "getOpenedTabs",
-        "description": "Get the info of all opened tabs in json format.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
+        "function": {
+            "name": "scroll",
+            "description": "Scrolls the portion of the page in the specified x and y distance. Use `getScrollPortions()` to get the portion ID.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "portionId": {
+                        "type": "number",
+                        "description": "The ID of the portion. DO NOT USE ANY RANDOM ID. USE THE ID FROM `getScrollPortions()` TOOL."
+                    },
+                    "xDistance": {
+                        "type": "number",
+                        "description": "The distance to scroll along the X axis (pixels)."
+                    },
+                    "yDistance": {
+                        "type": "number",
+                        "description": "The distance to scroll along the Y axis (pixels)."
+                    }
+                },
+                "required": ["portionId", "xDistance", "yDistance"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "openTab",
-        "description": "Opens a new tab with the specified URL.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "The URL to navigate to."
-                }
-            },
-            "required": ["url"],
-            "additionalProperties": False
+        "function": {
+            "name": "loadingState",
+            "description": "Check whether the page is loading or not.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "switchTab",
-        "description": "Switches to the specified tab.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "tabId": {
-                    "type": "number",
-                    "description": "The ID of the tab to switch to. USE THE ID FROM `getOpenTabs()` TOOL."
-                }
-            },
-            "required": ["tabId"],
-            "additionalProperties": False
+        "function": {
+            "name": "goto",
+            "description": "Navigate to a given URL in current tab.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to navigate to."
+                    }
+                },
+                "required": ["url"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "closeTab",
-        "description": "Closes the specified tab.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "tabId": {
-                    "type": "number",
-                    "description": "The ID of the tab to close. USE THE ID FROM `getOpenTabs()` TOOL."
-                }
-            },
-            "required": ["tabId"],
-            "additionalProperties": False
+        "function": {
+            "name": "getOpenedTabs",
+            "description": "Get the info of all opened tabs in json format.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "reload",
-        "description": "Reloads the current tab.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
+        "function": {
+            "name": "openTab",
+            "description": "Opens a new tab with the specified URL.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to navigate to."
+                    }
+                },
+                "required": ["url"],
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "wait",
-        "description": "Wait for a specified amount of time.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "ms": {
-                    "type": "number",
-                    "description": "The amount of time to wait in milliseconds."
-                }
-            },
-            "required": ["ms"],
-            "additionalProperties": False
+        "function": {
+            "name": "switchTab",
+            "description": "Switches to the specified tab.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tabId": {
+                        "type": "number",
+                        "description": "The ID of the tab to switch to. USE THE ID FROM `getOpenTabs()` TOOL."
+                    }
+                },
+                "required": ["tabId"],
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "closeTab",
+            "description": "Closes the specified tab.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tabId": {
+                        "type": "number",
+                        "description": "The ID of the tab to close. USE THE ID FROM `getOpenTabs()` TOOL."
+                    }
+                },
+                "required": ["tabId"],
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "reload",
+            "description": "Reloads the current tab.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "wait",
+            "description": "Wait for a specified amount of time.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ms": {
+                        "type": "number",
+                        "description": "The amount of time to wait in milliseconds."
+                    }
+                },
+                "required": ["ms"],
+                "additionalProperties": False
+            }
         }
     },
 ]
@@ -1249,35 +1302,41 @@ T2_TOOLS = [
 T3_TOOLS = [
     {
         "type": "function",
-        "name": "success",
-        "description": "Call when validation is successful.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
+        "function": {
+            "name": "success",
+            "description": "Call when validation is successful.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "failed",
-        "description": "Call when validation fails.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
+        "function": {
+            "name": "failed",
+            "description": "Call when validation fails.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     },
     {
         "type": "function",
-        "name": "suspended",
-        "description": "Call when the task is suspended.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
+        "function": {
+            "name": "suspended",
+            "description": "Call when the task is suspended.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     }
 ]

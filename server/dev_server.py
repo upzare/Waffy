@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 import litellm
+from litellm import ModelResponseStream
 from instructions import RESEARCH_PROMPT, T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T5_PROMPT, T1_TOOLS, T2_TOOLS, T3_TOOLS, TITLE_PROMPT, SEARCH_PROMPT, SEARCH_TOOLS
 
 import asyncio
@@ -22,6 +23,10 @@ from util.grider import Grider
 import os
 from supabase import acreate_client, AsyncClient
 from redis.asyncio import Redis
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DEBUG = True
 # litellm._turn_on_debug() if DEBUG else None
@@ -251,6 +256,14 @@ class ConversationDB:
             return None
         db_content = db_data.data[0]["content"]
         return db_content["t2_reasoning"]
+    
+    async def get_execution_steps(self, message_id):
+        msg_id = f"{self.id}:{message_id}"
+        db_data = await self.supabase.from_("messages").select("*", count="exact").eq("id", msg_id).execute()
+        if (db_data.count < 1):
+            return None
+        db_content = db_data.data[0]["content"]
+        return db_content["text"]["execution"]
 
 class Authentication:
     def __init__(self, state, key, client):
@@ -870,6 +883,10 @@ class AutomateRequest(RequestHandler):
             "files": [],
             "t2_reasoning": "" # only on server
         }
+        self.is_first = True
+        self.stream_text = ""
+        self.text_response = ""
+        self.tool_calls = {}
     
     async def get_client_props(self):
         redis_client_props = await self.redis.hget(self.key, "client_props")
@@ -977,21 +994,28 @@ class AutomateRequest(RequestHandler):
                 return
             print("MESSAGE ID:", self.message_id)
         
-        response = await litellm.aresponses(**request_params)
+        # start_params = await self.post_handler({ "type": "response.started" }, request_params)
+        # if (start_params):
+        #     yield f"data: {json.dumps(start_params)}\n\n"
+        
+        response = await litellm.acompletion(**request_params)
         async for chunk in response:
-            if not isinstance(chunk, dict):
-                try:
-                    chunk = chunk.model_dump()
-                except AttributeError:
-                    print("Chunk is not a dict:", chunk)
-                    continue
-            
+            # if not isinstance(chunk, dict):
+            #     try:
+            #         chunk = chunk.model_dump()
+            #     except AttributeError:
+            #         print("Chunk is not a dict:", chunk)
+            #         continue
             response_params = await self.response_handler(chunk, request_params)
             if (response_params):
                 post_params = await self.post_handler(response_params, request_params)
                 if (post_params):
                         yield f"data: {json.dumps(post_params)}\n\n"
 
+        final_params = await self.post_handler({ "type": "response.completed" }, request_params)
+        if (final_params):
+            yield f"data: {json.dumps(final_params)}\n\n"
+        
         # DB: Update assistant message
         update_result = await self.conv_db.update_message(
             message_id=self.message_id,
@@ -1033,21 +1057,25 @@ class AutomateRequest(RequestHandler):
                 "temperature": 0.5,
                 "parallel_tool_calls": False,
                 "tool_choice": "auto",
-                "truncation": "auto",
-                "instructions": T1_PROMPT,
-                "input": []
+                # "truncation": "auto",
+                # "instructions": T1_PROMPT,
+                # "input": []
+                "messages": [{ "role": "system", "content": T1_PROMPT }]
             }
         elif (mode == "t2"):
             model_params = {
                 "model": "openai/gpt-4.1",
+                # "model": "anthropic/claude-sonnet-4-20250514",
+                # "model": "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
                 "tools": T2_TOOLS,
                 "stream": True,
                 "temperature": 0,
                 "parallel_tool_calls": False,
                 "tool_choice": "auto",
-                "truncation": "auto",
-                "instructions": T2_PROMPT,
-                "input": []
+                # "truncation": "auto",
+                # "instructions": T2_PROMPT,
+                # "input": []
+                "messages": [{ "role": "system", "content": T2_PROMPT }]
             }
         elif (mode == "t3"):
             model_params = {
@@ -1057,20 +1085,22 @@ class AutomateRequest(RequestHandler):
                 "temperature": 0.1,
                 "parallel_tool_calls": False,
                 "tool_choice": "auto",
-                "truncation": "auto",
-                "instructions": T3_PROMPT,
-                "input": []
+                # "truncation": "auto",
+                # "instructions": T3_PROMPT,
+                # "input": []
+                "messages": [{ "role": "system", "content": T3_PROMPT }]
             }
         elif (mode == "t4"):
             model_params = {
                 "model": "openai/gpt-4.1-nano",
                 "stream": True,
                 "temperature": 1,
-                "parallel_tool_calls": False,
-                "tool_choice": "auto",
-                "truncation": "auto",
-                "instructions": T4_PROMPT,
-                "input": []
+                # "parallel_tool_calls": False,
+                # "tool_choice": "auto",
+                # "truncation": "auto",
+                # "instructions": T4_PROMPT,
+                # "input": []
+                "messages": [{ "role": "system", "content": T4_PROMPT }]
             }
         
         request_type = None
@@ -1085,32 +1115,57 @@ class AutomateRequest(RequestHandler):
                     content = []
                     for msg in messages["content"]:
                         if ("type" in msg and msg["type"] == "text"):
-                            content.append({ "type": "input_text", "text": msg["text"] })
+                            content.append({ "type": "text", "text": msg["text"] })
                         elif ("type" in msg and msg["type"] == "file"):
                             file = msg["payload"]
                             file_content = file["content"]
                             mime_type = file["mimeType"]
                             data_uri = f"data:{mime_type};base64,{file_content}"
                             if file["mimeType"].startswith("image"):
-                                content.append({ "type": "input_image", "image_url": data_uri })
+                                content.append({ "type": "image_url", "image_url": { "url": data_uri } })
                             else:
-                                content.append({ "type": "input_file", "filename": file["name"], "file_data": data_uri })
-                    model_params["input"].append({ "role": "user", "content": content })
+                                content.append({ "type": "file", "file": { "filename": file["name"], "file_data": data_uri } })
+                    model_params["messages"].append({ "role": "user", "content": content })
                 elif (messages["type"] == "response"):
                     content = []
                     for msg in messages["content"]:
                         if ("type" in msg and msg["type"] == "text"):
-                            content.append({ "type": "output_text", "text": msg["text"] })
+                            content.append({ "type": "text", "text": msg["text"] })
                         elif ("type" in msg and msg["type"] == "file"):
                             file = msg["payload"]
                             file_content = file["content"]
                             mime_type = file["mimeType"]
                             data_uri = f"data:{mime_type};base64,{file_content}"
                             if file["mimeType"].startswith("image"):
-                                content.append({ "type": "output_image", "image_url": data_uri })
+                                content.append({ "type": "image_url", "image_url": { "url": data_uri } })
                             else:
-                                content.append({ "type": "output_file", "filename": file["name"], "file_data": data_uri })
-                    model_params["input"].append({ "role": "assistant", "content": content })
+                                content.append({ "type": "file", "file": { "filename": file["name"], "file_data": data_uri } })
+                    model_params["messages"].append({ "role": "assistant", "content": content })
+                elif (messages["type"] == "task_context"):
+                    t2_reasoning = await self.conv_db.get_t2_reasoning(message_id=self.message_id)
+                    if (t2_reasoning):
+                        content = [{"type": "text", "text": t2_reasoning}]
+                        model_params["messages"].append({ "role": "assistant", "content": content })
+                elif (messages["type"] == "action.init"):
+                    tool_call_messaage = {
+                        "role": "assistant",
+                        "tool_calls": [{
+                            "id": messages["id"],
+                            "type": "function",
+                            "function": {
+                              "name": messages["name"],
+                              "arguments": messages["arguments"]
+                            }
+                        }]
+                    }
+                    model_params["messages"].append(tool_call_messaage)
+                elif (messages["type"] == "action"):
+                    tool_call_output = {
+                        "role": "tool",
+                        "tool_call_id": messages["id"],
+                        "content": messages["output"]
+                    }
+                    model_params["messages"].append(tool_call_output)
                 elif (messages["type"] == "screenshot" and mode == "t2"):
                     if ("parser" in messages and messages["parser"] == 1):
                         # Screenshot content
@@ -1125,7 +1180,7 @@ class AutomateRequest(RequestHandler):
                         grider_tasks.append(grider_task)
                         metadata[index] = messages["metadata"]
                 else:
-                    model_params["input"].append(messages)
+                    model_params["messages"].append(messages)
         
         if (request_type == "screenshot"):
             # Inject annotated screenshot
@@ -1135,16 +1190,18 @@ class AutomateRequest(RequestHandler):
                 client_props = {**await self.get_client_props(), "metadata": page_meta, "fetch_props": props}
                 await self.redis.hset(self.key, "client_props", json.dumps(client_props))
                 # Consider system prompt while inserting
-                model_params["input"].insert(index + 1, {
+                model_params["messages"].insert(index + 1, {
                     "role": "user",
                     "content": [
                         {
-                            "type": "input_text",
-                            "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, and the annotated image. You must use this to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{page_meta['url']}</URL><TITLE>{page_meta['title']}</TITLE><LOADING_STATUS>{page_meta['loading_status']}</LOADING_STATUS></PAGE_METDATA>"
+                            "type": "text",
+                            "text": f"<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, and the annotated image. You can use this information to perform actions on the page.</SYSTEM><PAGE_METDATA><URL>{page_meta['url']}</URL><TITLE>{page_meta['title']}</TITLE><LOADING_STATUS>{page_meta['loading_status']}</LOADING_STATUS></PAGE_METDATA>"
                         },
                         {
-                            "type": "input_image",
-                            "image_url": image,
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image
+                            }
                         }
                     ]
                 })
@@ -1153,123 +1210,157 @@ class AutomateRequest(RequestHandler):
             results = await asyncio.gather(*grider_tasks, return_exceptions=True)
             for index, (image, props) in zip(metadata, results):
                 page_meta = metadata[index]
-                client_props = {**await self.get_client_props(), "metadata": page_meta, "fetch_props": props}
+                client_props = {**await self.get_client_props(), "metadata": page_meta, "scroll_props": props}
                 await self.redis.hset(self.key, "client_props", json.dumps(client_props))
                 # Consider system prompt while inserting
-                model_params["input"].insert(index + 1, {
+                model_params["messages"].insert(index + 1, {
                     "role": "user",
                     "content": [
                         {
-                            "type": "input_text",
+                            "type": "text",
                             "text": f"<SYSTEM>This is the output of the `getScrollPortions()` tool call. It contains the annotated image of the current page with a grid overlay highlighting the scrollable portions with a unique ID. You can use this ID to scroll the desired portion.</SYSTEM>"
                         },
                         {
-                            "type": "input_image",
-                            "image_url": image
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image
+                            }
                         }
                     ]
                 })
         
         return model_params
 
-    async def response_handler(self, chunk, request_params):
-        if ("type" in chunk):
-            # DB updates
-            if (chunk["type"] == "response.completed" and chunk["response"]["output"][0]["type"] == "message"):
-                if (self.client.metadata.mode == "t1"):
-                    self.response_store["text"]["response"] = chunk["response"]["output"][0]["content"][0]["text"]
-                elif (self.client.metadata.mode == "t2"):
-                    self.response_store["t2_reasoning"] = chunk["response"]["output"][0]["content"][0]["text"]
-                elif (self.client.metadata.mode == "t3"):
-                    self.response_store["text"]["validation"] = chunk["response"]["output"][0]["content"][0]["text"]
-                elif (self.client.metadata.mode == "t4"):
-                    self.response_store["text"]["output"] = chunk["response"]["output"][0]["content"][0]["text"]
-                
-                await super().async_update_usage(chunk["response"]["usage"])
+    async def response_handler(self, chunk: ModelResponseStream, request_params):
+        response = chunk.choices[0]
+        chunk_dict = chunk.model_dump()
+        # DB updates
+        if (response.delta.content):
+            content = response.delta.content
+            if (self.client.metadata.mode == "t1"):
+                self.response_store["text"]["response"] += content
+            elif (self.client.metadata.mode == "t2"):
+                self.response_store["t2_reasoning"] += content
+            elif (self.client.metadata.mode == "t3"):
+                self.response_store["text"]["validation"] += content
+            elif (self.client.metadata.mode == "t4"):
+                self.response_store["text"]["output"] += content
             
-            if (chunk["type"] == "response.output_item.done" and "item" in chunk and "type" in chunk["item"] and chunk["item"]["type"] == "function_call"):
-                toolName = chunk["item"]["name"]
-                toolArgs = json.loads(chunk["item"]["arguments"])
-                if ("elementId" in toolArgs):
-                    element_id = toolArgs["elementId"]
-                    client_props = await self.get_client_props()
-                    fetch_props = client_props["fetch_props"]
-                    devicePixelRatio = client_props["metadata"]["pixelRatio"]
-                    coords = await self.id_to_coords(element_id, fetch_props, devicePixelRatio)
-                    if coords:
-                        toolArgs.pop("elementId")
-                        chunk["item"]["arguments"] = json.dumps({
-                            "x": coords["x"],
-                            "y": coords["y"],
-                            **toolArgs
-                        })
-                        return chunk
-                elif ("portionId" in toolArgs):
-                    portion_id = toolArgs["portionId"]
-                    client_props = await self.get_client_props()
-                    scroll_props = client_props["scroll_props"]
-                    devicePixelRatio = client_props["metadata"]["pixelRatio"]
-                    coords = await self.id_to_coords(portion_id, scroll_props, devicePixelRatio)
-                    if coords:
-                        toolArgs.pop("portionId")
-                        chunk["item"]["arguments"] = json.dumps({
-                            "x": coords["x"],
-                            "y": coords["y"],
-                            **toolArgs
-                        })
-                        return chunk
-            elif (chunk["type"] == "response.completed" and self.client.metadata.mode == "t2"):
-                if (chunk["response"]["output"][0]["type"] == "message"):
-                    t2_response = chunk["response"]["output"][0]["content"][0]["text"]
-                    step_chunk = await litellm.aresponses(
-                        model="groq/llama-3.3-70b-versatile",
-                        instructions=T5_PROMPT,
-                        temperature=1,
-                        input=t2_response
-                    )
-                    step_chunk = step_chunk.model_dump()
-                    # DB updates
-                    self.response_store["text"]["execution"].append(step_chunk["output"][0]["content"][0]["text"])
-                    print("GENERATED STEP:::", step_chunk["output"][0]["content"][0]["text"])
-                    step_chunk["type"] = "step.generation"
-                    await super().async_update_usage(step_chunk["usage"])
-                    return step_chunk
+            self.text_response += content
+            chunk_dict["type"] = "text.stream"
+            self.stream_text = content
+            # await super().async_update_usage(chunk["response"]["usage"])
         
-        return chunk
+        if (response.delta.tool_calls):
+            toolCalls = response.delta.tool_calls
+            for toolCall in toolCalls:
+                index = toolCall.index
+                if (not index in self.tool_calls):
+                    self.tool_calls[index] = {
+                        "id": toolCall.id,
+                        "name": toolCall.function.name,
+                        "arguments": toolCall.function.arguments
+                    }
+                self.tool_calls[index]["arguments"] += toolCall.function.arguments
+
+        if (response.finish_reason == "tool_calls"):
+            for idx in self.tool_calls:
+                print("ToolCall:", self.tool_calls[idx])
+                if (self.tool_calls[idx]["arguments"]):
+                    toolName = self.tool_calls[idx]["name"]
+                    toolArgs = json.loads(self.tool_calls[idx]["arguments"])
+                    if ("elementId" in toolArgs):
+                        element_id = toolArgs["elementId"]
+                        client_props = await self.get_client_props()
+                        fetch_props = client_props["fetch_props"]
+                        devicePixelRatio = client_props["metadata"]["pixelRatio"]
+                        coords = await self.id_to_coords(element_id, fetch_props, devicePixelRatio)
+                        if coords:
+                            toolArgs.pop("elementId")
+                            toolArgs["x"] = coords["x"]
+                            toolArgs["y"] = coords["y"]
+                            self.tool_calls[idx]["arguments"] = json.dumps(toolArgs)
+                            # chunk_dict["item"]["arguments"] = json.dumps({
+                            #     "x": coords["x"],
+                            #     "y": coords["y"],
+                            #     **toolArgs
+                            # })
+                            # return chunk_dict
+                    elif ("portionId" in toolArgs):
+                        portion_id = toolArgs["portionId"]
+                        client_props = await self.get_client_props()
+                        scroll_props = client_props["scroll_props"]
+                        devicePixelRatio = client_props["metadata"]["pixelRatio"]
+                        coords = await self.id_to_coords(portion_id, scroll_props, devicePixelRatio)
+                        if coords:
+                            toolArgs.pop("portionId")
+                            toolArgs["x"] = coords["x"]
+                            toolArgs["y"] = coords["y"]
+                            self.tool_calls[idx]["arguments"] = json.dumps(toolArgs)
+                            # chunk_dict["item"]["arguments"] = json.dumps({
+                            #     "x": coords["x"],
+                            #     "y": coords["y"],
+                            #     **toolArgs
+                            # })
+                            # return chunk_dict
+            chunk_dict["type"] = "action.call"
+            current_reasoning = self.response_store["t2_reasoning"]
+            if (current_reasoning):
+                previous_reasoning = await self.conv_db.get_t2_reasoning(message_id=self.message_id)
+                prompt_content = f"# PREVIOUS REASONING:\n {previous_reasoning}\n\n# CURRENT REASONING:\n {current_reasoning}\n\n# TOOL CALL:\n {self.tool_calls}"
+                print("PROMPT_CONTENT:", prompt_content)
+                # previous_steps = await self.conv_db.get_execution_steps(message_id=self.message_id)
+                step_chunk = await litellm.acompletion(
+                    model="groq/gemma2-9b-it",
+                    temperature=1,
+                    # reasoning_effort="none",
+                    # allowed_openai_params=["reasoning_effort"],
+                    messages=[
+                        { "role": "system", "content": T5_PROMPT },
+                        { "role": "user", "content": prompt_content }
+                    ]
+                )
+                # DB updates
+                self.response_store["text"]["execution"].append(step_chunk.choices[0].message.content)
+                print("GENERATED STEP:::", step_chunk.choices[0].message.content)
+                self.stream_text = step_chunk.choices[0].message.content
+                # chunk_dict["step"] = step_chunk.choices[0].message.content
+                # await super().async_update_usage(step_chunk["usage"])
+        
+        # if (chunk.usage):
+        #     chunk_dict["type"] = "response.completed"
+    
+        return chunk_dict
     
     async def post_handler(self, response, request_params):
         post_params = {}
         if ("type" in response):
-            if (response["type"] == "response.created"): # response.start
+            if (response["type"] == "response.started"): # response.start
                 post_params["type"] = "response.started"
                 post_params["id"] = self.response_id
                 post_params["message_id"] = self.message_id
                 post_params["started_at"] = datetime.datetime.now(datetime.timezone.utc).timestamp()
-            elif (response["type"] == "response.output_text.delta"): # text.stream
+            elif (response["type"] == "text.stream"): # text.stream
                 if (self.client.metadata.mode != "t2"):
                     post_params["type"] = "text.stream"
                     post_params["id"] = self.response_id
-                    post_params["text"] = response["delta"]
-            elif (response["type"] == "response.content_part.done"): # text.done
-                post_params["type"] = "text.done"
-                post_params["id"] = self.response_id
-            elif (response["type"] == "response.output_item.done" and
-                  response["item"] and response["item"]["type"] and
-                  response["item"]["type"] == "function_call"
-                ): # action.call
+                    post_params["text"] = self.stream_text
+            # elif (response["type"] == "response.content_part.done"): # text.done
+            #     post_params["type"] = "text.done"
+            #     post_params["id"] = self.response_id
+            elif (response["type"] == "action.call"): # action.call
                 post_params["type"] = "action.call"
                 post_params["id"] = self.response_id
-                post_params["action"] = response["item"]
-            elif (response["type"] == "error"): # response.error
-                post_params["type"] = "response.error"
-                post_params["id"] = self.response_id
-                post_params["error"] = response["message"]
+                post_params["action"] = self.tool_calls
+                if (self.stream_text): post_params["step"] = self.stream_text
+            # elif (response["type"] == "error"): # response.error
+            #     post_params["type"] = "response.error"
+            #     post_params["id"] = self.response_id
+            #     post_params["error"] = response["message"]
             elif (response["type"] == "step.generation"): # response.completed (step generation)
-                post_params["type"] = "response.completed"
+                post_params["type"] = "step.generation"
                 post_params["id"] = self.response_id
-                post_params["message_id"] = self.message_id
-                post_params["completed_at"] = datetime.datetime.now(datetime.timezone.utc).timestamp()
-                post_params["step"] = response["output"][0]["content"][0]["text"]
+                post_params["text"] = self.stream_text
             elif (response["type"] == "response.completed"): # response.completed
                 post_params["type"] = "response.completed"
                 post_params["id"] = self.response_id
@@ -1280,18 +1371,20 @@ class AutomateRequest(RequestHandler):
             if (post_params):
                 if (self.client.metadata.mode == "t1"):
                     if (post_params["type"] == "action.call"):
-                        if (post_params["action"]["name"] == "proceed"):
-                            json_data = json.loads(post_params["action"]["arguments"])
-                            task = json_data["task"]
-                            self.response_store["task"] = task
+                        for idx in post_params["action"]:
+                            if (post_params["action"][idx]["name"] == "proceed"):
+                                json_data = json.loads(post_params["action"][idx]["arguments"])
+                                task = json_data["task"]
+                                self.response_store["task"] = task
                 elif (self.client.metadata.mode == "t3"):
                     if (post_params["type"] == "action.call"):
-                        if (post_params["action"]["name"] == "success"):
-                            self.response_store["taskStatus"] = "success"
-                        elif (post_params["action"]["name"] == "failed"):
-                            self.response_store["taskStatus"] = "failed"
-                        elif (post_params["action"]["name"] == "suspended"):
-                            self.response_store["taskStatus"] = "suspended"
+                        for idx in post_params["action"]:
+                            if (post_params["action"][idx]["name"] == "success"):
+                                self.response_store["taskStatus"] = "success"
+                            elif (post_params["action"][idx]["name"] == "failed"):
+                                self.response_store["taskStatus"] = "failed"
+                            elif (post_params["action"][idx]["name"] == "suspended"):
+                                self.response_store["taskStatus"] = "suspended"
         
         return post_params
 

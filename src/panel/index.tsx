@@ -280,8 +280,11 @@ const App = () => {
         let idx = 0;
         for await (const res of responseStream) {
             if (res.type === "action.call") {
-                toolCalls[idx] = res.action as ToolCall;
-                idx++;
+                for (const [key, value] of Object.entries(res.action)) {
+                    toolCalls[key] = value as ToolCall;
+                }
+                // toolCalls[idx] = res.action as ToolCall;
+                // idx++;
             }
             if (res.type === "text.stream") {
                 response += res.text;
@@ -332,14 +335,16 @@ const App = () => {
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
+        let toolCallIndex;
         let executionResponse: ExecutionStep[] = [{ id: 0, text: "Initializing", executing: true }];
         setMessages(prev => {
             const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
             updateConversationsDB(update);
             return update;
         });
-        const t2Prompt = [];
+        const t2Prompt: any[] = [];
         t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
+        t2Prompt.push({ type: "task_context" });
         while (!finish || functionExecState) {
             console.log("t2Prompt:", t2Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
@@ -347,12 +352,14 @@ const App = () => {
             let idx = 0;
             for await (const res of executionModelStream) {
                 if (res.type === "action.call") {
-                    executionToolCalls[idx] = res.action as ToolCall;
-                    idx++;
+                    for (const [key, value] of Object.entries(res.action)) {
+                        executionToolCalls[key] = value as ToolCall;
+                    }
+                    // executionToolCalls[idx] = res.action as ToolCall;
+                    // idx++;
                     console.log("ToolCall:", executionToolCalls);
-                }
-                if (res.type === "response.completed") {
-                    messageID.current = res.message_id;
+                    // }
+                    // if (res.type === "step.generation") {
                     if (res.step) {
                         if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
                         executionResponse.push({ id: executionResponse.length, text: res.step, executing: true });
@@ -362,6 +369,9 @@ const App = () => {
                             return update;
                         });
                     }
+                }
+                if (res.type === "response.completed") {
+                    messageID.current = res.message_id;
                     if (!functionExecState) finish = true;
                 }
                 if (res.type === "response.error") {
@@ -375,10 +385,38 @@ const App = () => {
                 const toolArgs = JSON.parse(toolCall.arguments);
                 const toolCallResult = await availableFunctions[toolName](toolArgs);
                 console.log("tsresult", toolCallResult)
-                t2Prompt.push(toolCall);
+                // t2Prompt.push(toolCall);
+                // t2Prompt.push({
+                //     type: "function_call_output",
+                //     call_id: toolCall.call_id,
+                //     output: toolCallResult.message
+                // });
+                // if (toolCallIndex) {
+                    // t2Prompt.splice(toolCallIndex, 1);
+                    // if (domContentIndex) {
+                        // t2Prompt.splice(domContentIndex - 1, 1);
+                        // domContentIndex = domContentIndex - 1;
+                    // }
+                // }
+                // t2Prompt.map(msg => {
+                //     if (msg.type === "task_context") {
+                //         t2Prompt.splice(t2Prompt.indexOf(msg), 1)
+                //         t2Prompt.push({ type: "task_context" });
+                //     } else if (msg.type === "screenshot") {
+                //         t2Prompt.splice(t2Prompt.indexOf(msg), 1)
+                //     }
+                // });
+                // toolCallIndex = t2Prompt.length;
+                // t2Prompt.push({ type: "task_context" });
                 t2Prompt.push({
-                    type: "function_call_output",
-                    call_id: toolCall.call_id,
+                    type: "action.init",
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    arguments: toolCall.arguments
+                });
+                t2Prompt.push({
+                    type: "action",
+                    id: toolCall.id,
                     output: toolCallResult.message
                 });
                 if (toolName === "fetchScreen" || toolName === "getScrollPortions") {
@@ -420,8 +458,11 @@ const App = () => {
         let idx = 0;
         for await (const res of summaryModelStream) {
             if (res.type === "action.call") {
-                toolCalls[idx] = res.action as ToolCall;
-                idx++;
+                for (const [key, value] of Object.entries(res.action)) {
+                    toolCalls[key] = value as ToolCall;
+                }
+                // toolCalls[idx] = res.action as ToolCall;
+                // idx++;
             }
             if (res.type === "text.stream") {
                 validationResponse += res.text;
