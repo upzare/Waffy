@@ -16,7 +16,6 @@ export const DropdownSteps = ({ steps }: { steps: ExecutionStep[] }) => {
 
                 const stepHeight = stepElement.offsetHeight;
                 const lineHeight = Math.max(stepHeight - 15, 16);
-                console.log(lineHeight);
                 lineElement.style.setProperty("--target-height", `${lineHeight}px`);
             });
         };

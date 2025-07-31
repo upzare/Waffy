@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { CircleStop, EllipsisVertical, File, Info, Mic, Paperclip, Send, Settings, Share, X } from "lucide-react";
 import type { InputContainerProps } from "../../types";
 import styles from "css/panel/InputContainer.module.css";
+import ModeSelection from "./ModeSelection";
 
 const InputContainer: React.FC<InputContainerProps> = ({
     isGenerating,
@@ -11,8 +12,11 @@ const InputContainer: React.FC<InputContainerProps> = ({
     fileInputRef,
     message,
     files,
+    mode,
+    showModeSelection,
     setMessage,
     setFiles,
+    setMode,
     onSpeechRecognition,
     onSendMessage,
     onStopGeneration,
@@ -23,6 +27,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
     const microphoneIconRef = useRef<HTMLButtonElement>(null);
     const sendIconRef = useRef<HTMLButtonElement>(null);
 
+    const MODES = ["search", "research", "automate", "cloud"];
     const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
     const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
 
@@ -85,8 +90,14 @@ const InputContainer: React.FC<InputContainerProps> = ({
         chrome.runtime.openOptionsPage();
     }
 
+    const handleModeChange = (mode: string) => {
+        setMode(mode);
+        textareaRef.current?.focus();
+    }
+
     return (
         <div className={styles.inputContainer}>
+            {showModeSelection && <ModeSelection modes={MODES} current_mode={mode} onModeChange={handleModeChange} />}
             <div className={styles.inputBox}>
                 <div className={styles.inputOptionsContainer} ref={optionsMenuRef}>
                     <button className={styles.optionsButton} onClick={toggleOptionsMenu} title="Options">

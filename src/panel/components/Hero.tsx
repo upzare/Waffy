@@ -5,9 +5,9 @@ import styles from "css/panel/Hero.module.css";
 
 const Hero: React.FC<HeroProps> = ({ hidden, onPromptClick }) => {
     const suggestedPrompts = [
-        "Help me debug my CSS",
-        "Explain how JavaScript work",
-        "Generate a React component",
+        "What is in my screen",
+        "Book me a flight to Kochi",
+        "Summarize this page contents",
     ];
 
     return (

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
-import { ai, generateTitle } from '@/lib/agent';
+import { AI, createConversation, createTitle } from '@/lib/agent';
 import { socket } from '@/lib/socket';
 import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
@@ -27,6 +27,8 @@ const App = () => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [statusText, setStatusText] = useState("");
     const [message, setMessage] = useState("");
+    const [mode, setMode] = useState("search");
+    const [showModeSelection, setShowModeSelection] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [isRecorded, setIsRecorded] = useState(false);
@@ -46,6 +48,7 @@ const App = () => {
     const db = useRef<IDBDatabase>(null);
     const db_request = useRef<IDBOpenDBRequest>(null);
     const conversationID = useRef<string>(null);
+    const messageID = useRef<string>(null);
 
     useEffect(() => {
         initSigned();
@@ -81,6 +84,10 @@ const App = () => {
         }
     }, [message]);
 
+    useEffect(() => {
+        setShowModeSelection(isFirstMessage);
+    }, [isFirstMessage]);
+
     const speechRecognition = async () => {
         setIsRecording(true);
         const toastID = toast.loading("Listening...", { duration: 10000 });
@@ -111,7 +118,7 @@ const App = () => {
     const initDB = () => {
         db_request.current = indexedDB.open("WaffyDB", 1);
         db_request.current.onerror = (event) => {
-            console.error("Error opening database:", event);
+            console.log("Error opening database:", event);
         };
         db_request.current.onupgradeneeded = (event) => {
             db.current = (event.target as IDBOpenDBRequest).result as IDBDatabase;
@@ -122,11 +129,10 @@ const App = () => {
         };
     };
 
-    const initConversation = async (prompt: string) => {
-        conversationID.current = uuid4();
+    const initConversation = async () => {
+        await createConversation(conversationID.current);
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
         conversationDB?.add({ id: conversationID.current, title: "New Chat", timestamp: new Date(), messages: [] });
-        await createTitle(prompt);
         fetchConversations();
     }
 
@@ -148,8 +154,8 @@ const App = () => {
         setIsConnected(false);
     }
 
-    const createTitle = async (prompt: string) => {
-        const title = await generateTitle(prompt);
+    const generateTitle = async (prompt: string) => {
+        const title = await createTitle(conversationID.current, prompt);
         setCurrentTitle(title);
         const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
         if (conversationDB && conversationID.current) {
@@ -159,7 +165,7 @@ const App = () => {
                     data.title = title;
                     const res = conversationDB.put(data);
                     res.onerror = (event) => {
-                        console.error("Error updating title:", event);
+                        console.log("Error updating title:", event);
                     };
                     res.onsuccess = () => {
                         return;
@@ -192,7 +198,7 @@ const App = () => {
                     data.messages = updatedMessages;
                     const res = conversationDB.put(data);
                     res.onerror = (event) => {
-                        console.error("Error updating conversation:", event);
+                        console.log("Error updating conversation:", event);
                     };
                     res.onsuccess = () => {
                         return;
@@ -203,80 +209,93 @@ const App = () => {
     };
 
     const attachController = async () => {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>((resolve, reject) => {
             chrome.tabs.query({}, async (tabs) => {
-                for (let tab of tabs) {
-                    if (tab.url?.startsWith("chrome://")) {
-                        continue;
-                    }
-                    chrome.debugger.attach({ tabId: tab.id }, "1.3", async () => {
-                        if (chrome.runtime.lastError) {
-                            console.error("Debugger attach failed: ", chrome.runtime.lastError.message);
+                try {
+                    for (let tab of tabs) {
+                        if (tab.url?.startsWith("chrome://")) {
+                            continue;
                         }
-                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
-                        await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.enable");
-                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.enable");
-                        console.log(`Debugger attached to tab ${tab.id}`);
-                    });
-                }
-                // Set current tab as active
-                chrome.tabs.query({ active: true, currentWindow: true }, async (currentTabs) => {
-                    if (!currentTabs || !currentTabs[0]?.id) {
-                        return;
+                        chrome.debugger.attach({ tabId: tab.id }, "1.3", async () => {
+                            if (chrome.runtime.lastError) {
+                                reject();
+                            }
+                            await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
+                            await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.enable");
+                            await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.enable");
+                        });
                     }
-                    await updateOpenedTabs();
-                    await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: currentTabs[0].id });
-                    await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: true });
-                });
-                resolve();
+                    // Set current tab as active
+                    chrome.tabs.query({ active: true, currentWindow: true }, async (currentTabs) => {
+                        if (!currentTabs || !currentTabs[0]?.id) {
+                            return;
+                        }
+                        await updateOpenedTabs();
+                        await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: currentTabs[0].id });
+                        await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: true });
+                    });
+                    resolve();
+                } catch (e) {
+                    reject();
+                }
             });
         });
     };
 
     const detachController = async () => {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>((resolve, reject) => {
             chrome.tabs.query({}, async (tabs) => {
-                for (let tab of tabs) {
-                    if (tab.url?.startsWith("chrome://")) {
-                        continue;
-                    }
-                    await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id }); // force disable overlay
-                    await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.disable");
-                    await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.disable");
-                    await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.disable");
-                    await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: false });
-                    chrome.debugger.detach({ tabId: tab.id }, async () => {
-                        if (chrome.runtime.lastError) {
-                            console.error("Error detaching from tab:", chrome.runtime.lastError.message);
+                try {
+                    for (let tab of tabs) {
+                        if (tab.url?.startsWith("chrome://")) {
+                            continue;
                         }
-                    });
+                        await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id }); // force disable overlay
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.disable");
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.disable");
+                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.disable");
+                        await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: false });
+                        chrome.debugger.detach({ tabId: tab.id }, async () => {
+                            if (chrome.runtime.lastError) {
+                                reject();
+                            }
+                        });
+                    }
+                    resolve();
+                } catch (e) {
+                    reject();
                 }
-                resolve();
             });
         });
     };
 
-    const t1Handler = async (messageId: string, previousPrompt: any, prompt_text: string, prompt_files: FileFormat[]) => {
+    const t1Handler = async (messageId: string, prompt_text: string, prompt_files: FileFormat[]) => {
         setStatusText("GENERATING");
-        const t1Prompt = previousPrompt;
+        const handleError = () => raiseError(messageId);
+        const t1Prompt = [];
         t1Prompt.push({ type: "prompt", content: [{ type: "text", text: prompt_text }, ...prompt_files] });
-        const responseStream = ai(t1Prompt, "t1", abortControllerRef?.current?.signal);
+        const responseStream = AI(conversationID.current, t1Prompt, "t1", mode, messageID.current, abortControllerRef?.current, handleError);
         let response = "";
         const toolCalls: Record<string, ToolCall> = {};
+        let idx = 0;
         for await (const res of responseStream) {
-            if (res.type === "response.output_item.done" && res.item.type === "function_call") {
-                toolCalls[res.output_index] = res.item as ToolCall;
+            if (res.type === "action.call") {
+                toolCalls[idx] = res.action as ToolCall;
+                idx++;
             }
-            if (res.type === "response.output_text.delta") {
-                response += res.delta;
+            if (res.type === "text.stream") {
+                response += res.text;
                 setMessages(prev => {
                     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, response: response } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
             }
-            if (res.type === "error") {
-                throw new Error(res.message);
+            if (res.type === "response.completed") {
+                messageID.current = res.message_id;
+            }
+            if (res.type === "response.error") {
+                throw res.error;
             }
         }
         setMessages(prev => {
@@ -300,8 +319,9 @@ const App = () => {
         return false;
     }
 
-    const t2Handler = async (messageId: string, task: string, previousTask: any, prompt_files: FileFormat[]) => {
+    const t2Handler = async (messageId: string, task: string, prompt_files: FileFormat[]) => {
         setStatusText("EXECUTING");
+        const handleError = () => raiseError(messageId);
         await updateOpenedTabs();
         chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
             if (!tab || !tab.id) {
@@ -313,44 +333,41 @@ const App = () => {
         let functionExecState = false;
         let domContentIndex;
         let executionResponse: ExecutionStep[] = [{ id: 0, text: "Initializing", executing: true }];
-        const t2Prompt = previousTask;
+        setMessages(prev => {
+            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
+            updateConversationsDB(update);
+            return update;
+        });
+        const t2Prompt = [];
         t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
         while (!finish || functionExecState) {
             console.log("t2Prompt:", t2Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
-            const executionModelStream = ai(t2Prompt, "t2", abortControllerRef?.current?.signal);
+            const executionModelStream = AI(conversationID.current, t2Prompt, "t2", mode, messageID.current, abortControllerRef?.current, handleError);
+            let idx = 0;
             for await (const res of executionModelStream) {
-                // console.log("MODEL_RESPONSE:", res);
-                if (res.type === "response.output_item.done" && res.item.type === "function_call") {
-                    executionToolCalls[res.output_index] = res.item as ToolCall;
+                if (res.type === "action.call") {
+                    executionToolCalls[idx] = res.action as ToolCall;
+                    idx++;
                     console.log("ToolCall:", executionToolCalls);
                 }
-                // @ts-ignore
-                if (res.object === "chat.completion") {
-                    if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
-                    // @ts-ignore
-                    executionResponse.push({ id: executionResponse.length, text: res.output[0].content[0].text, executing: true });
-                    setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
-                        updateConversationsDB(update);
-                        return update;
-                    });
+                if (res.type === "response.completed") {
+                    messageID.current = res.message_id;
+                    if (res.step) {
+                        if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
+                        executionResponse.push({ id: executionResponse.length, text: res.step, executing: true });
+                        setMessages(prev => {
+                            const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
+                            updateConversationsDB(update);
+                            return update;
+                        });
+                    }
+                    if (!functionExecState) finish = true;
                 }
-                if (res.type === "response.completed" && !functionExecState) {
-                    if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
-                    executionResponse.push({ id: executionResponse.length, text: "Finished", executing: true });
-                    setMessages(prev => {
-                        const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
-                        updateConversationsDB(update);
-                        return update;
-                    });
-                    finish = true;
-                }
-                if (res.type === "error") {
-                    throw new Error(res.message);
+                if (res.type === "response.error") {
+                    throw res.error;
                 }
             }
-            // t2Prompt.push({ type: "response", content: [{ type: "text", text: executionResponse }] });
             functionExecState = false;
             for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
                 await updateOpenedTabs();
@@ -393,27 +410,32 @@ const App = () => {
         return executionResponse;
     }
 
-    const t3Handler = async (messageId: string, task: string, executionOutput: string) => {
+    const t3Handler = async (messageId: string, task: string) => {
         setStatusText("VALIDATING");
-        const prompt = `**Task:**\n${task}\n\n**Output:**\n${executionOutput}`;
-        const t3Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
-        const summaryModelStream = ai(t3Prompt, "t3", abortControllerRef?.current?.signal);
+        const handleError = () => raiseError(messageId);
+        const t3Prompt = [{ type: "prompt", content: [{ type: "text", text: task }] }];
+        const summaryModelStream = AI(conversationID.current, t3Prompt, "t3", mode, messageID.current, abortControllerRef?.current, handleError);
         const toolCalls: Record<string, ToolCall> = {};
         let validationResponse = "";
+        let idx = 0;
         for await (const res of summaryModelStream) {
-            if (res.type === "response.output_item.done" && res.item.type === "function_call") {
-                toolCalls[res.output_index] = res.item as ToolCall;
+            if (res.type === "action.call") {
+                toolCalls[idx] = res.action as ToolCall;
+                idx++;
             }
-            if (res.type === "response.output_text.delta") {
-                validationResponse += res.delta;
+            if (res.type === "text.stream") {
+                validationResponse += res.text;
                 setMessages(prev => {
                     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, validation: validationResponse } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
             }
-            if (res.type === "error") {
-                throw new Error(res.message);
+            if (res.type === "response.completed") {
+                messageID.current = res.message_id;
+            }
+            if (res.type === "response.error") {
+                throw res.error;
             }
         }
         for await (const [index, toolCall] of Object.entries(toolCalls)) {
@@ -451,23 +473,26 @@ const App = () => {
         return validationResponse;
     }
 
-    const t4Handler = async (messageId: string, task: string, executionOutput: string) => {
+    const t4Handler = async (messageId: string, task: string) => {
         setStatusText("FINALIZING");
-        const prompt = `**Task:**\n${task}\n\n**Output:**\n${executionOutput}`;
-        const t4Prompt = [{ type: "prompt", content: [{ type: "text", text: prompt }] }];
-        const summaryModelStream = ai(t4Prompt, "t4", abortControllerRef?.current?.signal);
+        const handleError = () => raiseError(messageId);
+        const t4Prompt = [{ type: "prompt", content: [{ type: "text", text: task }] }];
+        const summaryModelStream = AI(conversationID.current, t4Prompt, "t4", mode, messageID.current, abortControllerRef?.current, handleError);
         let summary = "";
         for await (const res of summaryModelStream) {
-            if (res.type === "response.output_text.delta") {
-                summary += res.delta;
+            if (res.type === "text.stream") {
+                summary += res.text;
                 setMessages(prev => {
                     const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, output: summary } } } : msg);
                     updateConversationsDB(update);
                     return update;
                 });
             }
-            if (res.type === "error") {
-                throw new Error(res.message);
+            if (res.type === "response.completed") {
+                messageID.current = res.message_id;
+            }
+            if (res.type === "response.error") {
+                throw res.error;
             }
         }
         setMessages(prev => {
@@ -477,8 +502,23 @@ const App = () => {
         });
     };
 
+    const raiseError = (messageId: string, error?: string) => {
+        setMessages(prev => {
+            const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
+            updateConversationsDB(update);
+            return update;
+        });
+        const errorMessage = "Something went wrong";
+        setMessages(prev => {
+            const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: `*${error ? error : errorMessage}*` } }, isUser: false, isError: true }];
+            updateConversationsDB(update);
+            return update;
+        });
+    };
+
     const handleSendMessage = async () => {
         if ((!message.trim() && files.length === 0) || isGenerating) return;
+        messageID.current = null;
         const messageId = Date.now().toString();
         setIsGenerating(true);
         setStatusText("INITIALIZING");
@@ -487,70 +527,57 @@ const App = () => {
         }
         abortControllerRef.current = new AbortController();
         const prompt_text = message.trim();
-        if (isFirstMessage) {
-            setIsChat(true);
-            setIsFirstMessage(false);
-            initConversation(prompt_text);
-        }
+        const prompt_files = await fileHandler(files);
         setMessages(prev => {
             const update = [
                 ...prev,
-                { id: `user-${messageId}`, content: { text: { prompt: prompt_text }, files: files }, isUser: true, isError: false },
+                { id: `user-${messageId}`, content: { text: { prompt: prompt_text }, files: prompt_files }, isUser: true, isError: false },
                 { id: `assistant-${messageId}`, content: { text: {}, files: [] }, streaming: { response: true, execution: false, validation: false, output: false }, isUser: false, isError: false }
             ];
             updateConversationsDB(update);
             return update;
         });
-        const previousPrompt = [];
-        const previousTask = [];
-        const userFiles: File[][] = [];
-        for await (const msg of messages) {
-            if (!msg.isError) {
-                if (msg.isUser) {
-                    previousPrompt.push({ type: "prompt", content: [{ type: "text", text: msg.content.text?.prompt }, ...await fileHandler(msg.content.files || [])] });
-                    userFiles.push(msg.content.files || []);
-                } else {
-                    const assistantPrompt = `${msg.content.text?.output ? `${msg.content.text?.output}\n\n**Validation Output**:\n${msg.content.text?.validation}` : msg.content.text?.response}`;
-                    previousPrompt.push({ type: "response", content: [{ type: "text", text: assistantPrompt }, ...await fileHandler(msg.content.files || [])] });
-                    if (msg.content?.task) {
-                        previousTask.push({ type: "prompt", content: [{ type: "text", text: msg.content?.task }, ...await fileHandler(userFiles[userFiles.length - 1] || [])] });
-                        previousTask.push({ type: "response", content: [{ type: "text", text: msg.content.text?.execution }, ...await fileHandler(msg.content.files || [])] });
-                    }
-                    userFiles.pop();
-                }
-            } else {
-                previousPrompt.push({ type: "response", content: [{ type: "text", text: `ERROR: ${msg.content.text?.prompt}` }] });
-                userFiles.pop();
-            }
-        };
-        const prompt_files = await fileHandler(files);
         try {
+            if (isFirstMessage) {
+                setIsChat(true);
+                setIsFirstMessage(false);
+                conversationID.current = uuid4();
+                await initConversation();
+                generateTitle(prompt_text).then(() => fetchConversations());
+            }
             await attachController();
-            const task = await t1Handler(messageId, previousPrompt, prompt_text, prompt_files);
+            const task = await t1Handler(messageId, prompt_text, prompt_files);
             if (task) {
-                const executionOutput = await t2Handler(messageId, task, previousTask, prompt_files);
+                const executionOutput = await t2Handler(messageId, task, prompt_files);
                 if (executionOutput) {
-                    await t3Handler(messageId, task, executionOutput.join("\n"));
-                    await t4Handler(messageId, task, executionOutput.join("\n"));
+                    await t3Handler(messageId, task);
+                    await t4Handler(messageId, task);
                 }
             }
-        } catch (error) {
-            setMessages(prev => {
-                const update = prev.filter(msg => msg.id !== `assistant-${messageId}`);
-                updateConversationsDB(update);
-                return update;
-            });
-            let errorMessage = "Something went wrong.";
-            if ((error as any).message) {
-                errorMessage = (error as any).message;
+        } catch (error: any) {
+            raiseError(messageId, error);
+        } finally {
+            try {
+                await detachController();
+            } catch (e) {
+                console.log("Error detaching from tab");
             }
             setMessages(prev => {
-                const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: `*${errorMessage}*` } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
+                const update = prev.map(msg => {
+                    if (msg.id === `assistant-${messageId}`) {
+                        if (msg?.content?.text?.execution) {
+                            const execution = (msg.content.text.execution).map(step => ({
+                                ...step,
+                                executing: false
+                            }));
+                            return { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution } } };
+                        }
+                    }
+                    return msg;
+                });
                 updateConversationsDB(update);
                 return update;
             });
-        } finally {
-            await detachController();
             setMessages(prev => {
                 const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, streaming: { response: false, execution: false, validation: false, output: false } } : msg);
                 updateConversationsDB(update);
@@ -558,7 +585,7 @@ const App = () => {
             });
             if (abortControllerRef.current?.signal.aborted) {
                 setMessages(prev => {
-                    const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: "*User interupted while processing.*" } }, streaming: { response: false, execution: false, validation: false, output: false }, isUser: false, isError: true }];
+                    const update = [...prev, { id: `error-${messageId}`, content: { text: { prompt: "*User interupted while processing.*" } }, isUser: false, isError: true }];
                     updateConversationsDB(update);
                     return update;
                 });
@@ -571,6 +598,7 @@ const App = () => {
                 textareaRef.current.style.height = "auto";
                 textareaRef.current.style.color = "#ffffff";
             };
+            messageID.current = null;
             abortControllerRef.current = null;
         }
     };
@@ -668,8 +696,11 @@ const App = () => {
                     fileInputRef={fileInputRef as any}
                     message={message}
                     files={files}
+                    mode={mode}
+                    showModeSelection={showModeSelection}
                     setMessage={setMessage}
                     setFiles={setFiles}
+                    setMode={setMode}
                     onSpeechRecognition={speechRecognition}
                     onSendMessage={handleSendMessage}
                     onStopGeneration={handleStopGeneration}
