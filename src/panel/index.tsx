@@ -332,6 +332,7 @@ const App = () => {
             }
             await chrome.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: tab.id });
         });
+        let responded = true;
         let finish = false;
         let functionExecState = false;
         let domContentIndex;
@@ -346,11 +347,14 @@ const App = () => {
         t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
         t2Prompt.push({ type: "task_context" });
         while (!finish || functionExecState) {
+            if (!responded) return false;
+            responded = false;
             console.log("t2Prompt:", t2Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
             const executionModelStream = AI(conversationID.current, t2Prompt, "t2", mode, messageID.current, abortControllerRef?.current, handleError);
             let idx = 0;
             for await (const res of executionModelStream) {
+                responded = true;
                 if (res.type === "action.call") {
                     for (const [key, value] of Object.entries(res.action)) {
                         executionToolCalls[key] = value as ToolCall;
