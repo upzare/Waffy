@@ -38,7 +38,7 @@ config = {
     "caption_model_name": "florence2",
     "caption_model_path": "weights/icon_caption_florence",
     "device": detect_device(),
-    "BOX_TRESHOLD": 0.05,
+    "BOX_TRESHOLD": 0.55,
 }
 
 class State:
@@ -1050,8 +1050,9 @@ class AutomateRequest(RequestHandler):
 
         if (mode == "t1"):
             model_params = {
-                "model": "openai/gpt-4.1",
+                # "model": "openai/gpt-4.1",
                 # "model": "groq/llama-3.3-70b-versatile",
+                "model": "openrouter/openrouter/horizon-beta",
                 "tools": T1_TOOLS,
                 "stream": True,
                 "temperature": 0.5,
@@ -1064,12 +1065,15 @@ class AutomateRequest(RequestHandler):
             }
         elif (mode == "t2"):
             model_params = {
-                "model": "openai/gpt-4.1",
+                # "model": "openai/gpt-4.1",
                 # "model": "anthropic/claude-sonnet-4-20250514",
                 # "model": "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
+                "model": "openrouter/openrouter/horizon-beta",
+                # "model": "openrouter/moonshotai/kimi-vl-a3b-thinking:free",
                 "tools": T2_TOOLS,
                 "stream": True,
-                "temperature": 0,
+                "temperature": 0.8,
+                "top_p": 0.5,
                 "parallel_tool_calls": False,
                 "tool_choice": "auto",
                 # "truncation": "auto",
@@ -1143,7 +1147,10 @@ class AutomateRequest(RequestHandler):
                     model_params["messages"].append({ "role": "assistant", "content": content })
                 elif (messages["type"] == "task_context"):
                     t2_reasoning = await self.conv_db.get_t2_reasoning(message_id=self.message_id)
+                    # completed_steps = await self.conv_db.get_execution_steps(message_id=self.message_id)
                     if (t2_reasoning):
+                        # prompt_content = f"**REASONING:**\n{t2_reasoning}\n\n**STEPS:** {completed_steps}"
+                        # print("PROMPT_CONTENT:::", prompt_content)
                         content = [{"type": "text", "text": t2_reasoning}]
                         model_params["messages"].append({ "role": "assistant", "content": content })
                 elif (messages["type"] == "action.init"):
@@ -1308,18 +1315,21 @@ class AutomateRequest(RequestHandler):
             if (current_reasoning):
                 previous_reasoning = await self.conv_db.get_t2_reasoning(message_id=self.message_id)
                 prompt_content = f"# PREVIOUS REASONING:\n {previous_reasoning}\n\n# CURRENT REASONING:\n {current_reasoning}\n\n# TOOL CALL:\n {self.tool_calls}"
-                print("PROMPT_CONTENT:", prompt_content)
+                # print("PROMPT_CONTENT:", prompt_content)
                 # previous_steps = await self.conv_db.get_execution_steps(message_id=self.message_id)
-                step_chunk = await litellm.acompletion(
-                    model="groq/gemma2-9b-it",
-                    temperature=1,
-                    # reasoning_effort="none",
-                    # allowed_openai_params=["reasoning_effort"],
-                    messages=[
-                        { "role": "system", "content": T5_PROMPT },
-                        { "role": "user", "content": prompt_content }
-                    ]
-                )
+                try:
+                    step_chunk = await litellm.acompletion(
+                        model="groq/gemma2-9b-it",
+                        temperature=1,
+                        # reasoning_effort="none",
+                        # allowed_openai_params=["reasoning_effort"],
+                        messages=[
+                            { "role": "system", "content": T5_PROMPT },
+                            { "role": "user", "content": prompt_content }
+                        ]
+                    )
+                except:
+                    pass
                 # DB updates
                 self.response_store["text"]["execution"].append(step_chunk.choices[0].message.content)
                 print("GENERATED STEP:::", step_chunk.choices[0].message.content)
