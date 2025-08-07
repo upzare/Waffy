@@ -345,14 +345,13 @@ const App = () => {
         });
         const t2Prompt: any[] = [];
         t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
-        t2Prompt.push({ type: "task_context" });
+        // t2Prompt.push({ type: "task_context" });
         while (!finish || functionExecState) {
             if (!responded) return false;
             responded = false;
             console.log("t2Prompt:", t2Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
             const executionModelStream = AI(conversationID.current, t2Prompt, "t2", mode, messageID.current, abortControllerRef?.current, handleError);
-            let idx = 0;
             for await (const res of executionModelStream) {
                 responded = true;
                 if (res.type === "action.call") {
@@ -382,6 +381,7 @@ const App = () => {
                     throw res.error;
                 }
             }
+            t2Prompt.length = 0;
             functionExecState = false;
             for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
                 await updateOpenedTabs();
@@ -412,22 +412,22 @@ const App = () => {
                 // });
                 // toolCallIndex = t2Prompt.length;
                 // t2Prompt.push({ type: "task_context" });
+                // t2Prompt.push({
+                //     type: "action.init",
+                //     id: toolCall.id,
+                //     name: toolCall.name,
+                //     arguments: toolCall.arguments
+                // });
                 t2Prompt.push({
-                    type: "action.init",
-                    id: toolCall.id,
-                    name: toolCall.name,
-                    arguments: toolCall.arguments
-                });
-                t2Prompt.push({
-                    type: "action",
+                    type: "action.result",
                     id: toolCall.id,
                     output: toolCallResult.message
                 });
                 if (toolName === "fetchScreen" || toolName === "getScrollPortions") {
-                    if (domContentIndex) {
-                        t2Prompt.splice(domContentIndex, 1);
-                    }
-                    domContentIndex = t2Prompt.length;
+                    // if (domContentIndex) {
+                    //     t2Prompt.splice(domContentIndex, 1);
+                    // }
+                    // domContentIndex = t2Prompt.length;
                     t2Prompt.push(toolCallResult.data);
                 }
                 functionExecState = true;
