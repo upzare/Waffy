@@ -95,7 +95,7 @@ export const click = async ({ x, y }: { x: number, y: number }) => {
             if (chrome.runtime.lastError) {
                 reject("Failed to click on coordinates");
             } else {
-                resolve("Clicked on coordinates");
+                resolve("Click initiated");
             }
         });
     }).then((res) => {

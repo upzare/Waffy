@@ -2,7 +2,6 @@ torch
 easyocr
 torchvision
 supervision==0.18.0
-openai==1.86.0
 transformers
 ultralytics==8.3.50
 azure-identity
@@ -17,8 +16,9 @@ paddlepaddle
 paddleocr
 python-dotenv
 python-multipart
-cloudinary
 fastapi
 uvicorn
 prisma
 python-socketio[client]
+supabase
+redis
