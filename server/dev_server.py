@@ -12,10 +12,8 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 import litellm
-from litellm import ModelResponseStream
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage
-from langchain_redis import RedisChatMessageHistory
 
 from instructions import RESEARCH_PROMPT, T1_PROMPT, T2_PROMPT, T3_PROMPT, T4_PROMPT, T5_PROMPT, TITLE_PROMPT, SEARCH_PROMPT, SEARCH_TOOLS
 from beta_tools import T1_TOOLS, T2_TOOLS, T3_TOOLS
@@ -43,7 +41,7 @@ config = {
     "caption_model_name": "florence2",
     "caption_model_path": "weights/icon_caption_florence",
     "device": detect_device(),
-    "BOX_TRESHOLD": 0.55,
+    "BOX_TRESHOLD": 0.25,
 }
 
 class State:
@@ -905,8 +903,7 @@ class AutomateRequest(RequestHandler):
         return base_props
     
     async def init_t2_messeges(self):
-        t2_messages = []
-        await self.redis.hset(self.key, "t2_messages", json.dumps(t2_messages))
+        await self.redis.hset(self.key, "t2_messages", json.dumps([]))
     
     async def get_t2_messeges(self):
         redis_t2_messages = await self.redis.hget(self.key, "t2_messages")
@@ -919,6 +916,7 @@ class AutomateRequest(RequestHandler):
         return t2_messages
     
     async def add_t2_messeges(self, new_messages):
+        allowed_types = ["prompt", "response", "action.init", "action.result"]
         redis_t2_messages = await self.redis.hget(self.key, "t2_messages")
         if not redis_t2_messages:
             redis_t2_messages = []
@@ -926,7 +924,7 @@ class AutomateRequest(RequestHandler):
             redis_t2_messages = redis_t2_messages.decode("utf-8")
         t2_messages = json.loads(redis_t2_messages)
         for message in new_messages:
-            if ("type" in message and message["type"] != "screenshot"):
+            if ("type" in message and message["type"] in allowed_types):
                 t2_messages.append(message)
         await self.redis.hset(self.key, "t2_messages", json.dumps(t2_messages))
         return t2_messages
@@ -964,7 +962,6 @@ class AutomateRequest(RequestHandler):
         return await asyncio.to_thread(parse)
     
     async def id_to_coords(self, id, props, devicePixelRatio):
-        # target = list(filter(lambda e: e["id"] == id, props))[0] if props else None
         target = next((e for e in props if e["id"] == id), None) if props else None
         if target:
             coords_x = (target["x"] + target["width"] / 2) / devicePixelRatio
@@ -1027,9 +1024,9 @@ class AutomateRequest(RequestHandler):
                 return
             print("MESSAGE ID:", self.message_id)
         
-        # start_params = await self.post_handler({ "type": "response.started" }, request_params)
-        # if (start_params):
-        #     yield f"data: {json.dumps(start_params)}\n\n"
+        start_params = await self.post_handler({ "type": "response.started" }, request_params)
+        if (start_params):
+            yield f"data: {json.dumps(start_params)}\n\n"
         
         model = ChatOpenAI(
             model=request_params["model"] if ("model" in request_params) else None,
@@ -1038,7 +1035,7 @@ class AutomateRequest(RequestHandler):
             reasoning_effort=request_params["reasoning_effort"] if ("reasoning_effort" in request_params) else None,
             streaming=True,
             api_key=os.environ.get("OPENAI_API_KEY"),
-        ).bind_tools(request_params["tools"])
+        ).bind_tools(request_params["tools"], parallel_tool_calls=False)
 
         response = model.astream(request_params["messages"])
         async for chunk in response:
@@ -1105,40 +1102,27 @@ class AutomateRequest(RequestHandler):
         if (mode == "t1"):
             model_params = {
                 "model": "gpt-5",
-                # "model": "groq/llama-3.3-70b-versatile",
-                # "model": "openrouter/horizon-beta",
                 "tools": T1_TOOLS,
                 "reasoning_effort": "minimal",
-                # "temperature": 0.5,
                 "messages": [SystemMessage(content=T1_PROMPT)]
             }
         elif (mode == "t2"):
             model_params = {
                 "model": "gpt-5",
-                # "model": "anthropic/claude-sonnet-4-20250514",
-                # "model": "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
-                # "model": "openrouter/moonshotai/kimi-vl-a3b-thinking:free",
-                # "model": "openrouter/horizon-beta",
                 "tools": T2_TOOLS,
-                "reasoning_effort": "medium",
-                # "temperature": 1,
-                # "top_p": 0.7,
+                "reasoning_effort": "low",
                 "messages": [SystemMessage(content=T2_PROMPT)]
             }
         elif (mode == "t3"):
             model_params = {
-                "model": "gpt-5-mini",
-                # "model": "openrouter/horizon-beta",
+                "model": "gpt-5",
                 "tools": T3_TOOLS,
                 "reasoning_effort": "minimal",
-                # "temperature": 0.1,
                 "messages": [SystemMessage(content=T3_PROMPT)]
             }
         elif (mode == "t4"):
             model_params = {
-                "model": "gpt-5-nano",
-                # "model": "openrouter/horizon-beta",
-                # "temperature": 1,
+                "model": "gpt-5-mini",
                 "reasoning_effort": "minimal",
                 "tools": [],
                 "messages": [SystemMessage(content=T4_PROMPT)]
@@ -1233,7 +1217,8 @@ class AutomateRequest(RequestHandler):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": image
+                            "url": image,
+                            "detail": "high"
                         }
                     }
                 ]))
@@ -1317,12 +1302,6 @@ class AutomateRequest(RequestHandler):
                                     toolArgs["x"] = coords["x"]
                                     toolArgs["y"] = coords["y"]
                                     self.tool_calls[idx]["arguments"] = json.dumps(toolArgs)
-                                    # chunk_dict["item"]["arguments"] = json.dumps({
-                                    #     "x": coords["x"],
-                                    #     "y": coords["y"],
-                                    #     **toolArgs
-                                    # })
-                                    # return chunk_dict
                             elif ("portionId" in toolArgs):
                                 portion_id = toolArgs["portionId"]
                                 client_props = await self.get_client_props()
@@ -1334,24 +1313,14 @@ class AutomateRequest(RequestHandler):
                                     toolArgs["x"] = coords["x"]
                                     toolArgs["y"] = coords["y"]
                                     self.tool_calls[idx]["arguments"] = json.dumps(toolArgs)
-                                    # chunk_dict["item"]["arguments"] = json.dumps({
-                                    #     "x": coords["x"],
-                                    #     "y": coords["y"],
-                                    #     **toolArgs
-                                    # })
-                                    # return chunk_dict
                     current_reasoning = self.response_store["t2_reasoning"]
                     if (current_reasoning):
                         previous_reasoning = await self.conv_db.get_t2_reasoning(message_id=self.message_id)
                         prompt_content = f"# PREVIOUS REASONING:\n {previous_reasoning}\n\n# CURRENT REASONING:\n {current_reasoning}\n\n# TOOL CALL:\n {self.tool_calls}"
-                        # print("PROMPT_CONTENT:", prompt_content)
                         # previous_steps = await self.conv_db.get_execution_steps(message_id=self.message_id)
                         try:
                             step_chunk = await litellm.acompletion(
-                                model="groq/openai/gpt-oss-20b",
-                                temperature=1,
-                                # reasoning_effort="none",
-                                # allowed_openai_params=["reasoning_effort"],
+                                model="groq/openai/gpt-oss-120b",
                                 messages=[
                                     { "role": "system", "content": T5_PROMPT },
                                     { "role": "user", "content": prompt_content }
@@ -1363,8 +1332,6 @@ class AutomateRequest(RequestHandler):
                         self.response_store["text"]["execution"].append(step_chunk.choices[0].message.content)
                         print("GENERATED STEP:::", step_chunk.choices[0].message.content)
                         self.stream_text = step_chunk.choices[0].message.content
-                        # chunk_dict["step"] = step_chunk.choices[0].message.content
-                        # await super().async_update_usage(step_chunk["usage"])
                 response_type = "action.call"
             
             if (finish_reason == "stop"):
@@ -1387,22 +1354,11 @@ class AutomateRequest(RequestHandler):
                 post_params["type"] = "text.stream"
                 post_params["id"] = self.response_id
                 post_params["text"] = self.stream_text
-        # elif (response["type"] == "response.content_part.done"): # text.done
-        #     post_params["type"] = "text.done"
-        #     post_params["id"] = self.response_id
         elif (response_type == "action.call"): # action.call
             post_params["type"] = "action.call"
             post_params["id"] = self.response_id
             post_params["action"] = self.tool_calls
             if (self.stream_text): post_params["step"] = self.stream_text
-        # elif (response["type"] == "error"): # response.error
-        #     post_params["type"] = "response.error"
-        #     post_params["id"] = self.response_id
-        #     post_params["error"] = response["message"]
-        elif (response_type == "step.generation"): # response.completed (step generation)
-            post_params["type"] = "step.generation"
-            post_params["id"] = self.response_id
-            post_params["text"] = self.stream_text
         elif (response_type == "response.completed"): # response.completed
             post_params["type"] = "response.completed"
             post_params["id"] = self.response_id
