@@ -384,6 +384,7 @@ const App = () => {
                     id: toolCall.id,
                     output: toolCallResult.message
                 });
+                if (toolCallResult.status != "success") throw new Error("Action failed");
                 if (toolName === "fetchScreen" || toolName === "getScrollPortions") {
                     t2Prompt.push(toolCallResult.data);
                 }
