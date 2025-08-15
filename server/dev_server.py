@@ -1386,28 +1386,6 @@ class AutomateRequest(RequestHandler):
         
         return post_params
 
-# class AutomateClientResponseOutputFunctionCall(BaseModel):
-#     id: str
-#     type: str
-#     name: str
-#     arguments: str
-#     call_id: str
-#     status: str
-
-# class AutomateClientResponseOutputText(BaseModel):
-#     id: str
-#     type: str
-#     text: str
-
-# class AutomateClientResponseOutput(BaseModel):
-#     id: str
-#     type: str
-#     item: AutomateClientResponseOutputFunctionCall | AutomateClientResponseOutputText
-
-# class AutomateClientResponse(BaseModel):
-#     type: str # "response.start" or "text.stream" or "text.done" or "action.call" or "response.error" or "response.completed"
-#     data: list[AutomateClientResponseOutput]
-
 @model.post("/start")
 async def start_endpoint(key: Annotated[str, Depends(validate_token)], request: Request, client: StartClient):
     # try:
