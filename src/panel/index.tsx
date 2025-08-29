@@ -277,14 +277,11 @@ const App = () => {
         const responseStream = AI(conversationID.current, t1Prompt, "t1", mode, messageID.current, abortControllerRef?.current, handleError);
         let response = "";
         const toolCalls: Record<string, ToolCall> = {};
-        let idx = 0;
         for await (const res of responseStream) {
             if (res.type === "action.call") {
                 for (const [key, value] of Object.entries(res.action)) {
                     toolCalls[key] = value as ToolCall;
                 }
-                // toolCalls[idx] = res.action as ToolCall;
-                // idx++;
             }
             if (res.type === "text.stream") {
                 response += res.text;
@@ -335,8 +332,6 @@ const App = () => {
         let responded = true;
         let finish = false;
         let functionExecState = false;
-        let domContentIndex;
-        let toolCallIndex;
         let executionResponse: ExecutionStep[] = [{ id: 0, text: "Initializing", executing: true }];
         setMessages(prev => {
             const update = prev.map(msg => msg.id === `assistant-${messageId}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
@@ -345,25 +340,19 @@ const App = () => {
         });
         const t2Prompt: any[] = [];
         t2Prompt.push({ type: "prompt", content: [{ type: "text", text: task }, ...prompt_files] });
-        t2Prompt.push({ type: "task_context" });
         while (!finish || functionExecState) {
             if (!responded) return false;
             responded = false;
             console.log("t2Prompt:", t2Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
             const executionModelStream = AI(conversationID.current, t2Prompt, "t2", mode, messageID.current, abortControllerRef?.current, handleError);
-            let idx = 0;
             for await (const res of executionModelStream) {
                 responded = true;
                 if (res.type === "action.call") {
                     for (const [key, value] of Object.entries(res.action)) {
                         executionToolCalls[key] = value as ToolCall;
                     }
-                    // executionToolCalls[idx] = res.action as ToolCall;
-                    // idx++;
                     console.log("ToolCall:", executionToolCalls);
-                    // }
-                    // if (res.type === "step.generation") {
                     if (res.step) {
                         if (executionResponse.length > 0) executionResponse[executionResponse.length - 1].executing = false;
                         executionResponse.push({ id: executionResponse.length, text: res.step, executing: true });
@@ -382,6 +371,7 @@ const App = () => {
                     throw res.error;
                 }
             }
+            t2Prompt.length = 0;
             functionExecState = false;
             for await (const [index, toolCall] of Object.entries(executionToolCalls)) {
                 await updateOpenedTabs();
@@ -389,45 +379,13 @@ const App = () => {
                 const toolArgs = JSON.parse(toolCall.arguments);
                 const toolCallResult = await availableFunctions[toolName](toolArgs);
                 console.log("tsresult", toolCallResult)
-                // t2Prompt.push(toolCall);
-                // t2Prompt.push({
-                //     type: "function_call_output",
-                //     call_id: toolCall.call_id,
-                //     output: toolCallResult.message
-                // });
-                // if (toolCallIndex) {
-                    // t2Prompt.splice(toolCallIndex, 1);
-                    // if (domContentIndex) {
-                        // t2Prompt.splice(domContentIndex - 1, 1);
-                        // domContentIndex = domContentIndex - 1;
-                    // }
-                // }
-                // t2Prompt.map(msg => {
-                //     if (msg.type === "task_context") {
-                //         t2Prompt.splice(t2Prompt.indexOf(msg), 1)
-                //         t2Prompt.push({ type: "task_context" });
-                //     } else if (msg.type === "screenshot") {
-                //         t2Prompt.splice(t2Prompt.indexOf(msg), 1)
-                //     }
-                // });
-                // toolCallIndex = t2Prompt.length;
-                // t2Prompt.push({ type: "task_context" });
                 t2Prompt.push({
-                    type: "action.init",
-                    id: toolCall.id,
-                    name: toolCall.name,
-                    arguments: toolCall.arguments
-                });
-                t2Prompt.push({
-                    type: "action",
+                    type: "action.result",
                     id: toolCall.id,
                     output: toolCallResult.message
                 });
+                if (toolCallResult.status != "success") throw new Error("Action failed");
                 if (toolName === "fetchScreen" || toolName === "getScrollPortions") {
-                    if (domContentIndex) {
-                        t2Prompt.splice(domContentIndex, 1);
-                    }
-                    domContentIndex = t2Prompt.length;
                     t2Prompt.push(toolCallResult.data);
                 }
                 functionExecState = true;
@@ -459,14 +417,11 @@ const App = () => {
         const summaryModelStream = AI(conversationID.current, t3Prompt, "t3", mode, messageID.current, abortControllerRef?.current, handleError);
         const toolCalls: Record<string, ToolCall> = {};
         let validationResponse = "";
-        let idx = 0;
         for await (const res of summaryModelStream) {
             if (res.type === "action.call") {
                 for (const [key, value] of Object.entries(res.action)) {
                     toolCalls[key] = value as ToolCall;
                 }
-                // toolCalls[idx] = res.action as ToolCall;
-                // idx++;
             }
             if (res.type === "text.stream") {
                 validationResponse += res.text;
