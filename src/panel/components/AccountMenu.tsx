@@ -8,17 +8,17 @@ interface AccountMenuProps {
 }
 
 const AccountMenu: React.FC<AccountMenuProps> = ({ isOpen, onClose, accountMenuRef }) => {
-    const user = {
-        name: "John Doe",
-        email: "john.doe@example.com",
-        avatar: null,
-        plan: "free",
-        credits: {
-            used: 350,
-            total: 500,
-            percentage: 70,
-        },
-    };
+    // const user = {
+    //     name: "John Doe",
+    //     email: "john.doe@example.com",
+    //     avatar: null,
+    //     plan: "free",
+    //     credits: {
+    //         used: 350,
+    //         total: 500,
+    //         percentage: 70,
+    //     },
+    // };
 
     if (!isOpen) return null;
 
@@ -33,7 +33,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ isOpen, onClose, accountMenuR
     return (
         <div className={styles.accountMenu} ref={accountMenuRef}>
             <div className={styles.accountMenuHeader}>
-                <div className={styles.accountAvatarLarge}>
+                {/* <div className={styles.accountAvatarLarge}>
                     {user.avatar ? (
                         <img src={user.avatar || "/placeholder.svg"} alt={user.name} />
                     ) : (
@@ -41,14 +41,15 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ isOpen, onClose, accountMenuR
                             <User size={24} />
                         </div>
                     )}
-                </div>
+                </div> */}
                 <div className={styles.accountMenuUserInfo}>
-                    <div className={styles.accountMenuName}>{user.name}</div>
-                    <div className={styles.accountMenuEmail}>{user.email}</div>
+                    <div className={styles.accountMenuName}>Research Preview</div>
+                    {/* <div className={styles.accountMenuName}>{user.name}</div>
+                    <div className={styles.accountMenuEmail}>{user.email}</div> */}
                 </div>
             </div>
 
-            <div className={styles.accountMenuCredits}>
+            {/* <div className={styles.accountMenuCredits}>
                 <div className={styles.creditsHeader}>
                     <span>Credits Usage</span>
                     <span className={styles.creditsCount}>
@@ -67,7 +68,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ isOpen, onClose, accountMenuR
                     </div>
                     <div>{user.credits.total - user.credits.used} credits remaining this month</div>
                 </div>
-            </div>
+            </div> */}
 
             <div className={styles.accountMenuActions}>
                 <button className={styles.accountMenuAction} onClick={() => handleNavigation("/settings/account")}>
