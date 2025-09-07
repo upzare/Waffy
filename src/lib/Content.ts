@@ -19,51 +19,51 @@ async function initOverlay() {
             z-index: 2147483647;
             border: 0px solid transparent;
             box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
-                        inset 0 0 120px rgba(0, 255, 255, 0.3),
-                        inset 0 0 180px rgba(0, 255, 255, 0.2);
+                        inset 0 0 100px rgba(0, 255, 255, 0.3),
+                        inset 0 0 150px rgba(0, 255, 255, 0.2);
             animation: waffyOverlayAnim 4s ease-in-out infinite;
         }
         
         @keyframes waffyOverlayAnim {
             0% {
                 box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
-                            inset 0 0 120px rgba(0, 255, 255, 0.3),
-                            inset 0 0 180px rgba(0, 255, 255, 0.2);
+                            inset 0 0 100px rgba(0, 255, 255, 0.3),
+                            inset 0 0 150px rgba(0, 255, 255, 0.2);
             }
             14% {
                 box-shadow: inset 0 0 70px rgba(0, 255, 200, 0.5),
-                            inset 0 0 140px rgba(0, 255, 200, 0.35),
-                            inset 0 0 210px rgba(0, 255, 200, 0.25);
+                            inset 0 0 110px rgba(0, 255, 200, 0.35),
+                            inset 0 0 140px rgba(0, 255, 200, 0.25);
             }
             28% {
-                box-shadow: inset 0 0 80px rgba(0, 255, 127, 0.55),
-                            inset 0 0 160px rgba(0, 255, 127, 0.4),
-                            inset 0 0 200px rgba(0, 255, 127, 0.3);
+                box-shadow: inset 0 0 80px rgba(0, 255, 127, 0.5),
+                            inset 0 0 120px rgba(0, 255, 127, 0.4),
+                            inset 0 0 140px rgba(0, 255, 127, 0.3);
             }
             42% {
-                box-shadow: inset 0 0 75px rgba(144, 238, 144, 0.52),
-                            inset 0 0 150px rgba(144, 238, 144, 0.38),
-                            inset 0 0 195px rgba(144, 238, 144, 0.28);
+                box-shadow: inset 0 0 75px rgba(144, 238, 144, 0.5),
+                            inset 0 0 105px rgba(144, 238, 144, 0.38),
+                            inset 0 0 145px rgba(144, 238, 144, 0.28);
             }
             56% {
                 box-shadow: inset 0 0 70px rgba(173, 216, 230, 0.48),
-                            inset 0 0 140px rgba(173, 216, 230, 0.34),
-                            inset 0 0 210px rgba(173, 216, 230, 0.24);
+                            inset 0 0 100px rgba(173, 216, 230, 0.34),
+                            inset 0 0 140px rgba(173, 216, 230, 0.24);
             }
             70% {
                 box-shadow: inset 0 0 75px rgba(221, 160, 221, 0.5),
-                            inset 0 0 150px rgba(221, 160, 221, 0.36),
-                            inset 0 0 225px rgba(221, 160, 221, 0.26);
+                            inset 0 0 105px rgba(221, 160, 221, 0.36),
+                            inset 0 0 150px rgba(221, 160, 221, 0.26);
             }
             84% {
                 box-shadow: inset 0 0 65px rgba(175, 238, 238, 0.46),
-                            inset 0 0 130px rgba(175, 238, 238, 0.32),
-                            inset 0 0 195px rgba(175, 238, 238, 0.22);
+                            inset 0 0 95px rgba(175, 238, 238, 0.32),
+                            inset 0 0 135px rgba(175, 238, 238, 0.22);
             }
             100% {
                 box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
-                            inset 0 0 120px rgba(0, 255, 255, 0.3),
-                            inset 0 0 180px rgba(0, 255, 255, 0.2);
+                            inset 0 0 100px rgba(0, 255, 255, 0.3),
+                            inset 0 0 150px rgba(0, 255, 255, 0.2);
             }
         }
     `;

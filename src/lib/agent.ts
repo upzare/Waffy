@@ -1,10 +1,12 @@
 import { getLocalStorage } from './client';
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 
+const API_URL = process.env.NODE_ENV === "production" ? "https://waffy-preview-api.upzare.com/inference" : "http://localhost:4000/inference";
+
 export async function createConversation(conversationID: string | null) {
     try {
         const localStorage: Record<string, any> = await getLocalStorage();
-        const response = await fetch("http://localhost:4000/inference/start", {
+        const response = await fetch(`${API_URL}/start`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${localStorage.data.waffyAPI}`,
@@ -32,7 +34,7 @@ export async function createConversation(conversationID: string | null) {
 export async function createTitle(conversationID: string | null, prompt: string) {
     try {
         const localStorage: Record<string, any> = await getLocalStorage();
-        const response = await fetch("http://localhost:4000/inference/meta", {
+        const response = await fetch(`${API_URL}/meta`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${localStorage.data.waffyAPI}`,
@@ -99,7 +101,7 @@ export async function* AI(conversationID: string | null, messages: any[], handle
         });
     }
 
-    fetchEventSource(`http://localhost:4000/inference/${mode}`, {
+    fetchEventSource(`${API_URL}/${mode}`, {
         method: "POST",
         headers: {
             "Authorization": `Bearer ${localStorage.data.waffyAPI}`,

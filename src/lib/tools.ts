@@ -65,7 +65,7 @@ export const fetchScreen = async () => {
                 pixelRatio: devicePixelRatio,
                 loading_status: tab.status
             }
-            chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "png" }, (response?: { data?: string }) => {
+            chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "jpeg", quality: 35, fromSurface: true }, (response?: { data?: string }) => {
                 if (chrome.runtime.lastError) {
                     reject("Failed to capture DOM image");
                     return;
@@ -445,11 +445,13 @@ export const getScrollPortions = async () => {
                 pixelRatio: devicePixelRatio,
                 loading_status: tab.status
             }
-            chrome.tabs.captureVisibleTab({ format: "png" }).then((dataUrl) => {
-                const base64Image = dataUrl.split(',')[1];
+            chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "jpeg", quality: 25, fromSurface: true }, (response?: { data?: string }) => {
+                if (chrome.runtime.lastError) {
+                    reject("Failed to capture DOM image");
+                    return;
+                }
+                const base64Image = response?.data;
                 resolve({ meta, base64Image });
-            }).catch((error) => {
-                reject("Failed to capture DOM image");
             });
         });
     }).then((data) => {
