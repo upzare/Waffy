@@ -2,10 +2,11 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+  justify-content: center;
 }
 
 .button {
-  padding: 0.4rem 0.5rem;
+  padding: 0.4rem 0.8rem;
   border-radius: 9999px;
   border: 2px solid;
   font-size: 0.6rem;

@@ -4,7 +4,7 @@ import { Copy, File, Repeat } from "lucide-react";
 import type { ChatContainerProps, FileFormat } from "../../types";
 import styles from "css/panel/ChatContainer.module.css";
 
-const ChatContainer: React.FC<ChatContainerProps> = ({ messages, isGenerating, statusText }) => {
+const ChatContainer: React.FC<ChatContainerProps> = ({ hidden, messages, isGenerating, statusText }) => {
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     const handleFileClick = async (file: FileFormat) => {
@@ -19,7 +19,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ messages, isGenerating, s
     }, [messages]);
 
     return (
-        <div className={styles.chatContainer} ref={chatContainerRef} style={{ paddingTop: isGenerating ? 0 : "1rem" }}>
+        <div className={`${styles.chatContainer} ${hidden ? styles.hidden : ""}`} ref={chatContainerRef} style={{ paddingTop: hidden || isGenerating ? 0 : "1rem" }}>
             {isGenerating && (
                 <div className={styles.statusBar}>
                     <div className={styles.statusIcon}></div>

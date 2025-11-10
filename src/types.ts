@@ -28,6 +28,7 @@ export interface SuggestedPromptProps {
 }
 
 export interface ChatContainerProps {
+    hidden: boolean;
     messages: Message[];
     isGenerating: boolean;
     statusText: string;

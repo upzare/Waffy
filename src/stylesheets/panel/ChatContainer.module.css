@@ -69,6 +69,14 @@
     z-index: 1;
 }
 
+.chat-container.hidden {
+    max-height: 0;
+    max-width: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0rem 0rem;
+}
+
 .message {
     display: flex;
     gap: 1rem;

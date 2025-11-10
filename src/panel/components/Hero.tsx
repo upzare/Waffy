@@ -6,8 +6,8 @@ import styles from "css/panel/Hero.module.css";
 const Hero: React.FC<HeroProps> = ({ hidden, onPromptClick }) => {
     const suggestedPrompts = [
         "What is in my screen",
-        "Book me a flight to Kochi",
-        "Summarize this page contents",
+        "Look for latest news on AI",
+        "Summarize this page contents"
     ];
 
     return (

@@ -27,7 +27,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
     const microphoneIconRef = useRef<HTMLButtonElement>(null);
     const sendIconRef = useRef<HTMLButtonElement>(null);
 
-    const MODES = ["search", "research", "automate", "cloud"];
+    const MODES = ["auto", "search", "research", "automate"];
     const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
     const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
 

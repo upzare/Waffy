@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { AI, createConversation, createTitle } from '@/lib/agent';
-import { socket } from '@/lib/socket';
+// import { socket } from '@/lib/socket';
 import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
@@ -27,7 +27,7 @@ const App = () => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [statusText, setStatusText] = useState("");
     const [message, setMessage] = useState("");
-    const [mode, setMode] = useState("search");
+    const [mode, setMode] = useState("auto");
     const [showModeSelection, setShowModeSelection] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [isRecording, setIsRecording] = useState(false);
@@ -43,7 +43,7 @@ const App = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const abortControllerRef = useRef<AbortController>(null);
 
-    const [isConnected, setIsConnected] = useState(socket.connected);
+    // const [isConnected, setIsConnected] = useState(socket.connected);
 
     const db = useRef<IDBDatabase>(null);
     const db_request = useRef<IDBOpenDBRequest>(null);
@@ -53,7 +53,7 @@ const App = () => {
     useEffect(() => {
         initSigned();
         initDB();
-        initSocket();
+        // initSocket();
         fetchConversations();
         Mousetrap.bind("ctrl+space", () => { speechRecognition() });
 
@@ -73,7 +73,7 @@ const App = () => {
         document.addEventListener("mousemove", handleMouseMove);
         return () => {
             document.removeEventListener("mousemove", handleMouseMove);
-            deinitSocket();
+            // deinitSocket();
         }
     }, []);
 
@@ -136,23 +136,23 @@ const App = () => {
         fetchConversations();
     }
 
-    const initSocket = () => {
-        socket.on("connect", socketOnConnect);
-        socket.on("disconnect", socketOnDisconnect);
-    }
+    // const initSocket = () => {
+    //     socket.on("connect", socketOnConnect);
+    //     socket.on("disconnect", socketOnDisconnect);
+    // }
 
-    const deinitSocket = () => {
-        socket.off("connect", socketOnConnect);
-        socket.off("disconnect", socketOnDisconnect);
-    }
+    // const deinitSocket = () => {
+    //     socket.off("connect", socketOnConnect);
+    //     socket.off("disconnect", socketOnDisconnect);
+    // }
 
-    const socketOnConnect = () => {
-        setIsConnected(true);
-    }
+    // const socketOnConnect = () => {
+    //     setIsConnected(true);
+    // }
 
-    const socketOnDisconnect = () => {
-        setIsConnected(false);
-    }
+    // const socketOnDisconnect = () => {
+    //     setIsConnected(false);
+    // }
 
     const generateTitle = async (prompt: string) => {
         const title = await createTitle(conversationID.current, prompt);
@@ -384,7 +384,7 @@ const App = () => {
                     id: toolCall.id,
                     output: toolCallResult.message
                 });
-                if (toolCallResult.status != "success") throw new Error("Action failed");
+                // if (toolCallResult.status != "success") throw new Error("Action failed");
                 if (toolName === "fetchScreen" || toolName === "getScrollPortions") {
                     t2Prompt.push(toolCallResult.data);
                 }
@@ -688,7 +688,12 @@ const App = () => {
                     hidden={isChat}
                     onPromptClick={handleNewChat}
                 />
-                <ChatContainer messages={messages} isGenerating={isGenerating} statusText={statusText} />
+                <ChatContainer
+                    hidden={!isChat}
+                    messages={messages}
+                    isGenerating={isGenerating}
+                    statusText={statusText}
+                />
                 <InputContainer
                     isGenerating={isGenerating}
                     isRecording={isRecording}
