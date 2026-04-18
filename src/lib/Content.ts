@@ -18,52 +18,52 @@ async function initOverlay() {
             pointer-events: none;
             z-index: 2147483647;
             border: 0px solid transparent;
-            box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
-                        inset 0 0 100px rgba(0, 255, 255, 0.3),
-                        inset 0 0 150px rgba(0, 255, 255, 0.2);
+            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.4),
+                        inset 0 0 35px rgba(0, 255, 255, 0.3),
+                        inset 0 0 50px rgba(0, 255, 255, 0.2);
             animation: waffyOverlayAnim 4s ease-in-out infinite;
         }
         
         @keyframes waffyOverlayAnim {
             0% {
-                box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
-                            inset 0 0 100px rgba(0, 255, 255, 0.3),
-                            inset 0 0 150px rgba(0, 255, 255, 0.2);
+                box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.4),
+                            inset 0 0 35px rgba(0, 255, 255, 0.3),
+                            inset 0 0 50px rgba(0, 255, 255, 0.2);
             }
             14% {
-                box-shadow: inset 0 0 70px rgba(0, 255, 200, 0.5),
-                            inset 0 0 110px rgba(0, 255, 200, 0.35),
-                            inset 0 0 140px rgba(0, 255, 200, 0.25);
+                box-shadow: inset 0 0 24px rgba(0, 255, 200, 0.5),
+                            inset 0 0 36px rgba(0, 255, 200, 0.35),
+                            inset 0 0 46px rgba(0, 255, 200, 0.25);
             }
             28% {
-                box-shadow: inset 0 0 80px rgba(0, 255, 127, 0.5),
-                            inset 0 0 120px rgba(0, 255, 127, 0.4),
-                            inset 0 0 140px rgba(0, 255, 127, 0.3);
+                box-shadow: inset 0 0 26px rgba(0, 255, 127, 0.5),
+                            inset 0 0 40px rgba(0, 255, 127, 0.4),
+                            inset 0 0 46px rgba(0, 255, 127, 0.3);
             }
             42% {
-                box-shadow: inset 0 0 75px rgba(144, 238, 144, 0.5),
-                            inset 0 0 105px rgba(144, 238, 144, 0.38),
-                            inset 0 0 145px rgba(144, 238, 144, 0.28);
+                box-shadow: inset 0 0 25px rgba(144, 238, 144, 0.5),
+                            inset 0 0 35px rgba(144, 238, 144, 0.38),
+                            inset 0 0 48px rgba(144, 238, 144, 0.28);
             }
             56% {
-                box-shadow: inset 0 0 70px rgba(173, 216, 230, 0.48),
-                            inset 0 0 100px rgba(173, 216, 230, 0.34),
-                            inset 0 0 140px rgba(173, 216, 230, 0.24);
+                box-shadow: inset 0 0 24px rgba(173, 216, 230, 0.48),
+                            inset 0 0 34px rgba(173, 216, 230, 0.34),
+                            inset 0 0 46px rgba(173, 216, 230, 0.24);
             }
             70% {
-                box-shadow: inset 0 0 75px rgba(221, 160, 221, 0.5),
-                            inset 0 0 105px rgba(221, 160, 221, 0.36),
-                            inset 0 0 150px rgba(221, 160, 221, 0.26);
+                box-shadow: inset 0 0 25px rgba(221, 160, 221, 0.5),
+                            inset 0 0 35px rgba(221, 160, 221, 0.36),
+                            inset 0 0 50px rgba(221, 160, 221, 0.26);
             }
             84% {
-                box-shadow: inset 0 0 65px rgba(175, 238, 238, 0.46),
-                            inset 0 0 95px rgba(175, 238, 238, 0.32),
-                            inset 0 0 135px rgba(175, 238, 238, 0.22);
+                box-shadow: inset 0 0 22px rgba(175, 238, 238, 0.46),
+                            inset 0 0 32px rgba(175, 238, 238, 0.32),
+                            inset 0 0 45px rgba(175, 238, 238, 0.22);
             }
             100% {
-                box-shadow: inset 0 0 60px rgba(0, 255, 255, 0.4),
-                            inset 0 0 100px rgba(0, 255, 255, 0.3),
-                            inset 0 0 150px rgba(0, 255, 255, 0.2);
+                box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.4),
+                            inset 0 0 35px rgba(0, 255, 255, 0.3),
+                            inset 0 0 50px rgba(0, 255, 255, 0.2);
             }
         }
     `;
