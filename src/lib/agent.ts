@@ -58,7 +58,7 @@ export async function createTitle(conversationID: string | null, prompt: string)
     }
 }
 
-export async function* AI(conversationID: string | null, messages: any[], handler: string, mode: string, messageID: string | null, abortController: AbortController | null, handleError: () => void):
+export async function* AI(conversationID: string | null, messages: any[], handler: string, messageID: string | null, abortController: AbortController | null, handleError: () => void):
     AsyncGenerator<any> {
     const localStorage: Record<string, any> = await getLocalStorage();
 
@@ -101,7 +101,7 @@ export async function* AI(conversationID: string | null, messages: any[], handle
         });
     }
 
-    fetchEventSource(`${API_URL}/${mode}`, {
+    fetchEventSource(`${API_URL}/stream`, {
         method: "POST",
         headers: {
             "Authorization": `Bearer ${localStorage.data.waffyAPI}`,

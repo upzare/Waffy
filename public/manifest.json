@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "description": "Waffy is a chrome extension designed to enhance your browsing experience.",
   "icons": {
-    "64": "assets/icons/logo64.png",
-    "128": "assets/icons/logo128.png",
-    "256": "assets/icons/logo256.png"
+    "64": "assets/icons/icon64.png",
+    "128": "assets/icons/icon128.png",
+    "256": "assets/icons/icon256.png"
   },
   "action": {
     "default_title": "Open Waffy"

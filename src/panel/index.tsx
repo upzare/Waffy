@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { AI, createConversation, createTitle } from '@/lib/agent';
-// import { socket } from '@/lib/socket';
 import WelcomePage from './components/WelcomePage';
 import Header from './components/Header';
 import ChatContainer from './components/ChatContainer';
@@ -27,8 +26,6 @@ const App = () => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [statusText, setStatusText] = useState("");
     const [message, setMessage] = useState("");
-    const [mode, setMode] = useState("auto");
-    const [showModeSelection, setShowModeSelection] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [isRecorded, setIsRecorded] = useState(false);
@@ -83,10 +80,6 @@ const App = () => {
             setIsRecorded(false);
         }
     }, [message]);
-
-    useEffect(() => {
-        setShowModeSelection(isFirstMessage);
-    }, [isFirstMessage]);
 
     const speechRecognition = async () => {
         setIsRecording(true);
@@ -274,7 +267,7 @@ const App = () => {
         const handleError = () => raiseError(messageId);
         const t1Prompt = [];
         t1Prompt.push({ type: "prompt", content: [{ type: "text", text: prompt_text }, ...prompt_files] });
-        const responseStream = AI(conversationID.current, t1Prompt, "t1", mode, messageID.current, abortControllerRef?.current, handleError);
+        const responseStream = AI(conversationID.current, t1Prompt, "t1", messageID.current, abortControllerRef?.current, handleError);
         let response = "";
         const toolCalls: Record<string, ToolCall> = {};
         for await (const res of responseStream) {
@@ -345,7 +338,7 @@ const App = () => {
             responded = false;
             console.log("t2Prompt:", t2Prompt);
             const executionToolCalls: Record<string, ToolCall> = {};
-            const executionModelStream = AI(conversationID.current, t2Prompt, "t2", mode, messageID.current, abortControllerRef?.current, handleError);
+            const executionModelStream = AI(conversationID.current, t2Prompt, "t2", messageID.current, abortControllerRef?.current, handleError);
             for await (const res of executionModelStream) {
                 responded = true;
                 if (res.type === "action.call") {
@@ -414,7 +407,7 @@ const App = () => {
         setStatusText("VALIDATING");
         const handleError = () => raiseError(messageId);
         const t3Prompt = [{ type: "prompt", content: [{ type: "text", text: task }] }];
-        const summaryModelStream = AI(conversationID.current, t3Prompt, "t3", mode, messageID.current, abortControllerRef?.current, handleError);
+        const summaryModelStream = AI(conversationID.current, t3Prompt, "t3", messageID.current, abortControllerRef?.current, handleError);
         const toolCalls: Record<string, ToolCall> = {};
         let validationResponse = "";
         for await (const res of summaryModelStream) {
@@ -477,7 +470,7 @@ const App = () => {
         setStatusText("FINALIZING");
         const handleError = () => raiseError(messageId);
         const t4Prompt = [{ type: "prompt", content: [{ type: "text", text: task }] }];
-        const summaryModelStream = AI(conversationID.current, t4Prompt, "t4", mode, messageID.current, abortControllerRef?.current, handleError);
+        const summaryModelStream = AI(conversationID.current, t4Prompt, "t4", messageID.current, abortControllerRef?.current, handleError);
         let summary = "";
         for await (const res of summaryModelStream) {
             if (res.type === "text.stream") {
@@ -701,11 +694,8 @@ const App = () => {
                     fileInputRef={fileInputRef as any}
                     message={message}
                     files={files}
-                    mode={mode}
-                    showModeSelection={showModeSelection}
                     setMessage={setMessage}
                     setFiles={setFiles}
-                    setMode={setMode}
                     onSpeechRecognition={speechRecognition}
                     onSendMessage={handleSendMessage}
                     onStopGeneration={handleStopGeneration}

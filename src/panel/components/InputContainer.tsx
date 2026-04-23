@@ -12,11 +12,8 @@ const InputContainer: React.FC<InputContainerProps> = ({
     fileInputRef,
     message,
     files,
-    mode,
-    showModeSelection,
     setMessage,
     setFiles,
-    setMode,
     onSpeechRecognition,
     onSendMessage,
     onStopGeneration,
@@ -90,14 +87,8 @@ const InputContainer: React.FC<InputContainerProps> = ({
         chrome.runtime.openOptionsPage();
     }
 
-    const handleModeChange = (mode: string) => {
-        setMode(mode);
-        textareaRef.current?.focus();
-    }
-
     return (
         <div className={styles.inputContainer}>
-            {showModeSelection && <ModeSelection modes={MODES} current_mode={mode} onModeChange={handleModeChange} />}
             <div className={styles.inputBox}>
                 <div className={styles.inputOptionsContainer} ref={optionsMenuRef}>
                     <button className={styles.optionsButton} onClick={toggleOptionsMenu} title="Options">
