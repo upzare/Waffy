@@ -2,18 +2,69 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import toast, { Toaster } from 'react-hot-toast';
 import Browser from 'webextension-polyfill';
-import type { Settings } from '../types';
+import { Settings as SettingsIcon, CreditCard, Activity, User, Info } from 'lucide-react';
+import type { Settings as SettingsType } from '../types';
+import styles from 'css/settings/Settings.module.css';
+
+import GeneralSection from './components/GeneralSection';
+import AccountSection from './components/AccountSection';
+import BillingSection from './components/BillingSection';
+import UsageSection from './components/UsageSection';
+import AboutSection from './components/AboutSection';
 
 const sections = [
-    { id: "general", label: "General", icon: "" },
+    { id: "general", label: "General", description: "Manage your core extension preferences and configurations.", icon: SettingsIcon },
+    { id: "account", label: "Account", description: "View your account information fetched from the server.", icon: User },
+    { id: "billing", label: "Billing & Payments", description: "Manage your credits, payment methods, and billing history.", icon: CreditCard },
+    { id: "usage", label: "Usage", description: "Monitor your API usage and limits over time.", icon: Activity },
+    { id: "about", label: "About", description: "Information about Waffy and its creators.", icon: Info },
+];
+
+const mockServerData = {
+    client_id: "client_9a8b7c6d5e4f3g2h",
+    trace_user_id: "usr_trace_12345",
+    account_id: "acc_987654321",
+    name: "John Doe",
+    email: "john.doe@example.com",
+    available_balance: 37.52,
+    total_spend: 12.48,
+    automations_run: 1248,
+    tokens_used: "452k",
+    time_saved: "14hrs",
+};
+
+const mockInvoices = [
+    { id: "INV-2026-001", date: "Apr 01, 2026", amount: "$12.48", status: "Paid" },
+    { id: "INV-2026-002", date: "Mar 01, 2026", amount: "$8.99", status: "Paid" },
+    { id: "INV-2026-003", date: "Feb 01, 2026", amount: "$15.00", status: "Paid" },
 ];
 
 const Settings = () => {
-    const [settings, setSettings] = useState<Settings>({
+    const [settings, setSettings] = useState<SettingsType>({
         client_id: "",
         trace_user_id: "",
     });
-    const [activeSection, setActiveSection] = useState('general');
+
+    const getHashSection = () => {
+        const hash = window.location.hash.replace('#', '');
+        if (hash === "" || !sections.some(s => s.id === hash)) {
+            window.location.hash = sections[0].id;
+            window.location.reload();
+        }
+        return hash;
+    };
+
+    const [activeSection, setActiveSection] = useState(getHashSection);
+
+    // General settings states
+    const [theme, setTheme] = useState('dark');
+    const [defaultModel, setDefaultModel] = useState('gpt-4o');
+    const [showNotificationBadge, setShowNotificationBadge] = useState(true);
+    const [enableHistory, setEnableHistory] = useState(true);
+    const [enableKeyboardShortcuts, setEnableKeyboardShortcuts] = useState(true);
+
+    // Privacy states
+    const [telemetry, setTelemetry] = useState(false);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -52,7 +103,7 @@ const Settings = () => {
     };
 
     const handleReset = async () => {
-        const defaultSettings: Settings = {
+        const defaultSettings: SettingsType = {
             client_id: "",
             trace_user_id: "",
         };
@@ -66,6 +117,12 @@ const Settings = () => {
             enabled: true
         });
         setSettings(defaultSettings);
+        setTheme('dark');
+        setDefaultModel('gpt-4o');
+        setShowNotificationBadge(true);
+        setEnableHistory(true);
+        setEnableKeyboardShortcuts(true);
+        setTelemetry(false);
         toast.success('Settings reset to default');
     };
 
@@ -73,53 +130,79 @@ const Settings = () => {
         switch (activeSection) {
             case 'general':
                 return (
-                    <>
-                    
-                    </>
+                    <GeneralSection
+                        theme={theme}
+                        setTheme={setTheme}
+                        defaultModel={defaultModel}
+                        setDefaultModel={setDefaultModel}
+                        showNotificationBadge={showNotificationBadge}
+                        setShowNotificationBadge={setShowNotificationBadge}
+                        enableHistory={enableHistory}
+                        setEnableHistory={setEnableHistory}
+                        enableKeyboardShortcuts={enableKeyboardShortcuts}
+                        setEnableKeyboardShortcuts={setEnableKeyboardShortcuts}
+                        telemetry={telemetry}
+                        setTelemetry={setTelemetry}
+                    />
                 );
+            case 'account':
+                return <AccountSection serverData={mockServerData} />;
+            case 'billing':
+                return <BillingSection serverData={mockServerData} invoices={mockInvoices} />;
+            case 'usage':
+                return <UsageSection serverData={mockServerData} />;
+            case 'about':
+                return <AboutSection logoUrl={Browser.runtime.getURL('assets/logo.svg')} />;
             default:
                 return null;
         }
     };
 
     return (
-        <div className="settings-page">
-            <Toaster
-                position="top-center"
-                reverseOrder={false}
-            />
-            <div className="settings-sidebar">
-                <div className="settings-sidebar-header">
+        <div className={styles.settingsPage}>
+            <Toaster position="top-center" reverseOrder={false} />
+            <div className={styles.settingsSidebar}>
+                <div className={styles.settingsSidebarHeader}>
+                    <img src={Browser.runtime.getURL('assets/logo.svg')} alt="Waffy Logo" className={styles.sidebarLogo} />
                     <h1>Waffy</h1>
                 </div>
-                {sections.map((section) => (
-                    <button
-                        key={section.id}
-                        className={`sidebar-item ${activeSection === section.id ? 'active' : ''}`}
-                        onClick={() => setActiveSection(section.id)}
-                    >
-                        <i className={`fas ${section.icon}`}></i>
-                        <span>{section.label}</span>
-                    </button>
-                ))}
+                {sections.map((section) => {
+                    const Icon = section.icon;
+                    return (
+                        <button
+                            key={section.id}
+                            className={`${styles.sidebarItem} ${activeSection === section.id ? styles.active : ''}`}
+                            onClick={() => {
+                                setActiveSection(section.id);
+                                window.location.hash = section.id;
+                            }}
+                        >
+                            <Icon size={18} />
+                            <span>{section.label}</span>
+                        </button>
+                    );
+                })}
             </div>
-            <div className="settings-main">
-                <div className="settings-header">
-                    <h1>Extension Settings</h1>
+            <div className={styles.settingsMain}>
+                <div className={styles.settingsHeader}>
+                    <div className={styles.settingsHeaderTitle}>
+                        <h2>{sections.find(s => s.id === activeSection)?.label}</h2>
+                        <p className={styles.settingsHeaderDescription}>{sections.find(s => s.id === activeSection)?.description}</p>
+                    </div>
                 </div>
 
-                <div className="settings-content">
+                <div className={styles.settingsContent}>
                     {renderSection()}
                 </div>
-                <div className="settings-footer">
-                    <button className="reset-button" onClick={handleReset}>
-                        Reset to Default
+                <div className={styles.settingsFooter}>
+                    <button className={styles.resetButton} onClick={handleReset}>
+                        Reset
                     </button>
-                    <div className="action-buttons">
-                        <button className="cancel-button">
+                    <div className={styles.actionButtons}>
+                        <button className={styles.cancelButton} onClick={() => window.close()}>
                             Cancel
                         </button>
-                        <button className="save-button" onClick={handleSave}>
+                        <button className={styles.saveButton} onClick={handleSave}>
                             Save Changes
                         </button>
                     </div>
