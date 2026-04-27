@@ -140,7 +140,7 @@ const RenderResponse = ({
             </div>
 
             {/* Rendering Execution */}
-            {(content.execution || isExecuting) && (
+            {(content.execution.length || isExecuting) && (
                 <div className={styles.dropdownContainer}>
                     <div
                         className={styles.dropdownHeader}
@@ -169,7 +169,7 @@ const RenderResponse = ({
                     </div>
 
                     {isExecutingExpanded && (
-                        <DropdownSteps steps={content.execution || []} />
+                        <DropdownSteps steps={content.execution || []} isExecuting={isExecuting} />
                     )}
                 </div>
             )}

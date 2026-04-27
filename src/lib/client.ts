@@ -29,7 +29,6 @@ export const initSettings = async () => {
                 waffyAPI: "1234",
                 signed: true,
                 account: {
-                    account_id: "c9c20661-a918-4ef5-b805-d7273ccb79f6",
                     email: "",
                     name: "",
                     phone_number: "",

@@ -1,9 +1,4 @@
 .status-bar {
-    position: sticky;
-    top: 0;
-    left: 0;
-    width: -webkit-fill-available;
-    z-index: 10;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -12,6 +7,7 @@
     background: #ffffff10;
     box-shadow: 0 10px 25px 0 #000000b0;
     backdrop-filter: brightness(0.1);
+    z-index: 10;
 }
 
 .status-icon {
@@ -56,6 +52,41 @@
     font-size: 0.6rem;
     color: #fff;
     font-family: Arial, Helvetica, sans-serif;
+}
+
+.error-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 1rem;
+    background: rgba(255, 50, 50, 0.15);
+    box-shadow: 0 10px 25px 0 #000000b0;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+}
+
+.error-text {
+    font-size: 0.8rem;
+    color: #ffcccc;
+    font-family: Arial, Helvetica, sans-serif;
+    flex: 1;
+}
+
+.error-close-button {
+    background: transparent;
+    border: none;
+    color: #ffcccc;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-left: 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.error-close-button:hover {
+    color: #ffffff;
 }
 
 .chat-container {

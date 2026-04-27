@@ -3,7 +3,7 @@ import { fetchEventSource } from "@microsoft/fetch-event-source";
 
 const API_URL = process.env.NODE_ENV === "production" ? "https://waffy-preview-api.upzare.com/inference" : "http://localhost:4000/inference";
 
-export async function createConversation(conversationID: string | null) {
+export async function createConversation(conversationId: string | null) {
     try {
         const localStorage: Record<string, any> = await getLocalStorage();
         const response = await fetch(`${API_URL}/start`, {
@@ -13,25 +13,24 @@ export async function createConversation(conversationID: string | null) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                id: conversationID,
+                id: conversationId,
                 metadata: {
                     client_id: localStorage.client.client_id,
-                    account_id: localStorage.data.account.account_id,
                 }
             }),
         });
 
         const data = await response.json();
-        if (data.status !== "success") {
-            throw new Error(data.message);
+        if (!response.ok) {
+            throw (data.detail || "Something went wrong. Please try again.");
         }
         return data.id;
     } catch (error) {
-        throw new Error("Connection Failed");
+        throw error;
     }
 }
 
-export async function createTitle(conversationID: string | null, prompt: string) {
+export async function createTitle(conversationId: string | null, messageId: string | null, prompt: string) {
     try {
         const localStorage: Record<string, any> = await getLocalStorage();
         const response = await fetch(`${API_URL}/meta`, {
@@ -41,31 +40,33 @@ export async function createTitle(conversationID: string | null, prompt: string)
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                id: conversationID,
+                id: conversationId,
                 prompt: prompt,
                 metadata: {
                     client_id: localStorage.client.client_id,
-                    account_id: localStorage.data.account.account_id,
+                    message_id: messageId,
                 }
             }),
         });
 
-        const data: any = await response.json();
+        const data = await response.json();
+        if (!response.ok) {
+            throw (data.detail || "Something went wrong. Please try again.");
+        }
         const title = data.title ?? "Untitled";
         return title;
     } catch (error) {
-        throw new Error("Title Generation Error");
+        throw "Title Generation Error";
     }
 }
 
-export async function* AI(conversationID: string | null, messages: any[], handler: string, messageID: string | null, abortController: AbortController | null, handleError: () => void):
+export async function* AI(conversationId: string | null, messages: any[], handler: string, messageID: string | null, abortController: AbortController | null, safeToAbortRef: React.RefObject<boolean>, displayError: (error?: string) => void):
     AsyncGenerator<any> {
     const localStorage: Record<string, any> = await getLocalStorage();
 
     const generateMetadata = () => {
         const metadata: any = {}
         if (localStorage.client.client_id) metadata.client_id = localStorage.client.client_id;
-        if (localStorage.data.account.account_id) metadata.account_id = localStorage.data.account.account_id;
         if (handler) metadata.mode = handler;
         if (messageID) metadata.message_id = messageID;
         return metadata;
@@ -108,24 +109,39 @@ export async function* AI(conversationID: string | null, messages: any[], handle
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            id: conversationID,
+            id: conversationId,
             data: messages,
             metadata: generateMetadata(),
         }),
         signal: abortController?.signal,
         openWhenHidden: true,
+        async onopen(response) {
+            safeToAbortRef.current = true;
+            if (!response.ok) {
+                let errorMessage = "Something went wrong. Please try again.";
+                try {
+                    const data = await response.json();
+                    errorMessage = data.detail || errorMessage;
+                } catch { }
+                done = true;
+                if (resolveQueue) resolveQueue();
+                throw new Error(errorMessage);
+            }
+        },
         onmessage(event) {
             pushEvent(JSON.parse(event.data));
         },
         onclose() {
             done = true;
+            safeToAbortRef.current = false;
             if (resolveQueue) resolveQueue();
         },
         onerror(err) {
             done = true;
+            safeToAbortRef.current = false;
             if (resolveQueue) resolveQueue();
-            handleError();
-            throw new Error(err);
+            displayError(err?.message);
+            throw err;
         }
     }).catch(() => { });
 

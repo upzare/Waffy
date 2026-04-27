@@ -27,11 +27,21 @@ export interface SuggestedPromptProps {
     onClick?: () => void;
 }
 
+export interface StreamingState {
+    response: boolean;
+    execution: boolean;
+    validation: boolean;
+    output: boolean;
+}
+
 export interface ChatContainerProps {
     hidden: boolean;
     messages: Message[];
+    streaming: StreamingState;
     isGenerating: boolean;
     statusText: string;
+    errorText: string;
+    setErrorText: (error: string) => void;
 }
 
 export interface ModeSelectionProps {
@@ -65,11 +75,7 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: { prompt?: string, response?: string, execution?: ExecutionStep[], validation?: string, output?: string }, files?: FileFormat[], task?: string, taskStatus?: string };
-    streaming?: { response?: boolean, execution?: boolean, validation?: boolean, output?: boolean };
-    isUser: boolean;
-    isError?: boolean;
-    task?: string;
+    content: { text?: { prompt?: string, response?: string, execution?: string[], validation?: string, output?: string }, files?: FileFormat[], task?: string, taskStatus?: string };
 }
 
 export interface FileFormat {
@@ -87,11 +93,6 @@ export interface TextMessage {
     value: string;
 }
 
-export interface ExecutionStep {
-    id: number;
-    text: string;
-    executing: boolean;
-};
 
 export interface ToggleMessage {
     type: string;
