@@ -19,6 +19,7 @@ export interface HeaderProps {
 
 export interface HeroProps {
     hidden: boolean;
+    pinnedPrompts: string[];
     onPromptClick: (prompt: string) => void;
 }
 
@@ -27,33 +28,31 @@ export interface SuggestedPromptProps {
     onClick?: () => void;
 }
 
+export interface StreamingState {
+    response: boolean;
+    execution: boolean;
+    validation: boolean;
+    output: boolean;
+}
+
 export interface ChatContainerProps {
     hidden: boolean;
     messages: Message[];
+    streaming: StreamingState;
     isGenerating: boolean;
     statusText: string;
-}
-
-export interface ModeSelectionProps {
-    className?: string;
-    modes: string[];
-    current_mode: string;
-    onModeChange?: (option: string) => void;
+    errorText: string;
+    setErrorText: (error: string) => void;
 }
 
 export interface InputContainerProps {
     isGenerating: boolean;
-    isRecording: boolean;
     textareaRef: React.RefObject<HTMLTextAreaElement>;
     fileInputRef: React.RefObject<HTMLInputElement>;
     message: string;
     files: File[];
-    mode: string;
-    showModeSelection: boolean;
     setMessage: React.Dispatch<React.SetStateAction<string>>;
     setFiles: React.Dispatch<React.SetStateAction<File[]>>;
-    setMode: React.Dispatch<React.SetStateAction<string>>;
-    onSpeechRecognition: () => Promise<void>;
     onSendMessage: () => Promise<void>;
     onStopGeneration: () => Promise<void>;
 }
@@ -68,11 +67,7 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: { prompt?: string, response?: string, execution?: ExecutionStep[], validation?: string, output?: string }, files?: FileFormat[], task?: string, taskStatus?: string };
-    streaming?: { response?: boolean, execution?: boolean, validation?: boolean, output?: boolean };
-    isUser: boolean;
-    isError?: boolean;
-    task?: string;
+    content: { text?: { prompt?: string, response?: string, execution?: string[], validation?: string, output?: string }, files?: FileFormat[], task?: string, taskStatus?: string, aborted?: boolean };
 }
 
 export interface FileFormat {
@@ -90,11 +85,6 @@ export interface TextMessage {
     value: string;
 }
 
-export interface ExecutionStep {
-    id: number;
-    text: string;
-    executing: boolean;
-};
 
 export interface ToggleMessage {
     type: string;
@@ -114,8 +104,34 @@ export interface ParticlesProps {
 }
 
 export interface Settings {
-    client_id: string;
-    trace_user_id: string;
+    theme: string;
+    enableHistory: boolean;
+    enableNotifications: boolean;
+    pinnedPrompts: string[];
+    models: Partial<Record<StageId, ModelConfig>>;
+}
+
+export type ProviderId = "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter";
+
+export type StageId = "t1" | "t2" | "t3" | "t4" | "title" | "step";
+
+export interface ModelConfig {
+    provider: ProviderId;
+    model: string;
+}
+
+export interface ApiKeys {
+    openai?: string;
+    anthropic?: string;
+    google?: string;
+    xai?: string;
+    groq?: string;
+    openrouter?: string;
+}
+
+export interface AppSettings {
+    settings: Settings;
+    apiKeys: ApiKeys;
 }
 
 export interface DomProps {

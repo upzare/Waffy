@@ -1,4 +1,4 @@
-.suggested-prompt-button {
+.suggestedPromptButton {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -25,7 +25,7 @@
     font-family: "Orbitron", sans-serif;
 }
 
-.suggested-prompt-bg {
+.suggestedPromptBg {
     position: absolute;
     z-index: -1;
     width: 100%;
@@ -36,7 +36,7 @@
     border-radius: 5rem;
 }
 
-.suggested-prompt-text {
+.suggestedPromptText {
     z-index: 2;
     /* font-family: "Orbitron", sans-serif; */
     /* font-size: 12px; */
@@ -45,13 +45,13 @@
     text-shadow: 0 0 1px white;
 }
 
-.suggested-prompt-glow {
+.suggestedPromptGlow {
     position: absolute;
     display: flex;
     width: 12rem;
 }
 
-.suggested-prompt-circle {
+.suggestedPromptCircle {
     position: absolute;
     width: 30px;
     height: 30px;
@@ -59,35 +59,35 @@
     filter: blur(2rem);
 }
 
-.suggested-prompt-circle:nth-of-type(1) {
+.suggestedPromptCircle:nth-of-type(1) {
     background: rgba(245, 67, 79, 0.636);
     animation: orbit 8s linear infinite;
 }
 
-.suggested-prompt-circle:nth-of-type(2) {
+.suggestedPromptCircle:nth-of-type(2) {
     background: rgba(99, 30, 41, 0.704);
     animation: orbit 10s linear infinite;
 }
 
-.suggested-prompt-button:hover .suggested-prompt-bg {
+.suggestedPromptButton:hover .suggestedPromptBg {
     z-index: 1;
     background-color: #161a25;
 }
 
-.suggested-prompt-button:hover {
+.suggestedPromptButton:hover {
     transform: scale(1.05);
     /* background-origin: border-box;
     background-clip: content-box, border-box; */
 }
 
-.suggested-prompt-bg-stars {
+.suggestedPromptBgStars {
     position: relative;
     background: transparent;
     width: 200rem;
     height: 200rem;
 }
 
-.suggested-prompt-bg-stars::after {
+.suggestedPromptBgStars::after {
     content: "";
     position: absolute;
     top: -10rem;
@@ -97,12 +97,12 @@
     animation: animStarRotate 90s linear infinite;
 }
 
-.suggested-prompt-bg-stars::after {
+.suggestedPromptBgStars::after {
     background-image: radial-gradient(#ffffff 1px, transparent 1%);
     background-size: 50px 50px;
 }
 
-.suggested-prompt-bg-stars::before {
+.suggestedPromptBgStars::before {
     content: "";
     position: absolute;
     top: 0;
@@ -112,7 +112,7 @@
     animation: animStar 60s linear infinite;
 }
 
-.suggested-prompt-bg-stars::before {
+.suggestedPromptBgStars::before {
     background-image: radial-gradient(#ffffff 1px, transparent 1%);
     background-size: 50px 50px;
     opacity: 0.5;

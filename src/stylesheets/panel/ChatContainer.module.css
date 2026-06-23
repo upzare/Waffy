@@ -1,9 +1,4 @@
-.status-bar {
-    position: sticky;
-    top: 0;
-    left: 0;
-    width: -webkit-fill-available;
-    z-index: 10;
+.statusBar {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -12,17 +7,18 @@
     background: #ffffff10;
     box-shadow: 0 10px 25px 0 #000000b0;
     backdrop-filter: brightness(0.1);
+    z-index: 10;
 }
 
-.status-icon {
+.statusIcon {
     width: 1.2rem;
     height: 1.2rem;
     display: inline-block;
     position: relative;
 }
 
-.status-icon::after,
-.status-icon::before {
+.statusIcon::after,
+.statusIcon::before {
     content: '';
     box-sizing: border-box;
     width: 1.2rem;
@@ -35,7 +31,7 @@
     animation: iconloader 2s linear infinite;
 }
 
-.status-icon::after {
+.statusIcon::after {
     animation-delay: 1s;
     opacity: 0;
 }
@@ -52,13 +48,48 @@
     }
 }
 
-.status-text {
+.statusText {
     font-size: 0.6rem;
     color: #fff;
     font-family: Arial, Helvetica, sans-serif;
 }
 
-.chat-container {
+.errorBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 1rem;
+    background: rgba(255, 50, 50, 0.15);
+    box-shadow: 0 10px 25px 0 #000000b0;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+}
+
+.errorText {
+    font-size: 0.8rem;
+    color: #ffcccc;
+    font-family: Arial, Helvetica, sans-serif;
+    flex: 1;
+}
+
+.errorCloseButton {
+    background: transparent;
+    border: none;
+    color: #ffcccc;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-left: 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.errorCloseButton:hover {
+    color: #ffffff;
+}
+
+.chatContainer {
     flex: 1;
     overflow-y: auto;
     padding-bottom: 1rem;
@@ -69,7 +100,7 @@
     z-index: 1;
 }
 
-.chat-container.hidden {
+.chatContainer.hidden {
     max-height: 0;
     max-width: 0;
     opacity: 0;
@@ -125,7 +156,7 @@
     backdrop-filter: blur(5px);
 }
 
-.message-actions-container {
+.messageActionsContainer {
     position: absolute;
     top: -10px;
     right: 5px;
@@ -136,13 +167,13 @@
     pointer-events: none;
 }
 
-.message:hover .message-actions-container {
+.message:hover .messageActionsContainer {
     opacity: 1;
     transform: translateY(0);
     pointer-events: all;
 }
 
-.message-actions {
+.messageActions {
     display: flex;
     gap: 4px;
     background: rgba(15, 15, 15, 0.8);
@@ -152,7 +183,7 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.message-action-button {
+.messageActionButton {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -166,16 +197,16 @@
     transition: all 0.2s ease;
 }
 
-.message-action-button:hover {
+.messageActionButton:hover {
     background: rgba(0, 200, 83, 0.15);
     color: rgba(0, 200, 83, 1);
 }
 
-.message-action-button:active {
+.messageActionButton:active {
     transform: scale(0.95);
 }
 
-.message-content {
+.messageContent {
     flex: 1;
     white-space: normal;
     overflow-wrap: break-word;
@@ -184,7 +215,7 @@
     overflow: hidden;
 }
 
-.message-file-preview {
+.messageFilePreview {
     padding: 0.5rem 1rem;
     margin: 0.5rem 1rem 0.2rem 0;
     border-radius: 7px;
@@ -196,11 +227,11 @@
     transition: all 0.2s ease-in-out;
 }
 
-.message-file-preview:hover {
+.messageFilePreview:hover {
     background: rgba(255, 255, 255, 0.15);
 }
 
-.message-file-preview-name {
+.messageFilePreviewName {
     flex: 1;
     font-size: 0.7rem;
     overflow: hidden;
@@ -208,13 +239,13 @@
     white-space: nowrap;
 }
 
-.message-file-thubmnail {
+.messageFileThubmnail {
     width: 1rem;
     height: 1rem;
     object-fit: contain;
 }
 
-.message-file-preview svg {
+.messageFilePreview svg {
     height: 1rem;
     width: 1rem;
     stroke: white;
@@ -233,11 +264,11 @@
 }
 
 /* Chat container scrollbar styling */
-.chat-container::-webkit-scrollbar-thumb {
+.chatContainer::-webkit-scrollbar-thumb {
     background: rgba(245, 245, 245, 0.3);
     box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
 }
 
-.chat-container::-webkit-scrollbar-thumb:hover {
+.chatContainer::-webkit-scrollbar-thumb:hover {
     background: rgba(245, 245, 245, 0.5);
 }

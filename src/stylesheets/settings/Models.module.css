@@ -1,0 +1,230 @@
+.stageGroup {
+    margin-bottom: 1.75rem;
+}
+
+.stageGroupHeader {
+    margin-bottom: 0.875rem;
+}
+
+.stageGroupTitle {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.15rem;
+}
+
+.stageGroupSubtitle {
+    font-size: 0.825rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.stageList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.stageCard {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+
+.stageCard:hover {
+    border-color: var(--border-strong);
+}
+
+.stageCardHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: transparent;
+    border: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.stageCardHeader:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.stageCardTitleGroup {
+    min-width: 0;
+    flex: 1;
+}
+
+.stageCardTitle {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.stageCardDescription {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0.2rem 0 0;
+    line-height: 1.35;
+}
+
+.stageCardPreview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.stageModelPreview {
+    font-size: 0.8rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text-muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stageChevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.stageChevronOpen {
+    transform: rotate(180deg);
+}
+
+.stageCardBody {
+    padding: 1rem 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border-top: 1px solid var(--border);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stageWarning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 0.85rem;
+    background: var(--red-dim);
+    border: 1px solid var(--red-border);
+    border-radius: var(--radius-sm);
+    color: var(--red);
+    font-size: 0.8rem;
+}
+
+.stageField {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.stageFieldRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 900px) {
+    .stageFieldRow {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .stageCardHeader {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .stageCardPreview {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .stageModelPreview {
+        max-width: none;
+        flex: 1;
+    }
+}
+
+.fieldLabel {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.secretInput,
+.selectInput,
+.textInput {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    transition: border-color 0.15s;
+}
+
+.secretInput:focus,
+.selectInput:focus,
+.textInput:focus {
+    outline: none;
+    border-color: var(--green-border);
+    box-shadow: 0 0 0 2px var(--green-dim);
+}
+
+.secretInput {
+    padding: 0.65rem 2.5rem 0.65rem 0.75rem;
+}
+
+.secretInput::placeholder {
+    color: var(--text-muted);
+    font-family: Inter, system-ui, sans-serif;
+}
+
+.selectWrapper {
+    position: relative;
+}
+
+.selectInput {
+    appearance: none;
+    padding: 0.65rem 2.25rem 0.65rem 0.75rem;
+    cursor: pointer;
+}
+
+.selectChevron {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.textInput {
+    padding: 0.65rem 0.75rem;
+}

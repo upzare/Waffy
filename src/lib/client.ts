@@ -1,4 +1,6 @@
 import Browser from "webextension-polyfill";
+import { DEFAULT_MODELS } from "./llm/model";
+import type { ApiKeys, AppSettings, Settings } from "@/types";
 
 export const initClient = async () => {
     const localStorage = await Browser.storage.local.get();
@@ -15,38 +17,30 @@ export const initClient = async () => {
     }
 }
 
+export const DEFAULT_PINNED_PROMPTS = [
+    "What is in my screen",
+    "Look for latest news on AI",
+    "Summarize this page contents",
+    "Fill out this form for me",
+    "Find the key details on this page",
+];
+
+const defaultSettings: Settings = {
+    theme: "system",
+    enableHistory: true,
+    enableNotifications: true,
+    pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
+    models: { ...DEFAULT_MODELS },
+};
+
+const defaultApiKeys: ApiKeys = {};
+
 export const initSettings = async () => {
     const localStorage = await Browser.storage.local.get();
-    if (!localStorage.data) {
-        Browser.storage.local.set({
-            settings: JSON.stringify({
-                theme: "system",
-                enableHistory: true,
-                enableKeyboardShortcuts: true,
-                enableNotifications: true,
-            }),
-            data: JSON.stringify({
-                waffyAPI: "1234",
-                signed: true,
-                account: {
-                    account_id: "c9c20661-a918-4ef5-b805-d7273ccb79f6",
-                    email: "",
-                    name: "",
-                    phone_number: "",
-                },
-                subscription: {
-                    plan: "",
-                    created_at: 0,
-                    expires_at: 0,
-                    active: false,
-                },
-                credits: {
-                    total_credits: 0,
-                    used_credits: 0,
-                    total_tokens: 0,
-                    used_tokens: 0,
-                },
-            })
+    if (!localStorage.settings) {
+        await Browser.storage.local.set({
+            settings: JSON.stringify(defaultSettings),
+            apiKeys: JSON.stringify(defaultApiKeys),
         });
     }
 }
@@ -55,6 +49,33 @@ export const getLocalStorage = async () => {
     const localStorage = await Browser.storage.local.get();
     localStorage.client = JSON.parse(localStorage.client as string);
     localStorage.settings = JSON.parse(localStorage.settings as string);
-    localStorage.data = JSON.parse(localStorage.data as string);
+    localStorage.apiKeys = JSON.parse((localStorage.apiKeys as string) || "{}");
     return localStorage;
+}
+
+export const getAppSettings = async (): Promise<AppSettings> => {
+    const localStorage = await getLocalStorage();
+    const storedSettings = (localStorage.settings ?? {}) as Partial<Settings>;
+    const settings: Settings = {
+        ...defaultSettings,
+        ...storedSettings,
+        pinnedPrompts: storedSettings.pinnedPrompts?.length
+            ? storedSettings.pinnedPrompts
+            : defaultSettings.pinnedPrompts,
+        models: {
+            ...DEFAULT_MODELS,
+            ...(storedSettings.models ?? {}),
+        },
+    };
+    return {
+        settings,
+        apiKeys: (localStorage.apiKeys ?? {}) as ApiKeys,
+    };
+}
+
+export const saveAppSettings = async (settings: Settings, apiKeys: ApiKeys) => {
+    await Browser.storage.local.set({
+        settings: JSON.stringify(settings),
+        apiKeys: JSON.stringify(apiKeys),
+    });
 }

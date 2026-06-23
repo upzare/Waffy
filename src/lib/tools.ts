@@ -65,7 +65,7 @@ export const fetchScreen = async () => {
                 pixelRatio: devicePixelRatio,
                 loading_status: tab.status
             }
-            chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "jpeg", quality: 35, fromSurface: true }, (response?: { data?: string }) => {
+            chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "jpeg", quality: 10, fromSurface: true }, (response?: { data?: string }) => {
                 if (chrome.runtime.lastError) {
                     reject("Failed to capture DOM image");
                     return;
@@ -76,7 +76,7 @@ export const fetchScreen = async () => {
         });
     }).then((data) => {
         const { meta, base64Image } = data as { meta: Record<string, string>, base64Image: string };
-        return { status: "success", message: "Success: Screen fetched", data: { type: "screenshot", metadata: meta, image: base64Image, parser: 1 } };
+        return { status: "success", message: "Success: Screen fetched", data: { type: "screenshot", metadata: meta, image: base64Image } };
     }).catch((error) => {
         return { status: "error", message: "Error: " + error };
     });
@@ -151,7 +151,7 @@ export const typeText = async ({ x, y, text }: { x: number, y: number, text: str
             }
             chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y, timeout: text.length * 150 + 500 } })
             await _click({ x, y, tabId: tab.id });
-            await sleep(300);
+            await sleep(100);
             for await (const char of text) {
                 if (char === '\n') {
                     keyPress({ key: "Enter" });
@@ -161,12 +161,12 @@ export const typeText = async ({ x, y, text }: { x: number, y: number, text: str
                     type: 'keyDown',
                     text: char,
                 });
-                await sleep(50);
+                await sleep(25);
                 await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.dispatchKeyEvent', {
                     type: 'keyUp',
                     text: char,
                 });
-                await sleep(100);
+                await sleep(10);
             }
             if (chrome.runtime.lastError) {
                 reject("Failed to send keystrokes");
@@ -271,6 +271,33 @@ export const setOption = async ({ x, y, value }: { x: number, y: number, value: 
                 .catch((error) => {
                     reject(error.value);
                 });
+        });
+    }).then((res) => {
+        return { status: "success", message: "Success: " + res };;
+    }).catch((error) => {
+        return { status: "error", message: "Error: " + error };
+    });
+}
+
+export const scroll = async ({ x, y, xDistance, yDistance }: { x: number, y: number, xDistance: number, yDistance: number }) => {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
+            if (!tab || !tab.id) {
+                reject("Tab not found");
+                return;
+            }
+            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
+            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.synthesizeScrollGesture', {
+                x,
+                y,
+                xDistance: -xDistance,
+                yDistance: -yDistance,
+            });
+            if (chrome.runtime.lastError) {
+                reject("Failed to scroll");
+            } else {
+                resolve("Scroll initiated");
+            }
         });
     }).then((res) => {
         return { status: "success", message: "Success: " + res };;
@@ -431,64 +458,6 @@ export const reload = async () => {
     });
 }
 
-export const getScrollPortions = async () => {
-    return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-            if (!tab || !tab.id) {
-                reject("Tab not found");
-                return;
-            }
-            const devicePixelRatio = await chrome.tabs.sendMessage(tab.id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
-            const meta = {
-                url: tab.url,
-                title: tab.title,
-                pixelRatio: devicePixelRatio,
-                loading_status: tab.status
-            }
-            chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "jpeg", quality: 25, fromSurface: true }, (response?: { data?: string }) => {
-                if (chrome.runtime.lastError) {
-                    reject("Failed to capture DOM image");
-                    return;
-                }
-                const base64Image = response?.data;
-                resolve({ meta, base64Image });
-            });
-        });
-    }).then((data) => {
-        const { meta, base64Image } = data as { meta: Record<string, string>, base64Image: string };
-        return { status: "success", message: "Success: Scroll portions fetched", data: { type: "screenshot", metadata: meta, image: base64Image, parser: 2 } };
-    }).catch((error) => {
-        return { status: "error", message: "Error: " + error };
-    });
-}
-
-export const scroll = async ({ x, y, xDistance, yDistance }: { x: number, y: number, xDistance: number, yDistance: number }) => {
-    return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-            if (!tab || !tab.id) {
-                reject("Tab not found");
-                return;
-            }
-            chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
-            await chrome.debugger.sendCommand({ tabId: tab.id }, 'Input.synthesizeScrollGesture', {
-                x,
-                y,
-                xDistance: -xDistance,
-                yDistance: -yDistance,
-            });
-            if (chrome.runtime.lastError) {
-                reject("Failed to scroll");
-            } else {
-                resolve("Scroll initiated");
-            }
-        });
-    }).then((res) => {
-        return { status: "success", message: "Success: " + res };;
-    }).catch((error) => {
-        return { status: "error", message: "Error: " + error };
-    });
-}
-
 export const wait = async ({ ms }: { ms: number }) => {
     return new Promise((resolve) => {
         setTimeout(() => resolve(`Waited for ${ms} milliseconds`), ms);
@@ -507,6 +476,7 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<any> } 
     "keyPress": keyPress,
     "getOption": getOption,
     "setOption": setOption,
+    "scroll": scroll,
     "loadingState": loadingState,
     "goto": goto,
     "getOpenedTabs": getOpenedTabs,
@@ -514,7 +484,5 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<any> } 
     "switchTab": switchTab,
     "closeTab": closeTab,
     "reload": reload,
-    "getScrollPortions": getScrollPortions,
-    "scroll": scroll,
     "wait": wait,
 };
