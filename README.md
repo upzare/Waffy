@@ -1,68 +1,112 @@
 # Waffy
 
-Waffy is a Chrome extension that enhances your web navigation and automation experience using the power of AI. It leverages tool calling and other AI features to execute commands, automate repetitive tasks and streamline your workflow—all within your browser.
+Waffy is an open-source Chrome extension that brings AI-powered browser automation to your side panel. Describe what you want in natural language — Waffy can browse pages, click elements, fill forms, extract data, and complete multi-step workflows using vision-capable models and tool calling.
 
----
+## Features
 
-## Overview
+- **Natural language automation** — Tell Waffy what to do in plain English and it plans and executes browser actions for you.
+- **Vision-based interaction** — Uses screenshots and coordinates to click, type, scroll, and navigate like a human would.
+- **Multi-stage pipeline** — Separate models for planning, execution, validation, and output so each step can use the right model for the job.
+- **Bring your own API keys** — Connect your own provider accounts. Keys are stored locally in the extension — Waffy does not run a backend for inference.
+- **Multiple providers** — OpenAI, Anthropic, Google AI Studio, xAI, Groq, and OpenRouter.
+- **Flexible model configuration** — Choose different models for each pipeline stage and UI helper task in settings.
+- **Chat history & pinned prompts** — Keep conversation history and customize quick-start prompts on the home screen.
+- **Side panel UI** — Open Waffy from the toolbar or with `Ctrl+I` (configurable in `chrome://extensions/shortcuts`).
 
-Waffy is designed for users who want to simplify their online tasks. With natural language command support, you can easily perform actions like navigating between websites, clicking buttons, extracting data, and even calling external APIs to get real-time information. The goal is to save you time and effort by automating tasks that would otherwise require manual intervention.
+## Supported providers
 
----
+| Provider | Example models |
+|----------|----------------|
+| OpenAI | GPT-4o, GPT-4.1 |
+| Anthropic | Claude Sonnet, Claude Opus |
+| Google AI Studio | Gemini 2.x |
+| xAI | Grok |
+| Groq | Llama, Mixtral |
+| OpenRouter | 100+ models via a single API key |
 
-## Key Features
+Add API keys in **Extension settings → API Keys** after installation.
 
-- **AI-Driven Command Parsing:**  
-  Use natural language to instruct Waffy on what tasks to perform, whether it’s navigating to a specific URL, interacting with page elements, or fetching data from external sources.
+## Getting started
 
-- **Tool Calling Integration:**  
-  Waffy can interface with other APIs and services, enabling complex automation workflows right from your browser.
+### Prerequisites
 
-- **Automation Workflows:**  
-  Create and execute workflows that combine multiple commands into a single, streamlined process.
+- [Node.js](https://nodejs.org/) 18+
+- Google Chrome (or a Chromium-based browser)
 
-- **User-Friendly Interface:**  
-  A simple, intuitive design ensures that both technical and non-technical users can effectively use the extension.
+### Build from source
 
----
+```bash
+git clone https://github.com/aravind-manoj/Waffy.git
+cd Waffy
+npm install
+npm run build
+```
 
-## Installation
+This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
 
-Waffy is designed to be easily installed as a Chrome extension. Follow these steps to get started:
+### Load the extension in Chrome
 
-1. **Download the Extension Package:**  
-   Obtain the extension package from the provided source.
+1. Open `chrome://extensions/`
+2. Enable **Developer mode**
+3. Click **Load unpacked** and select the `build/` folder
+4. Click the Waffy icon in the toolbar, or press `Ctrl+I` to open the side panel
 
-2. **Install on Chrome:**
-   - Open Chrome and navigate to `chrome://extensions/`.
-   - Enable **Developer Mode** using the toggle in the top-right corner.
-   - Click **Load unpacked** and select the directory where the extension is located.
+### Configure API keys
 
-3. **Launch Waffy:**  
-   Click on the Waffy icon in your Chrome toolbar to open the interface and start using the extension.
+1. Right-click the Waffy icon → **Options**, or open **Extension settings** from the side panel
+2. Go to **API Keys** and add a key for at least one provider
+3. Go to **Models** and pick models for each pipeline stage (execution requires a vision-capable model)
+4. Start chatting — try something like *"Go to example.com and click the login button"*
 
----
+## Development
 
-## Usage
+```bash
+npm run dev    # watch mode — rebuilds on file changes
+npm run start  # dev server with hot reload
+```
 
-1. **Open Waffy:**  
-   Click the Waffy icon in the Chrome toolbar. The extension interface will pop up, ready to receive your commands.
+After `npm run dev`, reload the extension in `chrome://extensions/` when you make changes.
 
-2. **Enter Commands:**  
-   Type in your natural language command. For example:
-   - `"Go to example.com and click on the login button"`
-   - `"Extract all email addresses from this page"`
+## Project structure
 
-3. **Execute Tasks:**  
-   Once a command is entered, Waffy uses its integrated AI tools to parse and execute the desired actions automatically.
+```
+src/
+├── panel/          # Side panel UI (chat, history, input)
+├── settings/       # Extension options page (API keys, models, general)
+├── lib/
+│   ├── llm/        # Model providers, streaming, prompts, tools
+│   ├── agent.ts    # Entry point for AI calls
+│   ├── client.ts   # Chrome storage & settings
+│   ├── Background.ts
+│   └── Content.ts  # Page interaction (clicks, typing, screenshots)
+public/             # Manifest, icons, static assets
+build/              # Production output (load this in Chrome)
+```
 
-4. **Automation Workflows:**  
-   Combine multiple commands into a single workflow to automate complex or repetitive tasks with minimal effort.
+## Privacy
 
----
+API keys and conversation history are stored locally in your browser via Chrome's extension storage. Requests go directly from your browser to the AI provider you configure — Waffy does not proxy or log your prompts.
 
-## About
+See [waffy.io/privacy](https://waffy.io/privacy) for the full privacy policy.
 
-Waffy is a proprietary solution designed to improve your web automation and productivity. It uses state-of-the-art AI to understand and execute your commands, making your day-to-day web interactions more efficient. For any additional information or support, please refer to the documentation provided with your installation package.
+## Links
 
-Enjoy an effortless browsing experience with Waffy!
+- [Website](https://waffy.io)
+- [GitHub](https://github.com/aravind-manoj/Waffy)
+- [Twitter / X](https://x.com/WaffyHQ)
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+To report a security vulnerability, see [SECURITY.md](SECURITY.md). Please do not open public issues for security reports.
+
+## License
+
+Copyright 2025 [Waffy AI](https://waffy.io)
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
