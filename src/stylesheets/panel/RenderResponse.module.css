@@ -1,10 +1,10 @@
-.code-block {
+.codeBlock {
     border-radius: 0.5rem;
     border: 1px solid white;
     background: #000;
 }
 
-.code-header {
+.codeHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -17,27 +17,27 @@
     border-top-right-radius: 0.375rem;
 }
 
-.language-label {
+.languageLabel {
     font-weight: bold;
     color: black;
 }
 
-.copy-button {
+.copyButton {
     background-color: white;
     cursor: pointer;
     transition: transform 0.3s;
 }
 
-.copy-button:hover {
+.copyButton:hover {
     transform: scale(1.1);
 }
 
-.copy-button svg {
+.copyButton svg {
     width: 1rem;
     height: 1rem;
 }
 
-.code-content {
+.codeContent {
     font-family: monospace;
     font-size: 0.875rem;
     padding-left: 0.5rem;
@@ -47,25 +47,25 @@
     margin-bottom: -0.4rem;
 }
 
-.syntax-highlighter {
+.syntaxHighlighter {
     overflow-x: auto;
 }
 
-.markdown-content {
+.markdownContent {
     word-break: break-word;
     width: 100%;
 }
 
-.overflow-container {
+.overflowContainer {
     width: 100%;
 }
 
 /* Message dropdown styling */
-.response-container {
+.responseContainer {
     width: 100%;
 }
 
-.dropdown-container {
+.dropdownContainer {
     margin-top: 0.5rem;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -73,7 +73,7 @@
     overflow: hidden;
 }
 
-.dropdown-header {
+.dropdownHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -83,42 +83,42 @@
     transition: background 0.3s ease;
 }
 
-.dropdown-header:hover {
+.dropdownHeader:hover {
     background: rgba(0, 0, 0, 0.5);
 }
 
-.dropdown-header-left {
+.dropdownHeaderLeft {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.dropdown-loading-icon {
+.dropdownLoadingIcon {
     animation: spin 1.5s linear infinite;
     color: #fff;
 }
 
-.dropdown-complete-icon {
+.dropdownCompleteIcon {
     color: #fff;
 }
 
-.dropdown-label {
+.dropdownLabel {
     font-weight: 400;
     font-size: 0.75rem;
 }
 
-.dropdown-toggle {
+.dropdownToggle {
     color: #fff;
     transition: transform 0.2s ease;
 }
 
-.dropdown-content {
+.dropdownContent {
     padding: 0rem 0.7rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     animation: expandContent 0.3s ease-out;
 }
 
-.dropdown-markdown {
+.dropdownMarkdown {
     word-break: break-word;
     width: 100%;
 }
@@ -135,7 +135,7 @@
     }
 }
 
-.loader-container {
+.loaderContainer {
     display: flex;
     justify-content: center;
     padding: 0.5rem;
@@ -171,7 +171,7 @@
     }
 }
 
-.loading-indicator {
+.loadingIndicator {
     --dot-size: 25px;
     --dot-speed: 0.8s;
     --dot-color: rgb(0, 200, 83);
@@ -183,13 +183,13 @@
     animation: spin calc(var(--dot-speed) * 2.5) infinite linear;
 }
 
-.loading-indicator-dot {
+.loadingIndicatorDot {
     position: absolute;
     height: 100%;
     width: 30%;
 }
 
-.loading-indicator-dot:after {
+.loadingIndicatorDot:after {
     content: '';
     position: absolute;
     height: 0%;
@@ -199,40 +199,40 @@
     border-radius: 50%;
 }
 
-.loading-indicator-dot:nth-child(1) {
+.loadingIndicatorDot:nth-child(1) {
     bottom: 5%;
     left: 0;
     transform: rotate(60deg);
     transform-origin: 50% 85%;
 }
 
-.loading-indicator-dot:nth-child(1)::after {
+.loadingIndicatorDot:nth-child(1)::after {
     bottom: 0;
     left: 0;
     animation: wobble1 var(--dot-speed) infinite ease-in-out;
     animation-delay: calc(var(--dot-speed) * -0.3);
 }
 
-.loading-indicator-dot:nth-child(2) {
+.loadingIndicatorDot:nth-child(2) {
     bottom: 5%;
     right: 0;
     transform: rotate(-60deg);
     transform-origin: 50% 85%;
 }
 
-.loading-indicator-dot:nth-child(2)::after {
+.loadingIndicatorDot:nth-child(2)::after {
     bottom: 0;
     left: 0;
     animation: wobble1 var(--dot-speed) infinite calc(var(--dot-speed) * -0.15) ease-in-out;
 }
 
-.loading-indicator-dot:nth-child(3) {
+.loadingIndicatorDot:nth-child(3) {
     bottom: -5%;
     left: 0;
     transform: translateX(116.666%);
 }
 
-.loading-indicator-dot:nth-child(3)::after {
+.loadingIndicatorDot:nth-child(3)::after {
     top: 0;
     left: 0;
     animation: wobble2 var(--dot-speed) infinite ease-in-out;

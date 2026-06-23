@@ -19,6 +19,7 @@ export interface HeaderProps {
 
 export interface HeroProps {
     hidden: boolean;
+    pinnedPrompts: string[];
     onPromptClick: (prompt: string) => void;
 }
 
@@ -44,23 +45,14 @@ export interface ChatContainerProps {
     setErrorText: (error: string) => void;
 }
 
-export interface ModeSelectionProps {
-    className?: string;
-    modes: string[];
-    current_mode: string;
-    onModeChange?: (option: string) => void;
-}
-
 export interface InputContainerProps {
     isGenerating: boolean;
-    isRecording: boolean;
     textareaRef: React.RefObject<HTMLTextAreaElement>;
     fileInputRef: React.RefObject<HTMLInputElement>;
     message: string;
     files: File[];
     setMessage: React.Dispatch<React.SetStateAction<string>>;
     setFiles: React.Dispatch<React.SetStateAction<File[]>>;
-    onSpeechRecognition: () => Promise<void>;
     onSendMessage: () => Promise<void>;
     onStopGeneration: () => Promise<void>;
 }
@@ -75,7 +67,7 @@ export interface HistorySidebarProps {
 
 export interface Message {
     id: string;
-    content: { text?: { prompt?: string, response?: string, execution?: string[], validation?: string, output?: string }, files?: FileFormat[], task?: string, taskStatus?: string };
+    content: { text?: { prompt?: string, response?: string, execution?: string[], validation?: string, output?: string }, files?: FileFormat[], task?: string, taskStatus?: string, aborted?: boolean };
 }
 
 export interface FileFormat {
@@ -112,8 +104,34 @@ export interface ParticlesProps {
 }
 
 export interface Settings {
-    client_id: string;
-    trace_user_id: string;
+    theme: string;
+    enableHistory: boolean;
+    enableNotifications: boolean;
+    pinnedPrompts: string[];
+    models: Partial<Record<StageId, ModelConfig>>;
+}
+
+export type ProviderId = "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter";
+
+export type StageId = "t1" | "t2" | "t3" | "t4" | "title" | "step";
+
+export interface ModelConfig {
+    provider: ProviderId;
+    model: string;
+}
+
+export interface ApiKeys {
+    openai?: string;
+    anthropic?: string;
+    google?: string;
+    xai?: string;
+    groq?: string;
+    openrouter?: string;
+}
+
+export interface AppSettings {
+    settings: Settings;
+    apiKeys: ApiKeys;
 }
 
 export interface DomProps {

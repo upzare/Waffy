@@ -3,12 +3,8 @@ import { Files, Globe, Images, MessageSquare } from "lucide-react";
 import type { HeroProps } from "../../types";
 import styles from "css/panel/Hero.module.css";
 
-const Hero: React.FC<HeroProps> = ({ hidden, onPromptClick }) => {
-    const suggestedPrompts = [
-        "What is in my screen",
-        "Look for latest news on AI",
-        "Summarize this page contents"
-    ];
+const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => {
+    const suggestedPrompts = pinnedPrompts.filter((prompt) => prompt.trim().length > 0);
 
     return (
         <div className={`${styles.heroSection} ${hidden ? styles.hidden : ""}`}>
@@ -46,14 +42,16 @@ const Hero: React.FC<HeroProps> = ({ hidden, onPromptClick }) => {
                 </div>
             </div>
 
-            <div className={styles.suggestedPromptsContainer}>
-                <h2 className={styles.suggestedPromptsTitle}>Try asking</h2>
-                <div className={styles.suggestedPrompts}>
-                    {suggestedPrompts.map((prompt, index) => (
-                        <SuggestedPromptButton key={index} text={prompt} onClick={() => onPromptClick(prompt)} />
-                    ))}
+            {suggestedPrompts.length > 0 && (
+                <div className={styles.suggestedPromptsContainer}>
+                    <h2 className={styles.suggestedPromptsTitle}>Try asking</h2>
+                    <div className={styles.suggestedPrompts}>
+                        {suggestedPrompts.map((prompt, index) => (
+                            <SuggestedPromptButton key={index} text={prompt} onClick={() => onPromptClick(prompt)} />
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     )
 }

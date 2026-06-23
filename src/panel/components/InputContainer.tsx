@@ -1,32 +1,23 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect } from "react";
 import toast from "react-hot-toast";
-import { CircleStop, EllipsisVertical, File, Info, Mic, Paperclip, Send, Settings, Share, X } from "lucide-react";
+import { CircleStop, File, Paperclip, Send, X } from "lucide-react";
 import type { InputContainerProps } from "../../types";
 import styles from "css/panel/InputContainer.module.css";
-import ModeSelection from "./ModeSelection";
 
 const InputContainer: React.FC<InputContainerProps> = ({
     isGenerating,
-    isRecording,
     textareaRef,
     fileInputRef,
     message,
     files,
     setMessage,
     setFiles,
-    onSpeechRecognition,
     onSendMessage,
     onStopGeneration,
 }) => {
-    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-    const optionsMenuRef = useRef<HTMLDivElement>(null);
-    const fileInputIconRef = useRef<HTMLButtonElement>(null);
-    const microphoneIconRef = useRef<HTMLButtonElement>(null);
-    const sendIconRef = useRef<HTMLButtonElement>(null);
-
-    const MODES = ["auto", "search", "research", "automate"];
     const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
     const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+    const canSend = message.trim().length > 0 || files.length > 0;
 
     useEffect(() => {
         if (textareaRef.current) textareaRef.current.focus();
@@ -40,23 +31,10 @@ const InputContainer: React.FC<InputContainerProps> = ({
         }
     }, [message]);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (optionsMenuRef.current && !optionsMenuRef.current.contains(event.target as Node)) {
-                setShowOptionsMenu(false);
-            }
-        }
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        }
-    }, []);
-
     const handleKeyDown = async (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            onSendMessage();
+            if (canSend && !isGenerating) onSendMessage();
         }
     }
 
@@ -79,40 +57,9 @@ const InputContainer: React.FC<InputContainerProps> = ({
         setFiles((prev) => prev.filter((_, i) => i !== index));
     }
 
-    const toggleOptionsMenu = () => {
-        setShowOptionsMenu(!showOptionsMenu);
-    }
-
-    const handleSettings = () => {
-        chrome.runtime.openOptionsPage();
-    }
-
     return (
         <div className={styles.inputContainer}>
             <div className={styles.inputBox}>
-                <div className={styles.inputOptionsContainer} ref={optionsMenuRef}>
-                    <button className={styles.optionsButton} onClick={toggleOptionsMenu} title="Options">
-                        <EllipsisVertical />
-                    </button>
-
-                    {showOptionsMenu && (
-                        <div className={styles.optionsMenu}>
-                            <div className={styles.optionsMenuItem} onClick={() => handleSettings()}>
-                                <Settings />
-                                <span>Settings</span>
-                            </div>
-                            <div className={styles.optionsMenuItem}>
-                                <Share />
-                                <span>Share</span>
-                            </div>
-                            <div className={styles.optionsMenuItem}>
-                                <Info />
-                                <span>Help</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
                 <textarea
                     ref={textareaRef}
                     className={styles.inputTextarea}
@@ -121,7 +68,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
                     rows={1}
-                    disabled={!!(isGenerating || isRecording)}
+                    disabled={isGenerating}
                 />
                 <div className={styles.inputButtons}>
                     {isGenerating ? (
@@ -139,35 +86,21 @@ const InputContainer: React.FC<InputContainerProps> = ({
                                 onChange={handleFileUpload}
                             />
                             <button
-                                ref={fileInputIconRef}
                                 className={styles.actionButton}
                                 onClick={() => fileInputRef.current?.click()}
-                                disabled={!!(isGenerating || isRecording)}
+                                disabled={isGenerating}
                                 title="Attach files"
                             >
                                 <Paperclip />
                             </button>
-                            {message === "" ? (
-                                <button
-                                    ref={microphoneIconRef}
-                                    className={styles.actionButton}
-                                    onClick={onSpeechRecognition}
-                                    title="Microphone"
-                                    disabled={!!(isGenerating || isRecording)}
-                                >
-                                    <Mic />
-                                </button>
-                            ) : (
-                                <button
-                                    ref={sendIconRef}
-                                    className={`${styles.actionButton} ${styles.sendButton}`}
-                                    onClick={onSendMessage}
-                                    disabled={!!(isGenerating || isRecording)}
-                                    title="Send"
-                                >
-                                    <Send />
-                                </button>
-                            )}
+                            <button
+                                className={`${styles.actionButton} ${styles.sendButton}`}
+                                onClick={onSendMessage}
+                                disabled={!canSend || isGenerating}
+                                title="Send"
+                            >
+                                <Send />
+                            </button>
                         </>
                     )}
                 </div>

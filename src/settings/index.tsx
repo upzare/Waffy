@@ -2,79 +2,67 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import toast, { Toaster } from 'react-hot-toast';
 import Browser from 'webextension-polyfill';
-import { Settings as SettingsIcon, CreditCard, Activity, User, Info } from 'lucide-react';
-import type { Settings as SettingsType } from '../types';
-import styles from 'css/settings/Settings.module.css';
+import { Settings as SettingsIcon, Key, Cpu, Info } from 'lucide-react';
+import { getAppSettings, saveAppSettings, DEFAULT_PINNED_PROMPTS } from '@/lib/client';
+import { DEFAULT_MODELS } from '@/lib/llm/model';
+import type { ApiKeys, Settings as SettingsType } from '../types';
+import styles from 'css/settings/Root.module.css';
 
 import GeneralSection from './components/GeneralSection';
-import AccountSection from './components/AccountSection';
-import BillingSection from './components/BillingSection';
-import UsageSection from './components/UsageSection';
+import ApiKeysSection from './components/ApiKeysSection';
+import ModelsSection from './components/ModelsSection';
 import AboutSection from './components/AboutSection';
 
 const sections = [
-    { id: "general", label: "General", description: "Manage your core extension preferences and configurations.", icon: SettingsIcon },
-    { id: "account", label: "Account", description: "View your account information fetched from the server.", icon: User },
-    { id: "billing", label: "Billing & Payments", description: "Manage your credits, payment methods, and billing history.", icon: CreditCard },
-    { id: "usage", label: "Usage", description: "Monitor your API usage and limits over time.", icon: Activity },
-    { id: "about", label: "About", description: "Information about Waffy and its creators.", icon: Info },
+    { id: "general", label: "General", description: "Manage your core extension preferences.", icon: SettingsIcon },
+    { id: "api-keys", label: "API Keys", description: "Connect your OpenAI, Anthropic, Google, OpenRouter, xAI, or Groq API keys.", icon: Key },
+    { id: "models", label: "Models", description: "Configure which provider and model to use for each pipeline stage.", icon: Cpu },
+    { id: "about", label: "About", description: "Information about Waffy.", icon: Info },
 ];
 
-const mockServerData = {
-    client_id: "client_9a8b7c6d5e4f3g2h",
-    trace_user_id: "usr_trace_12345",
-    account_id: "acc_987654321",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    available_balance: 37.52,
-    total_spend: 12.48,
-    automations_run: 1248,
-    tokens_used: "452k",
-    time_saved: "14hrs",
+const defaultSettings: SettingsType = {
+    theme: "system",
+    enableHistory: true,
+    enableNotifications: true,
+    pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
+    models: { ...DEFAULT_MODELS },
 };
 
-const mockInvoices = [
-    { id: "INV-2026-001", date: "Apr 01, 2026", amount: "$12.48", status: "Paid" },
-    { id: "INV-2026-002", date: "Mar 01, 2026", amount: "$8.99", status: "Paid" },
-    { id: "INV-2026-003", date: "Feb 01, 2026", amount: "$15.00", status: "Paid" },
-];
+const getHashSection = () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash === "" || !sections.some((section) => section.id === hash)) {
+        return sections[0].id;
+    }
+    return hash;
+};
 
 const Settings = () => {
-    const [settings, setSettings] = useState<SettingsType>({
-        client_id: "",
-        trace_user_id: "",
-    });
-
-    const getHashSection = () => {
-        const hash = window.location.hash.replace('#', '');
-        if (hash === "" || !sections.some(s => s.id === hash)) {
-            window.location.hash = sections[0].id;
-            window.location.reload();
-        }
-        return hash;
-    };
-
     const [activeSection, setActiveSection] = useState(getHashSection);
+    const activeSectionMeta = sections.find((section) => section.id === activeSection) ?? sections[0];
+    const logoUrl = Browser.runtime.getURL('assets/logo.svg');
 
-    // General settings states
-    const [theme, setTheme] = useState('dark');
-    const [defaultModel, setDefaultModel] = useState('gpt-4o');
-    const [showNotificationBadge, setShowNotificationBadge] = useState(true);
+    const [settings, setSettings] = useState<SettingsType>(defaultSettings);
+    const [apiKeys, setApiKeys] = useState<ApiKeys>({});
+
+    const [theme, setTheme] = useState('system');
     const [enableHistory, setEnableHistory] = useState(true);
-    const [enableKeyboardShortcuts, setEnableKeyboardShortcuts] = useState(true);
-
-    // Privacy states
-    const [telemetry, setTelemetry] = useState(false);
+    const [enableNotifications, setEnableNotifications] = useState(true);
+    const [pinnedPrompts, setPinnedPrompts] = useState<string[]>([...DEFAULT_PINNED_PROMPTS]);
 
     useEffect(() => {
         const loadSettings = async () => {
             try {
-                const localStorage = await Browser.storage.local.get("data");
-                if (localStorage.data) {
-                    setSettings(JSON.parse(localStorage.data as string));
-                } else {
-                    handleSave();
-                }
+                const data = await getAppSettings();
+                setSettings(data.settings);
+                setApiKeys(data.apiKeys);
+                setTheme(data.settings.theme ?? 'system');
+                setEnableHistory(data.settings.enableHistory ?? true);
+                setEnableNotifications(data.settings.enableNotifications ?? true);
+                setPinnedPrompts(
+                    data.settings.pinnedPrompts !== undefined
+                        ? (data.settings.pinnedPrompts.length > 0 ? data.settings.pinnedPrompts : [""])
+                        : [...DEFAULT_PINNED_PROMPTS]
+                );
             } catch (error) {
                 console.error('Error loading settings:', error);
             }
@@ -84,17 +72,17 @@ const Settings = () => {
 
     const handleSave = async () => {
         try {
-            await Browser.storage.local.set({ data: JSON.stringify(settings) });
-            chrome.sidePanel.setOptions({
-                path: "panel.html",
-                enabled: false
-            });
-            chrome.sidePanel.setOptions({
-                path: "panel.html",
-                enabled: true
-            });
-            // @ts-ignore
-            chrome.windows.getCurrent(w => chrome.sidePanel.open({ windowId: w.id }))
+            const merged: SettingsType = {
+                ...settings,
+                theme,
+                enableHistory,
+                enableNotifications,
+                pinnedPrompts: pinnedPrompts.map((prompt) => prompt.trim()).filter(Boolean),
+            };
+            await saveAppSettings(merged, apiKeys);
+            setSettings(merged);
+            chrome.sidePanel.setOptions({ path: "panel.html", enabled: false });
+            chrome.sidePanel.setOptions({ path: "panel.html", enabled: true });
             toast.success('Settings saved successfully');
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -102,28 +90,14 @@ const Settings = () => {
         }
     };
 
-    const handleReset = async () => {
-        const defaultSettings: SettingsType = {
-            client_id: "",
-            trace_user_id: "",
-        };
-        await Browser.storage.local.set({ data: JSON.stringify(defaultSettings) });
-        chrome.sidePanel.setOptions({
-            path: "panel.html",
-            enabled: false
-        });
-        chrome.sidePanel.setOptions({
-            path: "panel.html",
-            enabled: true
-        });
+    const handleReset = () => {
         setSettings(defaultSettings);
-        setTheme('dark');
-        setDefaultModel('gpt-4o');
-        setShowNotificationBadge(true);
+        setApiKeys({});
+        setTheme('system');
         setEnableHistory(true);
-        setEnableKeyboardShortcuts(true);
-        setTelemetry(false);
-        toast.success('Settings reset to default');
+        setEnableNotifications(true);
+        setPinnedPrompts([...DEFAULT_PINNED_PROMPTS]);
+        toast.success('Changes reset to default values');
     };
 
     const renderSection = () => {
@@ -133,26 +107,20 @@ const Settings = () => {
                     <GeneralSection
                         theme={theme}
                         setTheme={setTheme}
-                        defaultModel={defaultModel}
-                        setDefaultModel={setDefaultModel}
-                        showNotificationBadge={showNotificationBadge}
-                        setShowNotificationBadge={setShowNotificationBadge}
                         enableHistory={enableHistory}
                         setEnableHistory={setEnableHistory}
-                        enableKeyboardShortcuts={enableKeyboardShortcuts}
-                        setEnableKeyboardShortcuts={setEnableKeyboardShortcuts}
-                        telemetry={telemetry}
-                        setTelemetry={setTelemetry}
+                        enableNotifications={enableNotifications}
+                        setEnableNotifications={setEnableNotifications}
+                        pinnedPrompts={pinnedPrompts}
+                        setPinnedPrompts={setPinnedPrompts}
                     />
                 );
-            case 'account':
-                return <AccountSection serverData={mockServerData} />;
-            case 'billing':
-                return <BillingSection serverData={mockServerData} invoices={mockInvoices} />;
-            case 'usage':
-                return <UsageSection serverData={mockServerData} />;
+            case 'api-keys':
+                return <ApiKeysSection apiKeys={apiKeys} setApiKeys={setApiKeys} />;
+            case 'models':
+                return <ModelsSection settings={settings} setSettings={setSettings} apiKeys={apiKeys} />;
             case 'about':
-                return <AboutSection logoUrl={Browser.runtime.getURL('assets/logo.svg')} />;
+                return <AboutSection logoUrl={logoUrl} />;
             default:
                 return null;
         }
@@ -163,48 +131,48 @@ const Settings = () => {
             <Toaster position="top-center" reverseOrder={false} />
             <div className={styles.settingsSidebar}>
                 <div className={styles.settingsSidebarHeader}>
-                    <img src={Browser.runtime.getURL('assets/logo.svg')} alt="Waffy Logo" className={styles.sidebarLogo} />
-                    <h1>Waffy</h1>
+                    <img src={logoUrl} alt="Waffy Logo" className={styles.sidebarLogo} />
+                    <h1>Waffy Settings</h1>
                 </div>
-                {sections.map((section) => {
-                    const Icon = section.icon;
-                    return (
-                        <button
-                            key={section.id}
-                            className={`${styles.sidebarItem} ${activeSection === section.id ? styles.active : ''}`}
-                            onClick={() => {
-                                setActiveSection(section.id);
-                                window.location.hash = section.id;
-                            }}
-                        >
-                            <Icon size={18} />
-                            <span>{section.label}</span>
-                        </button>
-                    );
-                })}
+                <nav className={styles.sidebarNav}>
+                    {sections.map((section) => {
+                        const Icon = section.icon;
+                        const isActive = activeSection === section.id;
+                        return (
+                            <button
+                                key={section.id}
+                                className={`${styles.sidebarItem} ${isActive ? styles.sidebarItemActive : ''}`}
+                                onClick={() => {
+                                    setActiveSection(section.id);
+                                    window.location.hash = section.id;
+                                }}
+                            >
+                                <span className={styles.sidebarItemIcon}>
+                                    <Icon size={17} />
+                                </span>
+                                <span className={styles.sidebarItemLabel}>{section.label}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
             </div>
             <div className={styles.settingsMain}>
                 <div className={styles.settingsHeader}>
                     <div className={styles.settingsHeaderTitle}>
-                        <h2>{sections.find(s => s.id === activeSection)?.label}</h2>
-                        <p className={styles.settingsHeaderDescription}>{sections.find(s => s.id === activeSection)?.description}</p>
+                        <h2>{activeSectionMeta.label}</h2>
+                        <p className={styles.settingsHeaderDescription}>{activeSectionMeta.description}</p>
                     </div>
                 </div>
-
                 <div className={styles.settingsContent}>
-                    {renderSection()}
+                    <div className={styles.sectionContainer}>
+                        {renderSection()}
+                    </div>
                 </div>
                 <div className={styles.settingsFooter}>
-                    <button className={styles.resetButton} onClick={handleReset}>
-                        Reset
-                    </button>
+                    <button className={styles.resetButton} onClick={handleReset}>Reset Defaults</button>
                     <div className={styles.actionButtons}>
-                        <button className={styles.cancelButton} onClick={() => window.close()}>
-                            Cancel
-                        </button>
-                        <button className={styles.saveButton} onClick={handleSave}>
-                            Save Changes
-                        </button>
+                        <button className={styles.cancelButton} onClick={() => window.close()}>Cancel</button>
+                        <button className={styles.saveButton} onClick={handleSave}>Save Changes</button>
                     </div>
                 </div>
             </div>

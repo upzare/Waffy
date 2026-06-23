@@ -1,39 +1,50 @@
 import React from 'react';
-import { ExternalLink } from 'lucide-react';
-import styles from 'css/settings/Settings.module.css';
+import { ExternalLink, Globe } from 'lucide-react';
+import styles from 'css/settings/About.module.css';
 
 interface AboutSectionProps {
     logoUrl: string;
 }
 
+const LINKS = [
+    { href: 'https://waffy.io', label: 'Official Website', icon: Globe },
+    { href: 'https://waffy.io/terms', label: 'Terms of Service', icon: ExternalLink },
+    { href: 'https://waffy.io/privacy', label: 'Privacy Policy', icon: ExternalLink },
+    { href: 'https://x.com/WaffyHQ', label: 'Follow on Twitter', icon: ExternalLink },
+];
+
 const AboutSection: React.FC<AboutSectionProps> = ({ logoUrl }) => {
     return (
-        <div className={styles.sectionContainer}>
-            <div className={`${styles.card} ${styles.aboutCard}`}>
-                <img src={logoUrl} alt="Waffy Logo" className={styles.aboutLogo} />
-                <h1 className={styles.aboutTitle}>Waffy</h1>
-                <p className={styles.aboutVersion}>Version 1.0.0</p>
-
-                <div className={styles.aboutLinks}>
-                    <a href="https://waffy.app" target="_blank" rel="noreferrer" className={`${styles.cancelButton} ${styles.aboutLink}`}>
-                        Official Website <ExternalLink size={14} />
-                    </a>
-                    <a href="https://waffy.app/terms" target="_blank" rel="noreferrer" className={`${styles.cancelButton} ${styles.aboutLink}`}>
-                        Terms of Service <ExternalLink size={14} />
-                    </a>
-                    <a href="https://waffy.app/privacy" target="_blank" rel="noreferrer" className={`${styles.cancelButton} ${styles.aboutLink}`}>
-                        Privacy Policy <ExternalLink size={14} />
-                    </a>
-                    <a href="https://twitter.com/waffyhq" target="_blank" rel="noreferrer" className={`${styles.cancelButton} ${styles.aboutLink}`}>
-                        Follow us on Twitter <ExternalLink size={14} />
-                    </a>
+        <>
+            <div className={styles.aboutHero}>
+                <div className={styles.aboutLogoWrap}>
+                    <img src={logoUrl} alt="Waffy Logo" className={styles.aboutLogo} />
                 </div>
-
-                <p className={styles.aboutCopyright}>
-                    © {new Date().getFullYear()} Waffy HQ. All rights reserved.
-                </p>
+                <h2 className={styles.aboutTitle}>Waffy</h2>
+                <p className={styles.aboutTagline}>AI-powered browser automation</p>
+                <span className={styles.aboutVersionBadge}>Version 1.0.0</span>
             </div>
-        </div>
+
+            <div className={styles.aboutLinksGrid}>
+                {LINKS.map(({ href, label, icon: Icon }) => (
+                    <a
+                        key={href}
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={styles.aboutLinkCard}
+                    >
+                        <Icon size={16} />
+                        <span>{label}</span>
+                        <ExternalLink size={14} className={styles.aboutLinkArrow} />
+                    </a>
+                ))}
+            </div>
+
+            <p className={styles.aboutCopyright}>
+                © {new Date().getFullYear()} Waffy AI. All rights reserved.
+            </p>
+        </>
     );
 };
 

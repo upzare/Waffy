@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Waffy",
   "version": "1.0.0",
-  "description": "Waffy is a chrome extension designed to enhance your browsing experience.",
+  "description": "Waffy is an AI assistant in your browser that can browse pages, answer questions and automate tasks for you.",
   "icons": {
     "64": "assets/icons/icon64.png",
     "128": "assets/icons/icon128.png",
@@ -41,10 +41,8 @@
     "tabs",
     "sidePanel",
     "activeTab",
-    "tabs",
     "debugger",
-    "webNavigation",
-    "cookies"
+    "webNavigation"
   ],
   "host_permissions": [
     "http://*/*",

@@ -1,6 +1,13 @@
-/// <reference types="react-scripts" />
+/// <reference types="chrome" />
+
+declare module "*.module.css" {
+    const classes: { readonly [key: string]: string };
+    export default classes;
+}
 
 declare global {
+    const chrome: typeof chrome;
+
     interface Window {
         ai: {
             [key: string]: {
@@ -12,5 +19,3 @@ declare global {
     }
     declare const self: Window & typeof globalThis;
 }
-
-export { };
