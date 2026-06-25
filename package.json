@@ -5,10 +5,10 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aravind-manoj/Waffy.git"
+    "url": "https://github.com/upzare/Waffy.git"
   },
   "bugs": {
-    "url": "https://github.com/aravind-manoj/Waffy/issues"
+    "url": "https://github.com/upzare/Waffy/issues"
   },
   "homepage": "https://waffy.io",
   "dependencies": {

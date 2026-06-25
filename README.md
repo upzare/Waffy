@@ -36,7 +36,7 @@ Add API keys in **Extension settings → API Keys** after installation.
 ### Build from source
 
 ```bash
-git clone https://github.com/aravind-manoj/Waffy.git
+git clone https://github.com/upzare/Waffy.git
 cd Waffy
 npm install
 npm run build
@@ -92,7 +92,7 @@ See [waffy.io/privacy](https://waffy.io/privacy) for the full privacy policy.
 ## Links
 
 - [Website](https://waffy.io)
-- [GitHub](https://github.com/aravind-manoj/Waffy)
+- [GitHub](https://github.com/upzare/Waffy)
 - [Twitter / X](https://x.com/WaffyHQ)
 
 ## Contributing

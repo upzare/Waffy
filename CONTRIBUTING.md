@@ -4,7 +4,7 @@ Thank you for your interest in contributing to Waffy. This project is maintained
 
 ## Ways to contribute
 
-- Report bugs and request features via [GitHub Issues](https://github.com/aravind-manoj/Waffy/issues)
+- Report bugs and request features via [GitHub Issues](https://github.com/upzare/Waffy/issues)
 - Improve documentation
 - Submit pull requests with bug fixes or enhancements
 - Help others in issue discussions
@@ -18,7 +18,7 @@ Thank you for your interest in contributing to Waffy. This project is maintained
 ## Development setup
 
 ```bash
-git clone https://github.com/aravind-manoj/Waffy.git
+git clone https://github.com/upzare/Waffy.git
 cd Waffy
 npm install
 npm run dev

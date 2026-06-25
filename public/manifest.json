@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Waffy",
+  "name": "Waffy - AI Copilot for Web",
   "version": "1.0.0",
-  "description": "Waffy is an AI assistant in your browser that can browse pages, answer questions and automate tasks for you.",
+  "description": "Automate your browser with AI. Browse, click and complete multi-step workflows with models you like. Free and open source.",
   "icons": {
     "64": "assets/icons/icon64.png",
     "128": "assets/icons/icon128.png",
