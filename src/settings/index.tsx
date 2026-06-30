@@ -81,8 +81,7 @@ const Settings = () => {
             };
             await saveAppSettings(merged, apiKeys);
             setSettings(merged);
-            chrome.sidePanel.setOptions({ path: "panel.html", enabled: false });
-            chrome.sidePanel.setOptions({ path: "panel.html", enabled: true });
+            chrome.runtime.sendMessage({ action: 'RELOAD_PANEL' });
             toast.success('Settings saved successfully');
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -132,7 +131,7 @@ const Settings = () => {
             <div className={styles.settingsSidebar}>
                 <div className={styles.settingsSidebarHeader}>
                     <img src={logoUrl} alt="Waffy Logo" className={styles.sidebarLogo} />
-                    <h1>Waffy Settings</h1>
+                    <h1>Extension Settings</h1>
                 </div>
                 <nav className={styles.sidebarNav}>
                     {sections.map((section) => {

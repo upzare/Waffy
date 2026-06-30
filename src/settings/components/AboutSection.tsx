@@ -21,7 +21,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({ logoUrl }) => {
                     <img src={logoUrl} alt="Waffy Logo" className={styles.aboutLogo} />
                 </div>
                 <h2 className={styles.aboutTitle}>Waffy</h2>
-                <p className={styles.aboutTagline}>AI-powered browser automation</p>
+                <p className={styles.aboutTagline}>Your AI Copilot for Web</p>
                 <span className={styles.aboutVersionBadge}>Version 1.0.0</span>
             </div>
 

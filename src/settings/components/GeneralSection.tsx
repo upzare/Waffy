@@ -13,7 +13,7 @@ interface GeneralSectionProps {
     setPinnedPrompts: (value: string[]) => void;
 }
 
-const MAX_PINNED_PROMPTS = 5;
+const MAX_PINNED_PROMPTS = 4;
 
 const THEME_OPTIONS = [
     { value: 'system', label: 'System', icon: Monitor },

@@ -73,6 +73,13 @@ const App = () => {
         fetchConversations();
         checkApiKeys();
 
+        const onMessage = (request: { action?: string }) => {
+            if (request.action === 'RELOAD_PANEL') {
+                window.location.reload();
+            }
+        };
+        chrome.runtime.onMessage.addListener(onMessage);
+
         const handleMouseMove = (e: MouseEvent) => {
             const threshold = window.innerWidth - 10;
             if (e.clientX > threshold) {
@@ -88,6 +95,7 @@ const App = () => {
 
         document.addEventListener("mousemove", handleMouseMove);
         return () => {
+            chrome.runtime.onMessage.removeListener(onMessage);
             document.removeEventListener("mousemove", handleMouseMove);
             if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
         }
@@ -483,7 +491,7 @@ const App = () => {
             return !apiKeys[provider];
         });
         if (missingProvider) {
-            toast.error("Configure API keys in extension settings before sending messages.");
+            toast.error("Configure API keys in extension settings.");
             chrome.runtime.openOptionsPage();
             return;
         }
@@ -641,7 +649,7 @@ const App = () => {
                 />
                 {missingApiKeys && (
                     <div style={{ padding: "8px 16px", background: "#3d2a00", color: "#f5c542", fontSize: "13px", textAlign: "center" }}>
-                        API keys required. <button style={{ color: "#fff", textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }} onClick={() => chrome.runtime.openOptionsPage()}>Open Settings</button>
+                        API keys not configured. <button style={{ color: "#fff", textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }} onClick={() => chrome.runtime.openOptionsPage()}>Open Settings</button>
                     </div>
                 )}
                 <Hero hidden={isChat} pinnedPrompts={pinnedPrompts} onPromptClick={handlePromptClick} />

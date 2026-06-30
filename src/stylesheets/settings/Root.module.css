@@ -36,7 +36,7 @@ body {
 }
 
 .settingsSidebar {
-    width: 260px;
+    width: 280px;
     flex-shrink: 0;
     background: var(--surface-1);
     border-right: 1px solid var(--border);

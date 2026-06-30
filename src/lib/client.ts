@@ -19,10 +19,9 @@ export const initClient = async () => {
 
 export const DEFAULT_PINNED_PROMPTS = [
     "What is in my screen",
+    "Fill out this form for me",
     "Look for latest news on AI",
     "Summarize this page contents",
-    "Fill out this form for me",
-    "Find the key details on this page",
 ];
 
 const defaultSettings: Settings = {

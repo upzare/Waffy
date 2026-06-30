@@ -1,5 +1,5 @@
 import SuggestedPromptButton from "./SuggestedPromptButton";
-import { Files, Globe, Images, MessageSquare } from "lucide-react";
+import { BookOpen, Bot, Globe, MessageSquare } from "lucide-react";
 import type { HeroProps } from "../../types";
 import styles from "css/panel/Hero.module.css";
 
@@ -21,23 +21,23 @@ const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => 
 
                     <div className={styles.capabilityItem}>
                         <div className={styles.capabilityIcon}>
+                            <BookOpen />
+                        </div>
+                        <div className={styles.capabilityLabel}>Research</div>
+                    </div>
+
+                    <div className={styles.capabilityItem}>
+                        <div className={styles.capabilityIcon}>
+                            <Bot />
+                        </div>
+                        <div className={styles.capabilityLabel}>Automate</div>
+                    </div>
+
+                    <div className={styles.capabilityItem}>
+                        <div className={styles.capabilityIcon}>
                             <MessageSquare />
                         </div>
                         <div className={styles.capabilityLabel}>Chat</div>
-                    </div>
-
-                    <div className={styles.capabilityItem}>
-                        <div className={styles.capabilityIcon}>
-                            <Files />
-                        </div>
-                        <div className={styles.capabilityLabel}>Files</div>
-                    </div>
-
-                    <div className={styles.capabilityItem}>
-                        <div className={styles.capabilityIcon}>
-                            <Images />
-                        </div>
-                        <div className={styles.capabilityLabel}>Images</div>
                     </div>
                 </div>
             </div>
