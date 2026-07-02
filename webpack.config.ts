@@ -9,6 +9,7 @@ import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin';
 import ZipPlugin from "zip-webpack-plugin";
 import LicensePlugin from "webpack-license-plugin";
 import ReactRefreshTypeScript from 'react-refresh-typescript';
+import { defineReactCompilerLoaderOption, reactCompilerLoader } from 'react-compiler-webpack';
 
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(process.cwd(), "./public", "manifest.json"), "utf8"));
 
@@ -89,7 +90,6 @@ const config: webpack.Configuration = {
       {
         test: /\.(ts|tsx)$/,
         exclude: /node_modules/,
-        // loader: "ts-loader",
         use: [
           {
             loader: "ts-loader",
@@ -99,8 +99,12 @@ const config: webpack.Configuration = {
                   Boolean
                 ),
               }),
-              transpileOnly: isDevelopment,
+              transpileOnly: true,
             },
+          },
+          {
+            loader: reactCompilerLoader,
+            options: defineReactCompilerLoaderOption({}),
           },
         ],
       },
@@ -119,6 +123,7 @@ const config: webpack.Configuration = {
                 ["@babel/preset-react"]
               ],
               plugins: [
+                "babel-plugin-react-compiler",
                 !isDevelopment && ["@babel/plugin-transform-react-jsx", { "runtime": "automatic" }],
                 isDevelopment && ["@babel/plugin-transform-react-jsx-development", { "runtime": "automatic" }],
                 isDevelopment && ["react-refresh/babel"],
@@ -143,7 +148,7 @@ const config: webpack.Configuration = {
     new ZipPlugin({
       filename: `${MANIFEST.name}-${MANIFEST.version}.zip`,
       path: path.join(process.cwd(), ".output"),
-    }),
+    }) as any,
     // new LicensePlugin({
     //   outputFilename: "licenses.json",
     // }),

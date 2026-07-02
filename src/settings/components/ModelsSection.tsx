@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { AlertCircle, ChevronDown } from 'lucide-react';
 import { CUSTOM_MODEL_OPTION, isPresetModel, PROVIDER_MODELS } from '@/lib/llm/model';
 import { getProviderMeta, hasApiKey, PROVIDERS } from '../providers';
@@ -40,13 +40,9 @@ const STAGE_GROUPS: StageGroup[] = [
 
 const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, apiKeys }) => {
     const [expandedStages, setExpandedStages] = useState<Partial<Record<StageId, boolean>>>({});
-    const providerHasKey = useMemo(
-        () =>
-            Object.fromEntries(
-                PROVIDERS.map((provider) => [provider.id, hasApiKey(apiKeys, provider.id)])
-            ) as Record<ProviderId, boolean>,
-        [apiKeys]
-    );
+    const providerHasKey = Object.fromEntries(
+        PROVIDERS.map((provider) => [provider.id, hasApiKey(apiKeys, provider.id)])
+    ) as Record<ProviderId, boolean>;
 
     const updateStage = (stage: StageId, patch: Partial<ModelConfig>) => {
         setSettings((prev) => ({

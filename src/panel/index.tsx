@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
@@ -150,7 +150,7 @@ const App = () => {
         }
     };
 
-    const updateConversationsDB = useCallback((updatedMessages: Message[], immediate = false) => {
+    const updateConversationsDB = (updatedMessages: Message[], immediate = false) => {
         const write = () => {
             const conversationDB = db.current?.transaction("conversations", "readwrite").objectStore("conversations");
             if (conversationDB && conversationIdRef.current) {
@@ -172,7 +172,7 @@ const App = () => {
 
         if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
         dbSyncTimerRef.current = setTimeout(write, 300);
-    }, []);
+    };
 
     const syncMessages = (updatedMessages: Message[], immediate = false) => {
         updateConversationsDB(updatedMessages, immediate);
