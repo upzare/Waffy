@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import RenderResponse from "./RenderResponse";
+import RenderResponse from "./render-response";
 import { Copy, File, Repeat, X } from "lucide-react";
 import type { ChatContainerProps, FileFormat } from "../../types";
-import styles from "css/panel/ChatContainer.module.css";
+import styles from "css/panel/chat-container.module.css";
 
 const ChatContainer: React.FC<ChatContainerProps> = ({ hidden, messages, streaming, isGenerating, statusText, errorText, setErrorText }) => {
     const chatContainerRef = useRef<HTMLDivElement>(null);

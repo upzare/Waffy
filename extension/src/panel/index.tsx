@@ -3,10 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { v4 as uuid4 } from 'uuid';
 import toast, { Toaster } from 'react-hot-toast';
 import { AI, createTitle } from '@/lib/agent';
-import Header from './components/Header';
-import ChatContainer from './components/ChatContainer';
-import InputContainer from './components/InputContainer';
-import { fileHandler } from './utils/FileHandler';
+import Header from './components/header';
+import ChatContainer from './components/chat-container';
+import InputContainer from './components/input-container';
+import { fileHandler } from './utils/file-handler';
 import { availableFunctions, updateOpenedTabs } from '@/lib/tools';
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from '@/lib/client';
 import {
@@ -16,12 +16,12 @@ import {
     buildT4Messages,
 } from '@/lib/llm/messages';
 import type { StreamSession } from '@/lib/llm/stream';
-import HistorySidebar from './components/HistorySidebar';
-import Hero from './components/Hero';
-import Particles from './components/Particles';
-import Loader from './components/Loader';
+import HistorySidebar from './components/history-sidebar';
+import Hero from './components/hero';
+import Particles from './components/particles';
+import Loader from './components/loader';
 import type { Message, Conversation, StreamingState, ToolCall, FileFormat } from '../types';
-import styles from "css/panel/Root.module.css";
+import styles from "css/panel/root.module.css";
 
 const App = () => {
     const [messages, setMessages] = useState<Message[]>([]);

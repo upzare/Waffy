@@ -20,10 +20,10 @@
     "noEmit": false,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./extension/src/*"]
     }
   },
   "include": [
-    "src"
+    "extension/src"
   ]
 }

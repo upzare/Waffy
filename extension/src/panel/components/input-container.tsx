@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import toast from "react-hot-toast";
 import { CircleStop, File, Paperclip, Send, X } from "lucide-react";
 import type { InputContainerProps } from "../../types";
-import styles from "css/panel/InputContainer.module.css";
+import styles from "css/panel/input-container.module.css";
 
 const InputContainer: React.FC<InputContainerProps> = ({
     isGenerating,

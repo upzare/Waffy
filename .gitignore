@@ -20,8 +20,8 @@ icon_caption_florence/
 icon_detect/
 
 # production
-build
-.output
+build/
+.output/
 
 # misc
 .DS_Store

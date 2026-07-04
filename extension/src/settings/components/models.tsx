@@ -3,7 +3,7 @@ import { AlertCircle, ChevronDown } from 'lucide-react';
 import { CUSTOM_MODEL_OPTION, isPresetModel, PROVIDER_MODELS } from '@/lib/llm/model';
 import { getProviderMeta, hasApiKey, PROVIDERS } from '../providers';
 import type { ApiKeys, ModelConfig, ProviderId, Settings, StageId } from '@/types';
-import styles from 'css/settings/Models.module.css';
+import styles from 'css/settings/models.module.css';
 
 interface ModelsSectionProps {
     settings: Settings;

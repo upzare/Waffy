@@ -1,6 +1,6 @@
 import { Trash2 } from "lucide-react";
 import type { HistorySidebarProps } from "../../types";
-import styles from "css/panel/HistorySidebar.module.css";
+import styles from "css/panel/history-sidebar.module.css";
 
 const HistorySidebar: React.FC<HistorySidebarProps> = ({
     conversations,

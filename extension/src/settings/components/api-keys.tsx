@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { hasApiKey, PROVIDERS } from '../providers';
 import type { ApiKeys } from '@/types';
-import styles from 'css/settings/ApiKeys.module.css';
+import styles from 'css/settings/api-keys.module.css';
 
 interface ApiKeysSectionProps {
     apiKeys: ApiKeys;

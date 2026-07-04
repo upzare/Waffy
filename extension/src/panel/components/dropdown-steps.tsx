@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import styles from "css/panel/DropdownSteps.module.css";
+import styles from "css/panel/dropdown-steps.module.css";
 
 export const DropdownSteps = ({ steps, isExecuting = false }: { steps: string[], isExecuting?: boolean }) => {
     const stepRefs = useRef<(HTMLDivElement | null)[]>([]);

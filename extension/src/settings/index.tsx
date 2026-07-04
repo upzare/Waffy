@@ -6,12 +6,12 @@ import { Settings as SettingsIcon, Key, Cpu, Info } from 'lucide-react';
 import { getAppSettings, saveAppSettings, DEFAULT_PINNED_PROMPTS } from '@/lib/client';
 import { DEFAULT_MODELS } from '@/lib/llm/model';
 import type { ApiKeys, Settings as SettingsType } from '../types';
-import styles from 'css/settings/Root.module.css';
+import styles from 'css/settings/root.module.css';
 
-import GeneralSection from './components/GeneralSection';
-import ApiKeysSection from './components/ApiKeysSection';
-import ModelsSection from './components/ModelsSection';
-import AboutSection from './components/AboutSection';
+import GeneralSection from './components/general';
+import ApiKeysSection from './components/api-keys';
+import ModelsSection from './components/models';
+import AboutSection from './components/about';
 
 const sections = [
     { id: "general", label: "General", description: "Manage your core extension preferences.", icon: SettingsIcon },

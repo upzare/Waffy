@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bell, History, Monitor, Moon, Pin, Plus, Sun, X } from 'lucide-react';
-import styles from 'css/settings/General.module.css';
+import styles from 'css/settings/general.module.css';
 
 interface GeneralSectionProps {
     theme: string;

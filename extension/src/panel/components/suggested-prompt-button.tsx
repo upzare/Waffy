@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { SuggestedPromptProps } from "../../types";
-import styles from "css/panel/SuggestedPromptButton.module.css"
+import styles from "css/panel/suggested-prompt-button.module.css"
 
 const SuggestedPromptButton: React.FC<SuggestedPromptProps> = ({ text, onClick }) => {
     const buttonRef = useRef<HTMLButtonElement>(null);

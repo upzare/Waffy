@@ -11,13 +11,15 @@ import LicensePlugin from "webpack-license-plugin";
 import ReactRefreshTypeScript from 'react-refresh-typescript';
 import { defineReactCompilerLoaderOption, reactCompilerLoader } from 'react-compiler-webpack';
 
-const MANIFEST = JSON.parse(fs.readFileSync(path.join(process.cwd(), "./public", "manifest.json"), "utf8"));
+const EXTENSION_DIR = path.resolve(process.cwd(), "extension");
+
+const MANIFEST = JSON.parse(fs.readFileSync(path.join(EXTENSION_DIR, "public", "manifest.json"), "utf8"));
 
 const PUBLIC_PATH = "/";
 
 const alias = {
-  "@": path.resolve(process.cwd(), "src"),
-  css: path.resolve(process.cwd(), "src/stylesheets"),
+  "@": path.resolve(EXTENSION_DIR, "src"),
+  css: path.resolve(EXTENSION_DIR, "src/stylesheets"),
 };
 
 const fileExtensions = [
@@ -39,15 +41,15 @@ const config: webpack.Configuration = {
   mode: (process.env.NODE_ENV === "production" ? "production" : "development"),
 
   entry: {
-    background: path.join(process.cwd(), "src", "lib", "Background.ts"),
-    content: path.join(process.cwd(), "src", "lib", "Content.ts"),
-    settings: path.join(process.cwd(), "src", "settings", "index.tsx"),
-    main: path.join(process.cwd(), "src", "panel", "index.tsx"),
+    background: path.join(EXTENSION_DIR, "src", "lib", "background.ts"),
+    content: path.join(EXTENSION_DIR, "src", "lib", "content.ts"),
+    settings: path.join(EXTENSION_DIR, "src", "settings", "index.tsx"),
+    main: path.join(EXTENSION_DIR, "src", "panel", "index.tsx"),
   },
 
   output: {
     filename: "[name].bundle.js",
-    path: path.resolve(process.cwd(), 'build'),
+    path: path.resolve(process.cwd(), "build"),
     clean: true,
     publicPath: PUBLIC_PATH,
   },
@@ -155,20 +157,20 @@ const config: webpack.Configuration = {
     new CopyWebpackPlugin({
       patterns: [
         {
-          from: path.resolve(process.cwd(), "public"),
-          to: path.join(process.cwd(), 'build'),
+          from: path.resolve(EXTENSION_DIR, "public"),
+          to: path.join(process.cwd(), "build"),
           force: true,
         },
       ],
     }),
     new HtmlWebpackPlugin({
-      template: path.join(process.cwd(), "src", "panel", "panel.html"),
+      template: path.join(EXTENSION_DIR, "src", "panel", "panel.html"),
       filename: "panel.html",
       chunks: ["main"],
       cache: false,
     }),
     new HtmlWebpackPlugin({
-      template: path.join(process.cwd(), "src", "settings", "settings.html"),
+      template: path.join(EXTENSION_DIR, "src", "settings", "settings.html"),
       filename: "settings.html",
       chunks: ["settings"],
       cache: false,

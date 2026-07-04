@@ -1,6 +1,6 @@
 import React from 'react';
 import { ExternalLink, Globe } from 'lucide-react';
-import styles from 'css/settings/About.module.css';
+import styles from 'css/settings/about.module.css';
 
 interface AboutSectionProps {
     logoUrl: string;

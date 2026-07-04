@@ -70,17 +70,21 @@ After `npm run dev`, reload the extension in `chrome://extensions/` when you mak
 ## Project structure
 
 ```
-src/
-├── panel/          # Side panel UI (chat, history, input)
-├── settings/       # Extension options page (API keys, models, general)
-├── lib/
-│   ├── llm/        # Model providers, streaming, prompts, tools
-│   ├── agent.ts    # Entry point for AI calls
-│   ├── client.ts   # Chrome storage & settings
-│   ├── Background.ts
-│   └── Content.ts  # Page interaction (clicks, typing, screenshots)
-public/             # Manifest, icons, static assets
-build/              # Production output (load this in Chrome)
+├── extension/
+│   ├── src/
+│   │   ├── panel/          # Side panel UI (chat, history, input)
+│   │   ├── settings/       # Extension options page (API keys, models, general)
+│   │   └── lib/
+│   │       ├── llm/        # Model providers, streaming, prompts, tools
+│   │       ├── agent.ts    # Entry point for AI calls
+│   │       ├── client.ts   # Chrome storage & settings
+│   │       ├── background.ts
+│   │       └── content.ts  # Page interaction (clicks, typing, screenshots)
+│   └── public/             # Manifest, icons, static assets
+├── build/                  # Production output (load this in Chrome)
+├── package.json
+├── webpack.config.ts
+└── tsconfig.json
 ```
 
 ## Privacy

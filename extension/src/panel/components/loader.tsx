@@ -1,4 +1,4 @@
-import styles from "css/panel/Loader.module.css";
+import styles from "css/panel/loader.module.css";
 
 export default function Loader() {
   return (

@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 import type { ParticlesProps } from "../../types";
-import styles from "css/panel/Particles.module.css";
+import styles from "css/panel/particles.module.css";
 
 const Particles = ({
     quantity = 30,

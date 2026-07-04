@@ -1,6 +1,6 @@
 import { Plus, Settings } from "lucide-react";
 import type { HeaderProps } from "../../types";
-import styles from "css/panel/Header.module.css";
+import styles from "css/panel/header.module.css";
 
 const Header: React.FC<HeaderProps> = ({ currentConversationId, currentTitle, onNewChat }) => {
     const openSettings = () => {

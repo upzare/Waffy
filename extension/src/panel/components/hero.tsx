@@ -1,7 +1,7 @@
-import SuggestedPromptButton from "./SuggestedPromptButton";
+import SuggestedPromptButton from "./suggested-prompt-button";
 import { BookOpen, Bot, Globe, MessageSquare } from "lucide-react";
 import type { HeroProps } from "../../types";
-import styles from "css/panel/Hero.module.css";
+import styles from "css/panel/hero.module.css";
 
 const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => {
     const suggestedPrompts = pinnedPrompts.filter((prompt) => prompt.trim().length > 0);
