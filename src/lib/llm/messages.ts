@@ -229,12 +229,10 @@ function buildPreviousContext(conversationMessages: Message[]): {
                 assistantResponse = `TASK_STATUS: INTERRUPTED\n\nCOMPLETED_STEPS: ${execution}\n\nAGENT_RESPONSE: ${assistantResponse}`;
             }
 
-            if (assistantResponse) {
-                previousPrompt.push({
-                    type: "response",
-                    content: toExtensionContentParts(assistantResponse, files),
-                });
-            }
+            previousPrompt.push({
+                type: "response",
+                content: toExtensionContentParts(assistantResponse, files),
+            });
             pendingUserFiles = [];
         }
     }

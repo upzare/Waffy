@@ -513,11 +513,15 @@ const App = () => {
                 setIsFirstMessage(false);
                 conversationIdRef.current = uuid4();
             }
-            setMessages(prev => [
-                ...prev,
-                { id: `user-${messageIdRef.current}`, content: { text: { prompt: prompt_text }, files: prompt_files } },
-                { id: `assistant-${messageIdRef.current}`, content: { task: "", taskStatus: "", text: { response: "", execution: [], validation: "", output: "" }, files: [] } }
-            ]);
+            setMessages(prev => {
+                const update = [
+                    ...prev,
+                    { id: `user-${messageIdRef.current}`, content: { text: { prompt: prompt_text }, files: prompt_files } },
+                    { id: `assistant-${messageIdRef.current}`, content: { task: "", taskStatus: "", text: { response: "", execution: [], validation: "", output: "" }, files: [] } }
+                ]
+                syncMessages(update);
+                return update;
+            });
             if (isFirstMessage) {
                 await initConversation();
                 generateTitle(prompt_text).then(() => fetchConversations()).catch(() => { });
