@@ -1,36 +1,36 @@
-import { getAppSettings } from './client';
-import { runStream, StreamEvent, StreamMode, StreamSession } from './llm/stream';
-import { generateTitle } from './llm/generate';
-import type { ExtensionMessage } from './llm/messages';
+import { getAppSettings } from "./client";
+import { runStream, StreamEvent, StreamMode, StreamSession } from "./llm/stream";
+import { generateTitle } from "./llm/generate";
+import type { ExtensionMessage } from "./llm/messages";
 
 export async function createTitle(prompt: string) {
-    try {
-        const { settings, apiKeys } = await getAppSettings();
-        return await generateTitle(prompt, { settings, apiKeys });
-    } catch {
-        throw "Title Generation Error";
-    }
+  try {
+    const { settings, apiKeys } = await getAppSettings();
+    return await generateTitle(prompt, { settings, apiKeys });
+  } catch {
+    throw "Title Generation Error";
+  }
 }
 
 export async function* AI(
-    messages: ExtensionMessage[],
-    handler: StreamMode,
-    abortController: AbortController | null,
-    safeToAbortRef: React.RefObject<boolean>,
-    session?: StreamSession
+  messages: ExtensionMessage[],
+  handler: StreamMode,
+  abortController: AbortController | null,
+  safeToAbortRef: React.RefObject<boolean>,
+  session?: StreamSession
 ): AsyncGenerator<StreamEvent> {
-    const { settings, apiKeys } = await getAppSettings();
-    safeToAbortRef.current = true;
+  const { settings, apiKeys } = await getAppSettings();
+  safeToAbortRef.current = true;
 
-    try {
-        yield* runStream({
-            mode: handler,
-            messages,
-            settings: { settings, apiKeys },
-            abortSignal: abortController?.signal,
-            session,
-        });
-    } finally {
-        safeToAbortRef.current = false;
-    }
+  try {
+    yield* runStream({
+      mode: handler,
+      messages,
+      settings: { settings, apiKeys },
+      abortSignal: abortController?.signal,
+      session,
+    });
+  } finally {
+    safeToAbortRef.current = false;
+  }
 }

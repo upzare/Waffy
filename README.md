@@ -15,14 +15,14 @@ Waffy is an open-source Chrome extension that brings AI-powered browser automati
 
 ## Supported providers
 
-| Provider | Example models |
-|----------|----------------|
-| OpenAI | GPT-4o, GPT-4.1 |
-| Anthropic | Claude Sonnet, Claude Opus |
-| Google AI Studio | Gemini 2.x |
-| xAI | Grok |
-| Groq | Llama, Mixtral |
-| OpenRouter | 100+ models via a single API key |
+| Provider         | Example models                   |
+| ---------------- | -------------------------------- |
+| OpenAI           | GPT-4o, GPT-4.1                  |
+| Anthropic        | Claude Sonnet, Claude Opus       |
+| Google AI Studio | Gemini 2.x                       |
+| xAI              | Grok                             |
+| Groq             | Llama, Mixtral                   |
+| OpenRouter       | 100+ models via a single API key |
 
 Add API keys in **Extension settings → API Keys** after installation.
 
@@ -56,7 +56,7 @@ This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
 1. Right-click the Waffy icon → **Options**, or open **Extension settings** from the side panel
 2. Go to **API Keys** and add a key for at least one provider
 3. Go to **Models** and pick models for each pipeline stage (execution requires a vision-capable model)
-4. Start chatting — try something like *"Go to example.com and click the login button"*
+4. Start chatting — try something like _"Go to example.com and click the login button"_
 
 ## Development
 

@@ -1,97 +1,97 @@
 .heroSection {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: start;
-    background: transparent;
-    position: relative;
-    overflow: auto;
-    z-index: 2;
-    transition: all 0.5s ease-out;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+  background: transparent;
+  position: relative;
+  overflow: auto;
+  z-index: 2;
+  transition: all 0.5s ease-out;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
 }
 
 .heroSection.hidden {
-    max-height: 0;
-    max-width: 0;
-    opacity: 0;
-    margin: 0;
-    padding: 0rem 0rem;
+  max-height: 0;
+  max-width: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0rem 0rem;
 }
 
 .heroContent {
-    text-align: center;
-    max-width: 95vw;
+  text-align: center;
+  max-width: 95vw;
 }
 
 .heroTitle {
-    font-size: 1.75rem;
-    font-weight: 800;
+  font-size: 1.75rem;
+  font-weight: 800;
 }
 
 .capabilitiesContainer {
-    display: flex;
-    justify-content: center;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
 }
 
 .capabilityItem {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .capabilityIcon {
-    width: 3rem;
-    height: 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(2px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    transition: all 0.3s ease;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(2px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  transition: all 0.3s ease;
 }
 
 .capabilityIcon svg {
-    width: 1.5rem;
-    height: 1.5rem;
-    stroke: white;
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke: white;
 }
 
 .capabilityItem:hover .capabilityIcon {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
 }
 
 .capabilityLabel {
-    font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .suggestedPromptsContainer {
-    width: 100%;
-    max-width: 90vw;
-    margin-top: 7vh;
+  width: 100%;
+  max-width: 90vw;
+  margin-top: 7vh;
 }
 
 .suggestedPromptsTitle {
-    text-align: center;
-    font-size: 1.2rem;
-    font-weight: 500;
-    margin-bottom: 1.5rem;
-    color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .suggestedPrompts {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
 }

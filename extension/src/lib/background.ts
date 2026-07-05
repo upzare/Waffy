@@ -19,12 +19,12 @@ const syncOpenedTabs = (): Promise<void> => {
 };
 
 const disableOverlay = (tabId: number) => {
-  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "HIDE_OVERLAY" }).catch(() => { });
+  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "HIDE_OVERLAY" }).catch(() => {});
   overlayInfo[tabId] = false;
 };
 
 const enableOverlay = (tabId: number) => {
-  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "SHOW_OVERLAY" }).catch(() => { });
+  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "SHOW_OVERLAY" }).catch(() => {});
   overlayInfo[tabId] = true;
 };
 
@@ -49,9 +49,7 @@ const setActiveTab = async (tabId: number) => {
 const attachDebugger = (tabId: number): Promise<void> => {
   return new Promise((resolve, reject) => {
     chrome.debugger.getTargets((targets) => {
-      const isAttached = targets.some(
-        (target) => target.tabId === tabId && target.attached
-      );
+      const isAttached = targets.some((target) => target.tabId === tabId && target.attached);
       if (isAttached) {
         resolve();
         return;
@@ -80,7 +78,7 @@ const detachDebugger = async (tabId: number): Promise<void> => {
     await chrome.debugger.sendCommand({ tabId }, "Page.disable");
     await chrome.debugger.sendCommand({ tabId }, "DOM.disable");
     await chrome.debugger.sendCommand({ tabId }, "Overlay.disable");
-  } catch (_) { }
+  } catch (_) {}
   return new Promise((resolve) => {
     chrome.debugger.detach({ tabId }, () => resolve());
   });
@@ -125,7 +123,7 @@ const stopSession = async () => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
     case "SET_TAB": {
-      const tab = openedTabs.find(tab => tab.id === request.tabId);
+      const tab = openedTabs.find((tab) => tab.id === request.tabId);
       if (tab) {
         disableNonActiveOverlays(tab.id);
         activeTabId = tab.id;
@@ -137,7 +135,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
     }
     case "GET_TAB": {
-      const tab = openedTabs.find(tab => tab.id === activeTabId);
+      const tab = openedTabs.find((tab) => tab.id === activeTabId);
       sendResponse(tab);
       break;
     }
@@ -164,7 +162,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
     }
     case "GET_OVERLAY_STATUS": {
-      if (sender?.tab?.id) sendResponse({ status: overlayInfo[sender.tab.id] ? "enabled" : "disabled" });
+      if (sender?.tab?.id)
+        sendResponse({ status: overlayInfo[sender.tab.id] ? "enabled" : "disabled" });
       else sendResponse({ status: "disabled" });
       break;
     }
@@ -197,7 +196,7 @@ chrome.runtime.onInstalled.addListener((event) => {
 
 chrome.commands.onCommand.addListener((command) => {
   if (command === "open_side_panel") {
-    chrome.windows.getCurrent(w => {
+    chrome.windows.getCurrent((w) => {
       if (w.id) chrome.sidePanel.open({ windowId: w.id });
     });
   }

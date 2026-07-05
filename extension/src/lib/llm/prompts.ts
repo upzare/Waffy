@@ -260,8 +260,8 @@ You will be given three inputs: \`PREVIOUS REASONING\`, \`CURRENT REASONING\`, a
 export const TITLE_PROMPT = `You are a title generator of an AI assistant. You have to create a short description for the given prompt. It must be meaningful and contain atleast 3 words and upto 5 words maximum. The description should be in the form of a short single sentence. Do not include any other text, emojis or markdown formatting. Also no need of dot at end.`;
 
 export const SYSTEM_PROMPTS: Record<string, string> = {
-    t1: T1_PROMPT,
-    t2: T2_PROMPT,
-    t3: T3_PROMPT,
-    t4: T4_PROMPT,
+  t1: T1_PROMPT,
+  t2: T2_PROMPT,
+  t3: T3_PROMPT,
+  t4: T4_PROMPT,
 };

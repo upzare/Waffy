@@ -1,274 +1,276 @@
 .statusBar {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0.3rem;
-    gap: 0.3rem;
-    background: #ffffff10;
-    box-shadow: 0 10px 25px 0 #000000b0;
-    backdrop-filter: brightness(0.1);
-    z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.3rem;
+  gap: 0.3rem;
+  background: #ffffff10;
+  box-shadow: 0 10px 25px 0 #000000b0;
+  backdrop-filter: brightness(0.1);
+  z-index: 10;
 }
 
 .statusIcon {
-    width: 1.2rem;
-    height: 1.2rem;
-    display: inline-block;
-    position: relative;
+  width: 1.2rem;
+  height: 1.2rem;
+  display: inline-block;
+  position: relative;
 }
 
 .statusIcon::after,
 .statusIcon::before {
-    content: '';
-    box-sizing: border-box;
-    width: 1.2rem;
-    height: 1.2rem;
-    border-radius: 50%;
-    background: oklch(79.2% 0.209 151.711);
-    position: absolute;
-    left: 0;
-    top: 0;
-    animation: iconloader 2s linear infinite;
+  content: "";
+  box-sizing: border-box;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: oklch(79.2% 0.209 151.711);
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: iconloader 2s linear infinite;
 }
 
 .statusIcon::after {
-    animation-delay: 1s;
-    opacity: 0;
+  animation-delay: 1s;
+  opacity: 0;
 }
 
 @keyframes iconloader {
-    0% {
-        transform: scale(0);
-        opacity: 1;
-    }
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
 
-    100% {
-        transform: scale(1);
-        opacity: 0;
-    }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
 }
 
 .statusText {
-    font-size: 0.6rem;
-    color: #fff;
-    font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.6rem;
+  color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 .errorBar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.7rem 1rem;
-    background: rgba(255, 50, 50, 0.15);
-    box-shadow: 0 10px 25px 0 #000000b0;
-    backdrop-filter: blur(8px);
-    z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.7rem 1rem;
+  background: rgba(255, 50, 50, 0.15);
+  box-shadow: 0 10px 25px 0 #000000b0;
+  backdrop-filter: blur(8px);
+  z-index: 10;
 }
 
 .errorText {
-    font-size: 0.8rem;
-    color: #ffcccc;
-    font-family: Arial, Helvetica, sans-serif;
-    flex: 1;
+  font-size: 0.8rem;
+  color: #ffcccc;
+  font-family: Arial, Helvetica, sans-serif;
+  flex: 1;
 }
 
 .errorCloseButton {
-    background: transparent;
-    border: none;
-    color: #ffcccc;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    margin-left: 0.5rem;
-    transition: color 0.2s ease;
+  background: transparent;
+  border: none;
+  color: #ffcccc;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-left: 0.5rem;
+  transition: color 0.2s ease;
 }
 
 .errorCloseButton:hover {
-    color: #ffffff;
+  color: #ffffff;
 }
 
 .chatContainer {
-    flex: 1;
-    overflow-y: auto;
-    padding-bottom: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: center;
-    z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  z-index: 1;
 }
 
 .chatContainer.hidden {
-    max-height: 0;
-    max-width: 0;
-    opacity: 0;
-    margin: 0;
-    padding: 0rem 0rem;
+  max-height: 0;
+  max-width: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0rem 0rem;
 }
 
 .message {
-    display: flex;
-    gap: 1rem;
-    font-size: 0.9rem;
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    animation: fadeIn 0.3s ease-in;
-    width: 80%;
-    max-width: 900px;
-    transition: all 0.2s ease-out;
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9rem;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease-in;
+  width: 80%;
+  max-width: 900px;
+  transition: all 0.2s ease-out;
 }
 
 .message.user {
-    background: rgba(0, 255, 70, 0.03);
-    border: 1px solid rgba(0, 255, 70, 0.08);
-    backdrop-filter: blur(2px);
+  background: rgba(0, 255, 70, 0.03);
+  border: 1px solid rgba(0, 255, 70, 0.08);
+  backdrop-filter: blur(2px);
 }
 
 .message.user:hover {
-    box-shadow: 0 0px 10px 1px #ffffff20;
-    backdrop-filter: blur(3px);
+  box-shadow: 0 0px 10px 1px #ffffff20;
+  backdrop-filter: blur(3px);
 }
 
 .message.assistant {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
 }
 
 .message.assistant:hover {
-    box-shadow: 0 0px 10px 1px #ffffff2b;
-    backdrop-filter: blur(5px);
+  box-shadow: 0 0px 10px 1px #ffffff2b;
+  backdrop-filter: blur(5px);
 }
 
 .message.error {
-    background: rgba(255, 50, 50, 0.1);
-    border: 1px solid rgba(255, 50, 50, 0.2);
-    text-align: center;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-    backdrop-filter: blur(4px);
+  background: rgba(255, 50, 50, 0.1);
+  border: 1px solid rgba(255, 50, 50, 0.2);
+  text-align: center;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  backdrop-filter: blur(4px);
 }
 
 .message.error:hover {
-    box-shadow: 0 0px 10px 1px #ff000040;
-    backdrop-filter: blur(5px);
+  box-shadow: 0 0px 10px 1px #ff000040;
+  backdrop-filter: blur(5px);
 }
 
 .messageActionsContainer {
-    position: absolute;
-    top: -10px;
-    right: 5px;
-    z-index: 5;
-    opacity: 0;
-    transform: translateY(5px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    pointer-events: none;
+  position: absolute;
+  top: -10px;
+  right: 5px;
+  z-index: 5;
+  opacity: 0;
+  transform: translateY(5px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  pointer-events: none;
 }
 
 .message:hover .messageActionsContainer {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: all;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
 }
 
 .messageActions {
-    display: flex;
-    gap: 4px;
-    background: rgba(15, 15, 15, 0.8);
-    backdrop-filter: blur(8px);
-    padding: 2px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 4px;
+  background: rgba(15, 15, 15, 0.8);
+  backdrop-filter: blur(8px);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .messageActionButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 4px;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.7);
-    cursor: pointer;
-    transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .messageActionButton:hover {
-    background: rgba(0, 200, 83, 0.15);
-    color: rgba(0, 200, 83, 1);
+  background: rgba(0, 200, 83, 0.15);
+  color: rgba(0, 200, 83, 1);
 }
 
 .messageActionButton:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 
 .messageContent {
-    flex: 1;
-    white-space: normal;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow: hidden;
+  flex: 1;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow: hidden;
 }
 
 .messageFilePreview {
-    padding: 0.5rem 1rem;
-    margin: 0.5rem 1rem 0.2rem 0;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: rgba(255, 255, 255, 0.1);
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem 1rem 0.2rem 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
 }
 
 .messageFilePreview:hover {
-    background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .messageFilePreviewName {
-    flex: 1;
-    font-size: 0.7rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  flex: 1;
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .messageFileThubmnail {
-    width: 1rem;
-    height: 1rem;
-    object-fit: contain;
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
 }
 
 .messageFilePreview svg {
-    height: 1rem;
-    width: 1rem;
-    stroke: white;
+  height: 1rem;
+  width: 1rem;
+  stroke: white;
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Chat container scrollbar styling */
 .chatContainer::-webkit-scrollbar-thumb {
-    background: rgba(245, 245, 245, 0.3);
-    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+  background: rgba(245, 245, 245, 0.3);
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
 }
 
 .chatContainer::-webkit-scrollbar-thumb:hover {
-    background: rgba(245, 245, 245, 0.5);
+  background: rgba(245, 245, 245, 0.5);
 }

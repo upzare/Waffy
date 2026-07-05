@@ -1,19 +1,21 @@
 import fs from "fs";
-import path from 'path';
-import webpack from 'webpack';
-import CopyWebpackPlugin from 'copy-webpack-plugin';
-import HtmlWebpackPlugin from 'html-webpack-plugin';
-import TerserPlugin from 'terser-webpack-plugin';
-import { CleanWebpackPlugin } from 'clean-webpack-plugin';
-import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin';
+import path from "path";
+import webpack from "webpack";
+import CopyWebpackPlugin from "copy-webpack-plugin";
+import HtmlWebpackPlugin from "html-webpack-plugin";
+import TerserPlugin from "terser-webpack-plugin";
+import { CleanWebpackPlugin } from "clean-webpack-plugin";
+import ReactRefreshWebpackPlugin from "@pmmmwh/react-refresh-webpack-plugin";
 import ZipPlugin from "zip-webpack-plugin";
 import LicensePlugin from "webpack-license-plugin";
-import ReactRefreshTypeScript from 'react-refresh-typescript';
-import { defineReactCompilerLoaderOption, reactCompilerLoader } from 'react-compiler-webpack';
+import ReactRefreshTypeScript from "react-refresh-typescript";
+import { defineReactCompilerLoaderOption, reactCompilerLoader } from "react-compiler-webpack";
 
 const EXTENSION_DIR = path.resolve(process.cwd(), "extension");
 
-const MANIFEST = JSON.parse(fs.readFileSync(path.join(EXTENSION_DIR, "public", "manifest.json"), "utf8"));
+const MANIFEST = JSON.parse(
+  fs.readFileSync(path.join(EXTENSION_DIR, "public", "manifest.json"), "utf8")
+);
 
 const PUBLIC_PATH = "/";
 
@@ -22,23 +24,12 @@ const alias = {
   css: path.resolve(EXTENSION_DIR, "src/stylesheets"),
 };
 
-const fileExtensions = [
-  'jpg',
-  'jpeg',
-  'png',
-  'gif',
-  'eot',
-  'otf',
-  'svg',
-  'ttf',
-  'woff',
-  'woff2',
-];
+const fileExtensions = ["jpg", "jpeg", "png", "gif", "eot", "otf", "svg", "ttf", "woff", "woff2"];
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 const config: webpack.Configuration = {
-  mode: (process.env.NODE_ENV === "production" ? "production" : "development"),
+  mode: process.env.NODE_ENV === "production" ? "production" : "development",
 
   entry: {
     background: path.join(EXTENSION_DIR, "src", "lib", "background.ts"),
@@ -60,7 +51,7 @@ const config: webpack.Configuration = {
         test: /\.module.css$/,
         use: [
           {
-            loader: "style-loader"
+            loader: "style-loader",
           },
           {
             loader: "css-loader",
@@ -68,15 +59,15 @@ const config: webpack.Configuration = {
               esModule: true,
               modules: {
                 namedExport: false,
-                exportLocalsConvention: "camel-case-only"
+                exportLocalsConvention: "camel-case-only",
               },
             },
-          }
+          },
         ],
         exclude: /node_modules/,
       },
       {
-        test: new RegExp('.(' + fileExtensions.join('|') + ')$'),
+        test: new RegExp(".(" + fileExtensions.join("|") + ")$"),
         type: "asset/resource",
         exclude: /node_modules/,
         loader: "file-loader",
@@ -97,9 +88,7 @@ const config: webpack.Configuration = {
             loader: "ts-loader",
             options: {
               getCustomTransformers: () => ({
-                before: [isDevelopment && ReactRefreshTypeScript()].filter(
-                  Boolean
-                ),
+                before: [isDevelopment && ReactRefreshTypeScript()].filter(Boolean),
               }),
               transpileOnly: true,
             },
@@ -120,14 +109,14 @@ const config: webpack.Configuration = {
           {
             loader: "babel-loader",
             options: {
-              presets: [
-                ["@babel/preset-env"],
-                ["@babel/preset-react"]
-              ],
+              presets: [["@babel/preset-env"], ["@babel/preset-react"]],
               plugins: [
                 "babel-plugin-react-compiler",
-                !isDevelopment && ["@babel/plugin-transform-react-jsx", { "runtime": "automatic" }],
-                isDevelopment && ["@babel/plugin-transform-react-jsx-development", { "runtime": "automatic" }],
+                !isDevelopment && ["@babel/plugin-transform-react-jsx", { runtime: "automatic" }],
+                isDevelopment && [
+                  "@babel/plugin-transform-react-jsx-development",
+                  { runtime: "automatic" },
+                ],
                 isDevelopment && ["react-refresh/babel"],
               ].filter(Boolean),
             },
@@ -151,9 +140,9 @@ const config: webpack.Configuration = {
       filename: `${MANIFEST.name}-${MANIFEST.version}.zip`,
       path: path.join(process.cwd(), ".output"),
     }) as any,
-    // new LicensePlugin({
-    //   outputFilename: "licenses.json",
-    // }),
+    new LicensePlugin({
+      outputFilename: "licenses.json",
+    }),
     new CopyWebpackPlugin({
       patterns: [
         {
@@ -181,7 +170,7 @@ const config: webpack.Configuration = {
   },
   performance: {
     hints: isDevelopment && false,
-  }
+  },
 };
 
 if (process.env.NODE_ENV === "development") {
@@ -192,11 +181,6 @@ if (process.env.NODE_ENV === "development") {
     minimizer: [
       new TerserPlugin({
         extractComments: false,
-        // terserOptions: {
-        //   format: {
-        //     comments: false,
-        //   },
-        // },
       }),
     ],
     splitChunks: {
@@ -213,11 +197,6 @@ if (process.env.NODE_ENV === "development") {
           name: "core",
           chunks: "all",
         },
-        // style: {
-        //   test: /\.module.css$/,
-        //   name: "style",
-        //   chunks: "all",
-        // },
         default: {
           minChunks: 2,
           priority: -20,
