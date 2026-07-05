@@ -1,3 +1,5 @@
+import { isInaccessiblePage } from "@/helper";
+
 const KEY_CODES = {
     Enter: 13,
     Backspace: 8,
@@ -58,6 +60,10 @@ export const fetchScreen = async () => {
                 reject("Tab not found");
                 return;
             }
+            if (isInaccessiblePage(tab.url)) {
+                reject(`Cannot capture screen on "${tab.url}". Browser internal pages cannot be accessed or automated.`);
+                return;
+            }
             const devicePixelRatio = await chrome.tabs.sendMessage(tab.id, { type: "GET_DEVICE_PIXEL_RATIO" }).then(res => res.value).catch(err => window.devicePixelRatio);
             const meta = {
                 url: tab.url,
@@ -67,7 +73,7 @@ export const fetchScreen = async () => {
             }
             chrome.debugger.sendCommand({ tabId: tab.id }, "Page.captureScreenshot", { format: "jpeg", quality: 10, fromSurface: true }, (response?: { data?: string }) => {
                 if (chrome.runtime.lastError) {
-                    reject("Failed to capture DOM image");
+                    reject(`Failed to capture screen. The page may be restricted or the debugger is not attached.`);
                     return;
                 }
                 const base64Image = response?.data;
@@ -82,6 +88,13 @@ export const fetchScreen = async () => {
     });
 }
 
+const findNewTabFromClick = async (sourceTabId: number, tabIdsBefore: Set<number | undefined>) => {
+    const tabsAfter = await new Promise<chrome.tabs.Tab[]>((resolve) => chrome.tabs.query({}, resolve));
+    const newTabs = tabsAfter.filter((t) => t.id && !tabIdsBefore.has(t.id));
+    if (newTabs.length === 1) return newTabs[0];
+    return newTabs.find((t) => t.openerTabId === sourceTabId);
+};
+
 export const click = async ({ x, y }: { x: number, y: number }) => {
     console.log("CLICK: ", x, y);
     return new Promise((resolve, reject) => {
@@ -90,9 +103,22 @@ export const click = async ({ x, y }: { x: number, y: number }) => {
                 reject("Tab not found");
                 return;
             }
+            const sourceTabId = tab.id;
+            const tabsBefore = await new Promise<chrome.tabs.Tab[]>((resolve) => chrome.tabs.query({}, resolve));
+            const tabIdsBefore = new Set(tabsBefore.map((t) => t.id));
+
             chrome.tabs.sendMessage(tab.id, { type: "INTERACT_DOM", name: "DISPLAY_POINTER", args: { x, y } })
             await _click({ x, y, tabId: tab.id });
-            if (chrome.runtime.lastError) {
+
+            await sleep(500);
+            const newTab = await findNewTabFromClick(sourceTabId, tabIdsBefore);
+
+            if (newTab?.id) {
+                await updateOpenedTabs();
+                await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: newTab.id });
+                chrome.tabs.update(newTab.id, { active: true });
+                resolve(`Click initiated. A new tab was opened (Tab ID: ${newTab.id}). Switched to the new tab.`);
+            } else if (chrome.runtime.lastError) {
                 reject("Failed to click on coordinates");
             } else {
                 resolve("Click initiated");

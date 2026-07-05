@@ -180,63 +180,15 @@ const App = () => {
     };
 
     const attachController = async () => {
-        return new Promise<void>((resolve, reject) => {
-            chrome.tabs.query({}, async (tabs) => {
-                try {
-                    for (let tab of tabs) {
-                        if (tab.url?.startsWith("chrome://")) {
-                            continue;
-                        }
-                        chrome.debugger.attach({ tabId: tab.id }, "1.3", async () => {
-                            if (chrome.runtime.lastError) {
-                                reject();
-                            }
-                            await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
-                            await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.enable");
-                            await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.enable");
-                        });
-                    }
-                    chrome.tabs.query({ active: true, currentWindow: true }, async (currentTabs) => {
-                        if (!currentTabs || !currentTabs[0]?.id) {
-                            return;
-                        }
-                        await updateOpenedTabs();
-                        await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: currentTabs[0].id });
-                        await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: true });
-                    });
-                    resolve();
-                } catch (e) {
-                    reject();
-                }
-            });
-        });
+        const currentTabs = await new Promise<chrome.tabs.Tab[]>((resolve) =>
+            chrome.tabs.query({ active: true, currentWindow: true }, resolve)
+        );
+        if (!currentTabs[0]?.id) return;
+        await chrome.runtime.sendMessage({ action: "START_SESSION", tabId: currentTabs[0].id });
     };
 
     const detachController = async () => {
-        return new Promise<void>((resolve, reject) => {
-            chrome.tabs.query({}, async (tabs) => {
-                try {
-                    for (let tab of tabs) {
-                        if (tab.url?.startsWith("chrome://")) {
-                            continue;
-                        }
-                        await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id });
-                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.disable");
-                        await chrome.debugger.sendCommand({ tabId: tab.id }, "DOM.disable");
-                        await chrome.debugger.sendCommand({ tabId: tab.id }, "Overlay.disable");
-                        await chrome.runtime.sendMessage({ action: "SET_ACTIVE", active: false });
-                        chrome.debugger.detach({ tabId: tab.id }, async () => {
-                            if (chrome.runtime.lastError) {
-                                reject();
-                            }
-                        });
-                    }
-                    resolve();
-                } catch (e) {
-                    reject();
-                }
-            });
-        });
+        await chrome.runtime.sendMessage({ action: "STOP_SESSION" });
     };
 
     const t1Handler = async (prompt_text: string, prompt_files: FileFormat[]) => {
@@ -246,7 +198,6 @@ const App = () => {
         const t1Messages = buildT1Messages(prompt_text, prompt_files, messages);
         console.log("t1Messages:", t1Messages);
         const responseStream = AI(t1Messages, "t1", abortControllerRef?.current, safeToAbortRef);
-        let response = "";
         const toolCalls: Record<string, ToolCall> = {};
         for await (const res of responseStream) {
             if (res.type === "action.call") {
@@ -255,15 +206,18 @@ const App = () => {
                 }
             }
             if (res.type === "text.stream") {
-                response += res.text;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, response: response } } } : msg);
+                    const update = prev.map(msg => {
+                        if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+                        const response = (msg.content.text?.response ?? "") + res.text;
+                        return { ...msg, content: { ...msg.content, text: { ...msg.content.text, response } } };
+                    });
                     syncMessages(update);
                     return update;
                 });
             }
             if (res.type === "response.completed") {
-                setMessages(prev => syncMessages(prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, response: response } } } : msg), true));
+                setMessages(prev => syncMessages(prev, true));
             }
             if (res.type === "response.error") {
                 throw res.error;
@@ -301,8 +255,7 @@ const App = () => {
         let responded = true;
         let finish = false;
         let functionExecState = false;
-        let executionResponse: string[] = ["Initializing"];
-        setMessages(prev => syncMessages(prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg)));
+        setMessages(prev => syncMessages(prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: ["Initializing"] } } } : msg)));
 
         const t2Messages = buildT2Messages(task, prompt_files, messages);
         console.log("t2History:", t2Messages);
@@ -333,9 +286,13 @@ const App = () => {
                         executionToolCalls[key] = value;
                     }
                     if (res.step) {
-                        executionResponse.push(res.step);
+                        const step = res.step;
                         setMessages(prev => {
-                            const update = prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg);
+                            const update = prev.map(msg => {
+                                if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+                                const execution = [...(msg.content.text?.execution ?? []), step];
+                                return { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution } } };
+                            });
                             syncMessages(update);
                             return update;
                         });
@@ -343,7 +300,7 @@ const App = () => {
                 }
                 if (res.type === "response.completed") {
                     if (!functionExecState) finish = true;
-                    setMessages(prev => syncMessages(prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, execution: executionResponse } } } : msg), true));
+                    setMessages(prev => syncMessages(prev, true));
                 }
                 if (res.type === "response.error") {
                     throw res.error;
@@ -382,9 +339,9 @@ const App = () => {
                     output: toolCallResult.message,
                 });
 
-                if (toolName === "fetchScreen") {
+                if (toolName === "fetchScreen" && toolCallResult.status === "success" && toolCallResult.data) {
                     iterationMessages.push(toolCallResult.data);
-                    if (toolCallResult.data?.image) {
+                    if (toolCallResult.data.image) {
                         t2SessionRef.current.screenshot = toolCallResult.data.image;
                         t2SessionRef.current.screenshotMetadata = toolCallResult.data.metadata ?? null;
                     }
@@ -403,7 +360,7 @@ const App = () => {
             await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id });
         });
 
-        return { steps: executionResponse, reasoning: t2Reasoning };
+        return t2Reasoning;
     }
 
     const t3Handler = async (task: string, t2Reasoning: string) => {
@@ -413,7 +370,6 @@ const App = () => {
         const t3Messages = buildT3Messages(task, t2Reasoning);
         const summaryModelStream = AI(t3Messages, "t3", abortControllerRef?.current, safeToAbortRef);
         const toolCalls: Record<string, ToolCall> = {};
-        let validationResponse = "";
         for await (const res of summaryModelStream) {
             if (res.type === "action.call") {
                 for (const [key, value] of Object.entries(res.action)) {
@@ -421,15 +377,18 @@ const App = () => {
                 }
             }
             if (res.type === "text.stream") {
-                validationResponse += res.text;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, validation: validationResponse } } } : msg);
+                    const update = prev.map(msg => {
+                        if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+                        const validation = (msg.content.text?.validation ?? "") + res.text;
+                        return { ...msg, content: { ...msg.content, text: { ...msg.content.text, validation } } };
+                    });
                     syncMessages(update);
                     return update;
                 });
             }
             if (res.type === "response.completed") {
-                setMessages(prev => syncMessages(prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, validation: validationResponse } } } : msg), true));
+                setMessages(prev => syncMessages(prev, true));
             }
             if (res.type === "response.error") {
                 throw res.error;
@@ -443,7 +402,6 @@ const App = () => {
                 setMessages(prev => syncMessages(prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, taskStatus: status } } : msg), true));
             }
         }
-        return validationResponse;
     }
 
     const t4Handler = async (task: string, t2Reasoning: string) => {
@@ -452,18 +410,20 @@ const App = () => {
         setStreaming(prev => ({ ...prev, output: true }));
         const t4Messages = buildT4Messages(task, t2Reasoning);
         const summaryModelStream = AI(t4Messages, "t4", abortControllerRef?.current, safeToAbortRef);
-        let summary = "";
         for await (const res of summaryModelStream) {
             if (res.type === "text.stream") {
-                summary += res.text;
                 setMessages(prev => {
-                    const update = prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, output: summary } } } : msg);
+                    const update = prev.map(msg => {
+                        if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+                        const output = (msg.content.text?.output ?? "") + res.text;
+                        return { ...msg, content: { ...msg.content, text: { ...msg.content.text, output } } };
+                    });
                     syncMessages(update);
                     return update;
                 });
             }
             if (res.type === "response.completed") {
-                setMessages(prev => syncMessages(prev.map(msg => msg.id === `assistant-${messageIdRef.current}` ? { ...msg, content: { ...msg.content, text: { ...msg.content.text, output: summary } } } : msg), true));
+                setMessages(prev => syncMessages(prev, true));
             }
             if (res.type === "response.error") {
                 throw res.error;
@@ -529,10 +489,10 @@ const App = () => {
             await attachController();
             const task = await t1Handler(prompt_text, prompt_files);
             if (task) {
-                const executionResult = await t2Handler(task, prompt_files);
-                if (executionResult) {
-                    await t3Handler(task, executionResult.reasoning);
-                    await t4Handler(task, executionResult.reasoning);
+                const t2Reasoning = await t2Handler(task, prompt_files);
+                if (t2Reasoning) {
+                    await t3Handler(task, t2Reasoning);
+                    await t4Handler(task, t2Reasoning);
                 }
             }
         } catch (error: any) {

@@ -63,7 +63,7 @@ const InputContainer: React.FC<InputContainerProps> = ({
                 <textarea
                     ref={textareaRef}
                     className={styles.inputTextarea}
-                    placeholder="Type a message..."
+                    placeholder="Tell me something..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={handleKeyDown}

@@ -165,6 +165,9 @@ Every interaction **MUST** follow the **Observe → Analyze → Think → Act �
 
 ### **F. Error Handling and Recovery**
 
+**Inaccessible Internal Pages (fetch/summarize only):**
+If the task is to summarize, fetch, or read the **current** page and the active tab is \`chrome://\`, \`chrome-extension://\`, or similar — or \`fetchScreen()\` fails because that page is restricted — stop and report via \`TASK_COMPLETE:\` that internal pages cannot be accessed. Do **not** apply this rule when the task is to navigate or act on a different site; in that case, navigate away first (\`goto()\`, \`openTab()\`, \`switchTab()\`) and continue execution.
+
 If verification fails (the action didn't produce the expected result):
 
   * **Tier 1 (Re-target):** \`fetchScreen()\`. Re-examine the screenshot carefully and retry.

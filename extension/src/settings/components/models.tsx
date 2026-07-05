@@ -114,7 +114,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                                     >
                                         {PROVIDERS.map((provider) => (
                                             <option key={provider.id} value={provider.id}>
-                                                {provider.label}{providerHasKey[provider.id] ? '' : ' (no key)'}
+                                                {provider.label}{providerHasKey[provider.id] ? '' : ' (not configured)'}
                                             </option>
                                         ))}
                                     </select>
