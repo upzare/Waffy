@@ -122,7 +122,14 @@ export interface Settings {
   models: Partial<Record<StageId, ModelConfig>>;
 }
 
-export type ProviderId = "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter";
+export type ProviderId =
+  | "openai"
+  | "anthropic"
+  | "google"
+  | "xai"
+  | "groq"
+  | "openrouter"
+  | "browser-ai";
 
 export type StageId = "t1" | "t2" | "t3" | "t4" | "title" | "step";
 

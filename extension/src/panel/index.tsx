@@ -9,6 +9,7 @@ import InputContainer from "./components/input-container";
 import { fileHandler } from "./utils/file-handler";
 import { availableFunctions, updateOpenedTabs } from "@/lib/tools";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
+import { findMissingProvider, getStageConfig } from "@/lib/llm/model";
 import {
   buildT1Messages,
   buildT2Messages,
@@ -64,11 +65,7 @@ const App = () => {
 
   const checkApiKeys = async () => {
     const { settings, apiKeys } = await getAppSettings();
-    const stages = ["t1", "t2", "t3", "t4"] as const;
-    const missing = stages.some((stage) => {
-      const provider = settings.models[stage]?.provider ?? "openai";
-      return !apiKeys[provider];
-    });
+    const missing = (await findMissingProvider(settings.models, apiKeys)) !== null;
     setMissingApiKeys(missing);
     setPinnedPrompts(settings.pinnedPrompts);
   };
@@ -157,12 +154,12 @@ const App = () => {
         .transaction("conversations", "readwrite")
         .objectStore("conversations")
         .getAll().onsuccess = (event) => {
-        const data = (event.target as IDBRequest).result;
-        const sortedData = data.sort((a: Conversation, b: Conversation) => {
-          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-        });
-        setConversations(sortedData);
-      };
+          const data = (event.target as IDBRequest).result;
+          const sortedData = data.sort((a: Conversation, b: Conversation) => {
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+          });
+          setConversations(sortedData);
+        };
     };
   };
 
@@ -287,12 +284,12 @@ const App = () => {
         prev.map((msg) =>
           msg.id === `assistant-${messageIdRef.current}`
             ? {
-                ...msg,
-                content: {
-                  ...msg.content,
-                  text: { ...msg.content.text, execution: ["Initializing"] },
-                },
-              }
+              ...msg,
+              content: {
+                ...msg.content,
+                text: { ...msg.content.text, execution: ["Initializing"] },
+              },
+            }
             : msg
         )
       )
@@ -509,13 +506,14 @@ const App = () => {
     if ((!message.trim() && files.length === 0) || isGenerating) return;
 
     const { settings, apiKeys } = await getAppSettings();
-    const stages = ["t1", "t2", "t3", "t4"] as const;
-    const missingProvider = stages.find((stage) => {
-      const provider = settings.models[stage]?.provider ?? "openai";
-      return !apiKeys[provider];
-    });
-    if (missingProvider) {
-      toast.error("Configure API keys in extension settings.");
+    const missingStage = await findMissingProvider(settings.models, apiKeys);
+    if (missingStage) {
+      const provider = getStageConfig(settings.models, missingStage).provider;
+      if (provider === "browser-ai") {
+        toast.error("Download Browser AI in extension settings.");
+      } else {
+        toast.error("Configure API keys in extension settings.");
+      }
       chrome.runtime.openOptionsPage();
       return;
     }
@@ -561,7 +559,7 @@ const App = () => {
         await initConversation();
         generateTitle(prompt_text)
           .then(() => fetchConversations())
-          .catch(() => {});
+          .catch(() => { });
       }
       await attachController();
       const task = await t1Handler(prompt_text, prompt_files);
@@ -700,7 +698,7 @@ const App = () => {
               textAlign: "center",
             }}
           >
-            API keys not configured.{" "}
+            Models not configured.{" "}
             <button
               style={{
                 color: "#fff",

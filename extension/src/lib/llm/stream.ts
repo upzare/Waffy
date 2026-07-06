@@ -104,7 +104,8 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
     startedAt: Date.now(),
   };
 
-  const model = resolveModel(getStageConfig(settings.settings.models, mode), settings.apiKeys);
+  const stageConfig = getStageConfig(settings.settings.models, mode);
+  const model = await resolveModel(stageConfig, settings.apiKeys);
   const system = SYSTEM_PROMPTS[mode] ?? "";
   const tools = MODE_TOOLS[mode] ?? {};
 

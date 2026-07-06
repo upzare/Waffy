@@ -1,7 +1,10 @@
 import React, { useState } from "react";
-import { AlertCircle, ChevronDown } from "lucide-react";
+import { AlertCircle, ChevronDown, Info } from "lucide-react";
 import { CUSTOM_MODEL_OPTION, isPresetModel, PROVIDER_MODELS } from "@/lib/llm/model";
-import { getProviderMeta, hasApiKey, PROVIDERS } from "../providers";
+import { getBrowserAIModelLabel, type BrowserAIStatus } from "@/lib/llm/browser-ai";
+import { BROWSER_AI_PROVIDER, getProviderMeta, hasApiKey, PROVIDERS } from "../providers";
+import type { CloudProviderId } from "../providers";
+import BrowserAISection from "./browser-ai";
 import type { ApiKeys, ModelConfig, ProviderId, Settings, StageId } from "@/types";
 import styles from "css/settings/models.module.css";
 
@@ -30,7 +33,8 @@ const STAGE_GROUPS: StageGroup[] = [
       {
         id: "t2",
         label: "Execution",
-        description: "Browser automation with vision — use a vision-capable model",
+        description:
+          "Browser automation with vision — use a model with spatial reasoning and image grounding",
       },
       {
         id: "t3",
@@ -60,9 +64,14 @@ const STAGE_GROUPS: StageGroup[] = [
 
 const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, apiKeys }) => {
   const [expandedStages, setExpandedStages] = useState<Partial<Record<StageId, boolean>>>({});
-  const providerHasKey = Object.fromEntries(
-    PROVIDERS.map((provider) => [provider.id, hasApiKey(apiKeys, provider.id)])
-  ) as Record<ProviderId, boolean>;
+  const [browserAIStatus, setBrowserAIStatus] = useState<BrowserAIStatus>("unavailable");
+
+  const isProviderReady = (provider: ProviderId) => {
+    if (provider === "browser-ai") {
+      return browserAIStatus === "available";
+    }
+    return hasApiKey(apiKeys, provider as CloudProviderId);
+  };
 
   const updateStage = (stage: StageId, patch: Partial<ModelConfig>) => {
     setSettings((prev) => ({
@@ -81,17 +90,67 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     setExpandedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
   };
 
+  const renderBrowserAIWarning = () => {
+    if (browserAIStatus === "unsupported") {
+      return (
+        <div className={styles.stageWarning}>
+          <AlertCircle size={15} />
+          <span>Browser AI is not supported in this browser.</span>
+        </div>
+      );
+    }
+
+    if (browserAIStatus === "unavailable") {
+      return (
+        <div className={styles.stageWarning}>
+          <AlertCircle size={15} />
+          <span>Browser AI is unavailable on this device. Check storage and system requirements.</span>
+        </div>
+      );
+    }
+
+    if (browserAIStatus !== "available") {
+      return (
+        <div className={styles.stageWarning}>
+          <AlertCircle size={15} />
+          <span>Download Browser AI in the section above before using it for this stage.</span>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const renderExecutionRecommendation = (id: StageId, config: ModelConfig) => {
+    if (id !== "t2") return null;
+
+    const isBrowserAI = config.provider === "browser-ai";
+
+    return (
+      <div className={styles.stageNote}>
+        <Info size={15} />
+        <span>
+          Execution works best with vision models that support spatial reasoning and image grounding
+          — they can identify UI element coordinates on screenshots. Recommended model:{" "}
+          <strong>gemini-3.5-flash</strong> or similar.
+        </span>
+      </div>
+    );
+  };
+
   const renderStageCard = (id: StageId, label: string, description: string) => {
     const config = settings.models[id] ?? {
       provider: "openai" as ProviderId,
       model: PROVIDER_MODELS.openai[0],
     };
+    const isBrowserAI = config.provider === "browser-ai";
     const models = PROVIDER_MODELS[config.provider] ?? [];
-    const isCustom = !isPresetModel(config.provider, config.model);
+    const isCustom = !isBrowserAI && !isPresetModel(config.provider, config.model);
     const selectValue = isCustom ? CUSTOM_MODEL_OPTION : config.model;
-    const providerMeta = getProviderMeta(config.provider);
-    const keyMissing = !providerHasKey[config.provider];
+    const providerMeta = isBrowserAI ? BROWSER_AI_PROVIDER : getProviderMeta(config.provider);
+    const keyMissing = !isProviderReady(config.provider);
     const isExpanded = expandedStages[id] ?? false;
+    const modelPreview = isBrowserAI ? getBrowserAIModelLabel() : config.model || "—";
 
     return (
       <div className={styles.stageCard} key={id}>
@@ -107,7 +166,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
           </div>
           <div className={styles.stageCardPreview}>
             <span className={styles.stageModelPreview}>
-              {providerMeta.shortLabel} / {config.model || "—"}
+              {providerMeta.shortLabel} / {modelPreview}
             </span>
             <ChevronDown
               size={16}
@@ -118,12 +177,16 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
 
         {isExpanded && (
           <div className={styles.stageCardBody}>
-            {keyMissing && (
-              <div className={styles.stageWarning}>
-                <AlertCircle size={15} />
-                <span>No API key for {providerMeta.label}. Add one in the API Keys section.</span>
-              </div>
-            )}
+            {isBrowserAI
+              ? renderBrowserAIWarning()
+              : keyMissing && (
+                <div className={styles.stageWarning}>
+                  <AlertCircle size={15} />
+                  <span>No API key for {providerMeta.label}. Add one in the API Keys section.</span>
+                </div>
+              )}
+
+            {renderExecutionRecommendation(id, config)}
 
             <div className={styles.stageFieldRow}>
               <div className={styles.stageField}>
@@ -142,10 +205,14 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                       })
                     }
                   >
+                    <option value={BROWSER_AI_PROVIDER.id}>
+                      {BROWSER_AI_PROVIDER.label}
+                      {browserAIStatus === "available" ? "" : " (not ready)"}
+                    </option>
                     {PROVIDERS.map((provider) => (
                       <option key={provider.id} value={provider.id}>
                         {provider.label}
-                        {providerHasKey[provider.id] ? "" : " (not configured)"}
+                        {isProviderReady(provider.id) ? "" : " (not configured)"}
                       </option>
                     ))}
                   </select>
@@ -153,35 +220,44 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                 </div>
               </div>
 
-              <div className={styles.stageField}>
-                <label className={styles.fieldLabel} htmlFor={`${id}-model`}>
-                  Model
-                </label>
-                <div className={styles.selectWrapper}>
-                  <select
-                    id={`${id}-model`}
-                    className={styles.selectInput}
-                    value={selectValue}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === CUSTOM_MODEL_OPTION) {
-                        updateStage(id, { model: isCustom ? config.model : "" });
-                      } else {
-                        updateStage(id, { model: value });
-                      }
-                    }}
-                  >
-                    {models.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                    <option value={CUSTOM_MODEL_OPTION}>Custom model ID…</option>
-                  </select>
-                  <ChevronDown size={16} className={styles.selectChevron} />
+              {!isBrowserAI && (
+                <div className={styles.stageField}>
+                  <label className={styles.fieldLabel} htmlFor={`${id}-model`}>
+                    Model
+                  </label>
+                  <div className={styles.selectWrapper}>
+                    <select
+                      id={`${id}-model`}
+                      className={styles.selectInput}
+                      value={selectValue}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === CUSTOM_MODEL_OPTION) {
+                          updateStage(id, { model: isCustom ? config.model : "" });
+                        } else {
+                          updateStage(id, { model: value });
+                        }
+                      }}
+                    >
+                      {models.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_MODEL_OPTION}>Custom model ID…</option>
+                    </select>
+                    <ChevronDown size={16} className={styles.selectChevron} />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
+
+            {isBrowserAI && (
+              <div className={styles.stageField}>
+                <label className={styles.fieldLabel}>Model</label>
+                <p className={styles.browserAiModelNote}>{getBrowserAIModelLabel()} (on-device)</p>
+              </div>
+            )}
 
             {isCustom && (
               <div className={styles.stageField}>
@@ -206,6 +282,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
 
   return (
     <>
+      <BrowserAISection onStatusChange={setBrowserAIStatus} />
       {STAGE_GROUPS.map((group) => (
         <div className={styles.stageGroup} key={group.title}>
           <div className={styles.stageGroupHeader}>

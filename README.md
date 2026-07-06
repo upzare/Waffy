@@ -7,8 +7,9 @@ Waffy is an open-source Chrome extension that brings AI-powered browser automati
 - **Natural language automation** — Tell Waffy what to do in plain English and it plans and executes browser actions for you.
 - **Vision-based interaction** — Uses screenshots and coordinates to click, type, scroll, and navigate like a human would.
 - **Multi-stage pipeline** — Separate models for planning, execution, validation, and output so each step can use the right model for the job.
+- **Browser built-in AI** — Optional on-device models (Chrome Gemini Nano / Edge Phi Mini) for lightweight tasks like title and step generation. No API key required.
 - **Bring your own API keys** — Connect your own provider accounts. Keys are stored locally in the extension — Waffy does not run a backend for inference.
-- **Multiple providers** — OpenAI, Anthropic, Google AI Studio, xAI, Groq, and OpenRouter.
+- **Multiple providers** — OpenAI, Anthropic, Google AI Studio, xAI, Groq, OpenRouter, and Browser built-in AI.
 - **Flexible model configuration** — Choose different models for each pipeline stage and UI helper task in settings.
 - **Chat history & pinned prompts** — Keep conversation history and customize quick-start prompts on the home screen.
 - **Side panel UI** — Open Waffy from the toolbar or with `Ctrl+I` (configurable in `chrome://extensions/shortcuts`).
@@ -24,7 +25,19 @@ Waffy is an open-source Chrome extension that brings AI-powered browser automati
 | Groq             | Llama, Mixtral                   |
 | OpenRouter       | 100+ models via a single API key |
 
-Add API keys in **Extension settings → API Keys** after installation.
+Add API keys in **Extension settings → API Keys** after installation. For browser built-in AI, download the on-device model from **Settings → Models**.
+
+### Choosing models
+
+Waffy runs a multi-stage pipeline. Each stage can use a different model:
+
+| Stage | Purpose | Model guidance |
+| ----- | ------- | -------------- |
+| Planning | Decides whether to automate and drafts a task plan | Fast text models work well |
+| **Execution** | Drives browser actions from screenshots | Use a **vision model with spatial reasoning and image grounding** — it must identify UI element coordinates on screenshots. Recommended: **gemini-3.5-flash** (Google AI Studio or OpenRouter). Browser built-in AI is not recommended here. |
+| Validation | Checks whether the task succeeded | Fast text models work well |
+| Output | Summarizes results for you | Fast text models work well |
+| Title / Step | Short UI labels | Browser built-in AI works well (default) |
 
 ## Getting started
 
@@ -55,7 +68,7 @@ This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
 
 1. Right-click the Waffy icon → **Options**, or open **Extension settings** from the side panel
 2. Go to **API Keys** and add a key for at least one provider
-3. Go to **Models** and pick models for each pipeline stage (execution requires a vision-capable model)
+3. Go to **Models** and pick models for each pipeline stage. For **Execution**, use a vision model with spatial reasoning — e.g. **gemini-3.5-flash** via Google or OpenRouter.
 4. Start chatting — try something like _"Go to example.com and click the login button"_
 
 ## Development

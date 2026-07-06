@@ -133,6 +133,30 @@
   font-size: 0.8rem;
 }
 
+.stageNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.stageNote strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.stageNote svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: #60a5fa;
+}
+
 .stageField {
   display: flex;
   flex-direction: column;
@@ -169,9 +193,9 @@
   }
 }
 
-.fieldLabel {
-  font-size: 0.8rem;
-  font-weight: 500;
+.browserAiModelNote {
+  margin: 0;
+  font-size: 0.875rem;
   color: var(--text-secondary);
 }
 

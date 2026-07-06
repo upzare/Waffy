@@ -1,13 +1,33 @@
 import type { ApiKeys, ProviderId } from "@/types";
 
+export type CloudProviderId = Exclude<ProviderId, "browser-ai">;
+
 export interface ProviderMeta {
-  id: ProviderId;
+  id: CloudProviderId;
   label: string;
   shortLabel: string;
   description: string;
   placeholder: string;
   docsUrl: string;
 }
+
+export interface BrowserAIProviderMeta {
+  id: "browser-ai";
+  label: string;
+  shortLabel: string;
+  description: string;
+  placeholder: string;
+  docsUrl: string;
+}
+
+export const BROWSER_AI_PROVIDER: BrowserAIProviderMeta = {
+  id: "browser-ai",
+  label: "Browser AI",
+  shortLabel: "Browser AI",
+  description: "On-device Chrome/Edge models. No API key required.",
+  placeholder: "",
+  docsUrl: "https://www.browser-ai.dev/docs/ai-sdk-v6/core/installation",
+};
 
 export const PROVIDERS: ProviderMeta[] = [
   {
@@ -60,14 +80,17 @@ export const PROVIDERS: ProviderMeta[] = [
   },
 ];
 
-const PROVIDER_META_BY_ID: Record<ProviderId, ProviderMeta> = Object.fromEntries(
+const PROVIDER_META_BY_ID: Record<CloudProviderId, ProviderMeta> = Object.fromEntries(
   PROVIDERS.map((provider) => [provider.id, provider])
-) as Record<ProviderId, ProviderMeta>;
+) as Record<CloudProviderId, ProviderMeta>;
 
-export function getProviderMeta(id: ProviderId): ProviderMeta {
+export function getProviderMeta(id: ProviderId): ProviderMeta | BrowserAIProviderMeta {
+  if (id === "browser-ai") {
+    return BROWSER_AI_PROVIDER;
+  }
   return PROVIDER_META_BY_ID[id];
 }
 
-export function hasApiKey(apiKeys: ApiKeys, provider: ProviderId): boolean {
+export function hasApiKey(apiKeys: ApiKeys, provider: CloudProviderId): boolean {
   return Boolean(apiKeys[provider]?.trim());
 }
