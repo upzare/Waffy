@@ -54,13 +54,13 @@ body {
   padding: 0.5rem 0.75rem 1.25rem;
   display: flex;
   align-items: center;
-  justify-content: space-around;
+  justify-content: center;
   gap: 0.75rem;
 }
 
 .sidebarLogo {
-  width: 40px;
-  height: 40px;
+  width: 35px;
+  height: 35px;
 }
 
 .settingsSidebarHeader h1 {

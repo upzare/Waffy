@@ -13,6 +13,7 @@ interface GeneralSectionProps {
   setPinnedPrompts: (value: string[]) => void;
 }
 
+const MIN_PINNED_PROMPTS = 2;
 const MAX_PINNED_PROMPTS = 4;
 
 const THEME_OPTIONS = [
@@ -36,7 +37,7 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
   };
 
   const removePrompt = (index: number) => {
-    if (pinnedPrompts.length <= 1) return;
+    if (pinnedPrompts.length <= MIN_PINNED_PROMPTS) return;
     setPinnedPrompts(pinnedPrompts.filter((_, i) => i !== index));
   };
 
@@ -73,7 +74,7 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
                 type="button"
                 className={styles.pinnedPromptRemove}
                 onClick={() => removePrompt(index)}
-                disabled={pinnedPrompts.length <= 1}
+                disabled={pinnedPrompts.length <= MIN_PINNED_PROMPTS}
                 title="Remove prompt"
               >
                 <X size={15} />
