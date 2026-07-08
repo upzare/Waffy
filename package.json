@@ -18,6 +18,7 @@
     "@ai-sdk/openai": "^3.0.74",
     "@ai-sdk/xai": "^3.0.96",
     "@browser-ai/core": "^2.1.13",
+    "@diceui/mention": "^0.8.0",
     "@openrouter/ai-sdk-provider": "^2.9.1",
     "ai": "^6.0.208",
     "lucide-react": "^1.21.0",

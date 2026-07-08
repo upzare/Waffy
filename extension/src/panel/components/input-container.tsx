@@ -1,37 +1,68 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { CircleStop, File, Paperclip, Send, X } from "lucide-react";
+import { MentionRoot, MentionInput, MentionContent, MentionItem } from "@diceui/mention";
 import type { InputContainerProps } from "../../types";
+import { hasSlashCommand, SLASH_COMMANDS } from "../utils/slash-commands";
 import styles from "css/panel/input-container.module.css";
 
-const InputContainer: React.FC<InputContainerProps> = ({
+const SUPPORTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "text/plain",
+  "application/pdf",
+];
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+
+function InputContainer({
   isGenerating,
   textareaRef,
   fileInputRef,
   message,
+  mentions,
   files,
   setMessage,
+  setMentions,
   setFiles,
   onSendMessage,
   onStopGeneration,
-}) => {
-  const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
-  const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+}: InputContainerProps) {
   const canSend = message.trim().length > 0 || files.length > 0;
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
+
+  const setTextareaRef = (el: HTMLTextAreaElement | null) => {
+    (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+  };
 
   useEffect(() => {
-    if (textareaRef.current) textareaRef.current.focus();
-  }, []);
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [message, textareaRef]);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-      textareaRef.current.focus();
+    const urls = files.map((file) =>
+      file.type.startsWith("image/") ? URL.createObjectURL(file) : ""
+    );
+    setFilePreviews(urls);
+    return () => {
+      for (const url of urls) {
+        if (url) URL.revokeObjectURL(url);
+      }
+    };
+  }, [files]);
+
+  useEffect(() => {
+    if (mentions.length > 0 && !hasSlashCommand(message)) {
+      setMentions([]);
     }
-  }, [message]);
+  }, [message, mentions]);
 
-  const handleKeyDown = async (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (mentionOpen && (e.key === "Enter" || e.key === "Tab")) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (canSend && !isGenerating) onSendMessage();
@@ -39,17 +70,23 @@ const InputContainer: React.FC<InputContainerProps> = ({
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      if (Array.from(e.target.files).every((file) => SUPPORTED_TYPES.includes(file.type))) {
-        if (Array.from(e.target.files).every((file) => file.size <= MAX_UPLOAD_SIZE)) {
-          const newFiles = Array.from(e.target.files);
-          setFiles((prev) => [...prev, ...newFiles]);
-        } else {
-          toast.error("File Size Exceeded", { duration: 3000 });
-        }
-      } else {
+    const input = e.target;
+    const selected = Array.from(input.files ?? []);
+    input.value = "";
+
+    for (const file of selected) {
+      if (!SUPPORTED_TYPES.includes(file.type)) {
         toast.error("Unsupported File Type", { duration: 3000 });
+        return;
       }
+      if (file.size > MAX_UPLOAD_SIZE) {
+        toast.error("File Size Exceeded", { duration: 3000 });
+        return;
+      }
+    }
+
+    if (selected.length > 0) {
+      setFiles((prev) => [...prev, ...selected]);
     }
   };
 
@@ -60,19 +97,46 @@ const InputContainer: React.FC<InputContainerProps> = ({
   return (
     <div className={styles.inputContainer}>
       <div className={styles.inputBox}>
-        <textarea
-          ref={textareaRef}
-          className={styles.inputTextarea}
-          placeholder="Tell me something..."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={1}
+        <MentionRoot
+          className={styles.mentionRoot}
+          trigger="/"
+          modal
+          open={mentionOpen}
+          onOpenChange={setMentionOpen}
+          value={mentions}
+          onValueChange={setMentions}
+          inputValue={message}
+          onInputValueChange={setMessage}
           disabled={isGenerating}
-        />
+        >
+          <MentionInput asChild onKeyDown={handleKeyDown}>
+            <textarea
+              ref={setTextareaRef}
+              className={styles.inputTextarea}
+              placeholder="Ask or type / for commands"
+              value={message}
+              rows={1}
+              disabled={isGenerating}
+            />
+          </MentionInput>
+          <div className={styles.mentionAnchor}>
+            <MentionContent className={styles.mentionContent} avoidCollisions={false}>
+              <p className={styles.mentionMenuLabel}>Commands</p>
+              {SLASH_COMMANDS.map(({ value, description }) => (
+                <MentionItem key={value} className={styles.mentionItem} value={value} label={value}>
+                  <div className={styles.mentionItemBody}>
+                    <span className={styles.mentionItemCommand}>/{value}</span>
+                    <span className={styles.mentionItemDescription}>{description}</span>
+                  </div>
+                </MentionItem>
+              ))}
+            </MentionContent>
+          </div>
+        </MentionRoot>
         <div className={styles.inputButtons}>
           {isGenerating ? (
             <button
+              type="button"
               className={`${styles.actionButton} ${styles.stopButton}`}
               onClick={onStopGeneration}
               title="Stop generating"
@@ -84,23 +148,24 @@ const InputContainer: React.FC<InputContainerProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                style={{ display: "none" }}
+                hidden
                 multiple
                 accept={SUPPORTED_TYPES.join(",")}
                 onChange={handleFileUpload}
               />
               <button
+                type="button"
                 className={styles.actionButton}
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isGenerating}
                 title="Attach files"
               >
                 <Paperclip />
               </button>
               <button
+                type="button"
                 className={`${styles.actionButton} ${styles.sendButton}`}
                 onClick={onSendMessage}
-                disabled={!canSend || isGenerating}
+                disabled={!canSend}
                 title="Send"
               >
                 <Send />
@@ -113,9 +178,9 @@ const InputContainer: React.FC<InputContainerProps> = ({
         <div className={styles.filePreviewContainer}>
           {files.map((file, index) => (
             <div key={`${file.name}-${index}`} className={styles.inputFilePreview}>
-              {file.type.startsWith("image/") ? (
+              {filePreviews[index] ? (
                 <img
-                  src={URL.createObjectURL(file)}
+                  src={filePreviews[index]}
                   className={styles.inputFileThubmnail}
                   alt={file.name}
                 />
@@ -134,6 +199,6 @@ const InputContainer: React.FC<InputContainerProps> = ({
       )}
     </div>
   );
-};
+}
 
 export default InputContainer;

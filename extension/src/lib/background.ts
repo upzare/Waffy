@@ -1,5 +1,5 @@
 import { initClient, initSettings } from "./client";
-import { isInaccessiblePage } from "@/helper";
+import { getActiveTab, isInaccessiblePage } from "@/helper";
 
 const overlayInfo: Record<number, boolean> = {};
 
@@ -19,12 +19,12 @@ const syncOpenedTabs = (): Promise<void> => {
 };
 
 const disableOverlay = (tabId: number) => {
-  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "HIDE_OVERLAY" }).catch(() => {});
+  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "HIDE_OVERLAY" }).catch(() => { });
   overlayInfo[tabId] = false;
 };
 
 const enableOverlay = (tabId: number) => {
-  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "SHOW_OVERLAY" }).catch(() => {});
+  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "SHOW_OVERLAY" }).catch(() => { });
   overlayInfo[tabId] = true;
 };
 
@@ -78,7 +78,7 @@ const detachDebugger = async (tabId: number): Promise<void> => {
     await chrome.debugger.sendCommand({ tabId }, "Page.disable");
     await chrome.debugger.sendCommand({ tabId }, "DOM.disable");
     await chrome.debugger.sendCommand({ tabId }, "Overlay.disable");
-  } catch (_) {}
+  } catch (_) { }
   return new Promise((resolve) => {
     chrome.debugger.detach({ tabId }, () => resolve());
   });
@@ -177,6 +177,100 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       stopSession()
         .then(() => sendResponse({ status: "success" }))
         .catch((e) => sendResponse({ status: "error", value: String(e) }));
+      break;
+    }
+    case "GET_PAGE_INFO": {
+      (async () => {
+        try {
+          const tab = await getActiveTab();
+          if (!tab) {
+            sendResponse({ status: "error", message: "No active tab found." });
+            return;
+          }
+          if (isInaccessiblePage(tab.url)) {
+            sendResponse({
+              status: "error",
+              message: `Cannot read "${tab.url}". Browser internal pages are not accessible.`,
+            });
+            return;
+          }
+          sendResponse({
+            status: "success",
+            message: `URL: ${tab.url ?? ""}\nTitle: ${tab.title ?? ""}\nLoading: ${tab.status ?? ""}`,
+          });
+        } catch (e) {
+          sendResponse({ status: "error", message: String(e) });
+        }
+      })();
+      break;
+    }
+    case "CAPTURE_VISIBLE_TAB": {
+      (async () => {
+        try {
+          const tab = await getActiveTab();
+          if (!tab?.id || tab.windowId == null) {
+            sendResponse({ status: "error", message: "No active tab found." });
+            return;
+          }
+          if (isInaccessiblePage(tab.url)) {
+            sendResponse({
+              status: "error",
+              message: `Cannot capture "${tab.url}". Browser internal pages are not accessible.`,
+            });
+            return;
+          }
+          const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+            format: "jpeg",
+            quality: 50,
+          });
+          const base64Image = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+          sendResponse({
+            status: "success",
+            image: base64Image,
+            metadata: {
+              url: tab.url ?? "",
+              title: tab.title ?? "",
+              loading_status: tab.status ?? "",
+            },
+          });
+        } catch (e) {
+          sendResponse({ status: "error", message: String(e) });
+        }
+      })();
+      break;
+    }
+    case "GET_PAGE_CONTENT": {
+      (async () => {
+        try {
+          const tab = await getActiveTab();
+          if (!tab?.id) {
+            sendResponse({ status: "error", message: "No active tab found." });
+            return;
+          }
+          if (isInaccessiblePage(tab.url)) {
+            sendResponse({
+              status: "error",
+              message: `Cannot read "${tab.url}". Browser internal pages are not accessible.`,
+            });
+            return;
+          }
+          const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_CONTENT" });
+          if (!response || response.status === "error") {
+            sendResponse({
+              status: "error",
+              message: response?.value ?? "Failed to read page content.",
+            });
+            return;
+          }
+          const text = String(response.text ?? "").slice(0, 16000);
+          sendResponse({
+            status: "success",
+            message: `URL: ${response.url}\nTitle: ${response.title}\n\nContent:\n${text}`,
+          });
+        } catch (e) {
+          sendResponse({ status: "error", message: String(e) });
+        }
+      })();
       break;
     }
     default:

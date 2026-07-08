@@ -41,8 +41,7 @@
     "tabs",
     "sidePanel",
     "activeTab",
-    "debugger",
-    "webNavigation"
+    "debugger"
   ],
   "host_permissions": [
     "http://*/*",

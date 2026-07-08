@@ -30,9 +30,6 @@ type ToolResultContent = {
   output: { type: "text"; value: string };
 };
 
-const SCREENSHOT_PROMPT_PREFIX =
-  "<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, and the annotated image. You can use this information to perform actions on the page.</SYSTEM>";
-
 function filePayloadToPart(payload: FileFormat["payload"]) {
   const dataUri = `data:${payload.mimeType};base64,${payload.content}`;
   if (payload.mimeType.startsWith("image")) {
@@ -130,11 +127,14 @@ function appendToolResult(
   messages.push({ role: "tool", content: [toolResult] });
 }
 
-function formatScreenshotPrompt(metadata: Record<string, unknown>): string {
-  return `${SCREENSHOT_PROMPT_PREFIX}<PAGE_METADATA><URL>${metadata.url ?? ""}</URL><TITLE>${metadata.title ?? ""}</TITLE><LOADING_STATUS>${metadata.loading_status ?? ""}</LOADING_STATUS></PAGE_METADATA>`;
+function formatChatScreenshotPrompt(metadata: Record<string, unknown>): string {
+  const CHAT_SCREENSHOT_PROMPT_PREFIX =
+    "<SYSTEM>This is the output of the \`captureScreenshot()\` tool call. It contains page metadata and a screenshot of the visible tab.</SYSTEM>";
+
+  return `${CHAT_SCREENSHOT_PROMPT_PREFIX}<PAGE_METADATA><URL>${metadata.url ?? ""}</URL><TITLE>${metadata.title ?? ""}</TITLE><LOADING_STATUS>${metadata.loading_status ?? ""}</LOADING_STATUS></PAGE_METADATA>`;
 }
 
-function appendScreenshotMessage(
+function appendChatScreenshotMessage(
   messages: ModelMessage[],
   msg: Extract<ExtensionMessage, { type: "screenshot" }>,
   screenshotState: ScreenshotState
@@ -145,7 +145,31 @@ function appendScreenshotMessage(
   messages.push({
     role: "user",
     content: [
-      { type: "text", text: formatScreenshotPrompt(msg.metadata ?? {}) },
+      { type: "text", text: formatChatScreenshotPrompt(msg.metadata ?? {}) },
+      { type: "image", image: `data:image/jpeg;base64,${msg.image}` },
+    ],
+  });
+}
+
+function formatExecutionScreenshotPrompt(metadata: Record<string, unknown>): string {
+  const SCREENSHOT_PROMPT_PREFIX =
+    "<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, and the image. You can use this information to perform actions on the page.</SYSTEM>";
+
+  return `${SCREENSHOT_PROMPT_PREFIX}<PAGE_METADATA><URL>${metadata.url ?? ""}</URL><TITLE>${metadata.title ?? ""}</TITLE><LOADING_STATUS>${metadata.loading_status ?? ""}</LOADING_STATUS></PAGE_METADATA>`;
+}
+
+function appendExecutionScreenshotMessage(
+  messages: ModelMessage[],
+  msg: Extract<ExtensionMessage, { type: "screenshot" }>,
+  screenshotState: ScreenshotState
+) {
+  screenshotState.image = msg.image ?? null;
+  screenshotState.metadata = msg.metadata ?? null;
+
+  messages.push({
+    role: "user",
+    content: [
+      { type: "text", text: formatExecutionScreenshotPrompt(msg.metadata ?? {}) },
       { type: "image", image: `data:image/jpeg;base64,${msg.image}` },
     ],
   });
@@ -173,7 +197,8 @@ export function toCoreMessages(
         appendToolResult(messages, msg);
         break;
       case "screenshot":
-        if (mode === "t2" && msg.image) appendScreenshotMessage(messages, msg, screenshotState);
+        if (mode === "chat" && msg.image) appendChatScreenshotMessage(messages, msg, screenshotState);
+        if (mode === "t2" && msg.image) appendExecutionScreenshotMessage(messages, msg, screenshotState);
         break;
     }
   }
@@ -238,6 +263,18 @@ function buildPreviousContext(conversationMessages: Message[]): {
   }
 
   return { previousPrompt, previousTask };
+}
+
+export function buildChatMessages(
+  promptText: string,
+  promptFiles: FileFormat[],
+  conversationMessages: Message[]
+): ExtensionMessage[] {
+  const { previousPrompt } = buildPreviousContext(conversationMessages);
+  return [
+    ...previousPrompt,
+    { type: "prompt", content: toExtensionContentParts(promptText, promptFiles) },
+  ];
 }
 
 export function buildT1Messages(

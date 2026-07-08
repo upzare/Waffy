@@ -1,4 +1,5 @@
 import { isInaccessiblePage } from "@/helper";
+import { AutomateToolResult } from "../automate";
 
 const KEY_CODES = {
   Enter: 13,
@@ -53,7 +54,7 @@ export const updateOpenedTabs = () => {
   });
 };
 
-export const fetchScreen = async () => {
+const fetchScreen = async () => {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
       if (!tab || !tab.id) {
@@ -115,7 +116,7 @@ const findNewTabFromClick = async (sourceTabId: number, tabIdsBefore: Set<number
   return newTabs.find((t) => t.openerTabId === sourceTabId);
 };
 
-export const click = async ({ x, y }: { x: number; y: number }) => {
+const click = async ({ x, y }: { x: number; y: number }) => {
   console.log("CLICK: ", x, y);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
@@ -161,7 +162,7 @@ export const click = async ({ x, y }: { x: number; y: number }) => {
     });
 };
 
-export const keyPress = async ({ key }: { key: KEY_TYPES }) => {
+const keyPress = async ({ key }: { key: KEY_TYPES }) => {
   console.log("KEYPRESS: ", key);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
@@ -199,7 +200,7 @@ export const keyPress = async ({ key }: { key: KEY_TYPES }) => {
     });
 };
 
-export const typeText = async ({ x, y, text }: { x: number; y: number; text: string }) => {
+const typeText = async ({ x, y, text }: { x: number; y: number; text: string }) => {
   console.log("TYPETEXT: ", x, y, text);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
@@ -245,7 +246,7 @@ export const typeText = async ({ x, y, text }: { x: number; y: number; text: str
     });
 };
 
-export const clearValue = async ({ x, y }: { x: number; y: number }) => {
+const clearValue = async ({ x, y }: { x: number; y: number }) => {
   console.log("CLEARVALUE: ", x, y);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
@@ -293,7 +294,7 @@ export const clearValue = async ({ x, y }: { x: number; y: number }) => {
     });
 };
 
-export const getOption = async ({ x, y }: { x: number; y: number }) => {
+const getOption = async ({ x, y }: { x: number; y: number }) => {
   console.log("GETOPTION: ", x, y);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
@@ -326,7 +327,7 @@ export const getOption = async ({ x, y }: { x: number; y: number }) => {
     });
 };
 
-export const setOption = async ({ x, y, value }: { x: number; y: number; value: string }) => {
+const setOption = async ({ x, y, value }: { x: number; y: number; value: string }) => {
   console.log("SETOPTION: ", x, y, value);
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
@@ -359,7 +360,7 @@ export const setOption = async ({ x, y, value }: { x: number; y: number; value: 
     });
 };
 
-export const scroll = async ({
+const scroll = async ({
   x,
   y,
   xDistance,
@@ -402,7 +403,7 @@ export const scroll = async ({
     });
 };
 
-export const loadingState = async () => {
+const loadingState = async () => {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
       if (!tab || !tab.id) {
@@ -436,7 +437,7 @@ export const loadingState = async () => {
     });
 };
 
-export const goto = async ({ url }: { url: string }) => {
+const goto = async ({ url }: { url: string }) => {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
       if (!tab || !tab.id) {
@@ -460,7 +461,7 @@ export const goto = async ({ url }: { url: string }) => {
     });
 };
 
-export const getOpenedTabs = async () => {
+const getOpenedTabs = async () => {
   return new Promise((resolve, reject) => {
     chrome.tabs.query({}, async (tabs) => {
       if (chrome.runtime.lastError) {
@@ -485,7 +486,7 @@ export const getOpenedTabs = async () => {
     });
 };
 
-export const openTab = async ({ url }: { url: string }) => {
+const openTab = async ({ url }: { url: string }) => {
   return new Promise((resolve, reject) => {
     chrome.tabs.create({ url: url }, async (tab) => {
       await updateOpenedTabs();
@@ -505,7 +506,7 @@ export const openTab = async ({ url }: { url: string }) => {
     });
 };
 
-export const switchTab = async ({ tabId }: { tabId: number }) => {
+const switchTab = async ({ tabId }: { tabId: number }) => {
   return new Promise((resolve, reject) => {
     chrome.tabs.update(tabId, { active: true }, async (tab) => {
       await updateOpenedTabs();
@@ -525,7 +526,7 @@ export const switchTab = async ({ tabId }: { tabId: number }) => {
     });
 };
 
-export const closeTab = async ({ tabId }: { tabId: number }) => {
+const closeTab = async ({ tabId }: { tabId: number }) => {
   return new Promise((resolve, reject) => {
     chrome.tabs.remove(tabId, () => {
       if (chrome.runtime.lastError) {
@@ -543,7 +544,7 @@ export const closeTab = async ({ tabId }: { tabId: number }) => {
     });
 };
 
-export const reload = async () => {
+const reload = async () => {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
       if (!tab || !tab.id) {
@@ -567,7 +568,7 @@ export const reload = async () => {
     });
 };
 
-export const wait = async ({ ms }: { ms: number }) => {
+const wait = async ({ ms }: { ms: number }) => {
   return new Promise((resolve) => {
     setTimeout(() => resolve(`Waited for ${ms} milliseconds`), ms);
   })
@@ -579,7 +580,7 @@ export const wait = async ({ ms }: { ms: number }) => {
     });
 };
 
-export const availableFunctions: { [key: string]: (args: any) => Promise<any> } = {
+export const availableFunctions: { [key: string]: (args: any) => Promise<AutomateToolResult> } = {
   fetchScreen: fetchScreen,
   click: click,
   typeText: typeText,

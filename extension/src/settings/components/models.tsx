@@ -14,48 +14,76 @@ interface ModelsSectionProps {
   apiKeys: ApiKeys;
 }
 
+interface StageConfig {
+  id: StageId;
+  label: string;
+  description: string;
+  recommendation?: React.ReactNode;
+}
+
 interface StageGroup {
   title: string;
   subtitle: string;
-  stages: { id: StageId; label: string; description: string }[];
+  stages: StageConfig[];
 }
 
 const STAGE_GROUPS: StageGroup[] = [
   {
-    title: "Automation Pipeline",
-    subtitle: "Models for each stage of a browser automation run.",
+    title: "General",
+    subtitle:
+      "Local models (Browser AI) work well here — fast, private, and free. Best for chat and title generation.",
     stages: [
       {
-        id: "t1",
-        label: "Planning",
-        description: "Analyzes prompts and decides whether to automate",
-      },
-      {
-        id: "t2",
-        label: "Execution",
+        id: "chat",
+        label: "Chat Model",
         description:
-          "Browser automation with vision — use a model with spatial reasoning and image grounding",
+          "Conversational assistant for chatting and question-answering.",
+        recommendation: (
+          <>
+            Use the built-in browser model, with vision capability (like Gemini Nano) for free.
+            For more advanced reasoning and querying, switch to a cloud model.
+          </>
+        ),
       },
       {
-        id: "t3",
-        label: "Validation",
-        description: "Validates that the task completed successfully",
+        id: "title",
+        label: "Title Generation Model",
+        description: "Creates a title for the conversation",
       },
-      { id: "t4", label: "Output", description: "Generates a user-friendly summary of results" },
     ],
   },
   {
-    title: "UI Helpers",
-    subtitle: "Models for in-panel text generation.",
+    title: "Automation",
+    subtitle:
+      "Cloud models are recommended for automation — stronger vision, reasoning, and reliability for multi-step browser tasks.",
     stages: [
       {
-        id: "title",
-        label: "Title Generation",
-        description: "Creates conversation titles from the first message",
+        id: "t1",
+        label: "Planning Model",
+        description: "Analyzes prompts and generates a plan for the automation task",
       },
       {
+        id: "t2",
+        label: "Execution Model",
+        description:
+          "Performs the automation task based on the generated plan",
+        recommendation: (
+          <>
+            Execution works best with vision models that support spatial reasoning and image grounding
+            — they can identify UI element coordinates on screenshots. Recommended model:{" "}
+            <strong>gemini-3.5-flash</strong> or similar.
+          </>
+        ),
+      },
+      {
+        id: "t3",
+        label: "Validation Model",
+        description: "Validates that the task completed or not",
+      },
+      { id: "t4", label: "Output Model", description: "Generates a summary of the task completion" },
+      {
         id: "step",
-        label: "Step Generation",
+        label: "Step Generation Model",
         description: "Short execution step descriptions shown in the UI",
       },
     ],
@@ -121,24 +149,18 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     return null;
   };
 
-  const renderExecutionRecommendation = (id: StageId, config: ModelConfig) => {
-    if (id !== "t2") return null;
-
-    const isBrowserAI = config.provider === "browser-ai";
+  const renderStageRecommendation = (recommendation?: React.ReactNode) => {
+    if (!recommendation) return null;
 
     return (
       <div className={styles.stageNote}>
         <Info size={15} />
-        <span>
-          Execution works best with vision models that support spatial reasoning and image grounding
-          — they can identify UI element coordinates on screenshots. Recommended model:{" "}
-          <strong>gemini-3.5-flash</strong> or similar.
-        </span>
+        <span>{recommendation}</span>
       </div>
     );
   };
 
-  const renderStageCard = (id: StageId, label: string, description: string) => {
+  const renderStageCard = ({ id, label, description, recommendation }: StageConfig) => {
     const config = settings.models[id] ?? {
       provider: "openai" as ProviderId,
       model: PROVIDER_MODELS.openai[0],
@@ -186,7 +208,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                 </div>
               )}
 
-            {renderExecutionRecommendation(id, config)}
+            {renderStageRecommendation(recommendation)}
 
             <div className={styles.stageFieldRow}>
               <div className={styles.stageField}>
@@ -290,9 +312,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             <p className={styles.stageGroupSubtitle}>{group.subtitle}</p>
           </div>
           <div className={styles.stageList}>
-            {group.stages.map(({ id, label, description }) =>
-              renderStageCard(id, label, description)
-            )}
+            {group.stages.map((stage) => renderStageCard(stage))}
           </div>
         </div>
       ))}

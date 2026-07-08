@@ -60,11 +60,12 @@ export function isPresetModel(provider: ProviderId, model: string): boolean {
 }
 
 export const DEFAULT_MODELS: Record<StageId, ModelConfig> = {
+  title: { provider: "browser-ai", model: "default" },
+  chat: { provider: "browser-ai", model: "default" },
   t1: { provider: "google", model: "gemini-flash-latest" },
   t2: { provider: "google", model: "gemini-3-flash-preview" },
   t3: { provider: "openai", model: "gpt-5-mini" },
   t4: { provider: "openai", model: "gpt-5-mini" },
-  title: { provider: "browser-ai", model: "default" },
   step: { provider: "browser-ai", model: "default" },
 };
 
