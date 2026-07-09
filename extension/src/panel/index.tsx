@@ -6,16 +6,25 @@ import { AI, createTitle } from "@/lib/agent";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
+import { parseSlashCommand, stripSlashCommands } from "./utils/slash-commands";
 import { fileHandler } from "./utils/file-handler";
-import { availableFunctions, updateOpenedTabs } from "@/lib/tools";
-import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
+import { availableFunctions as chatFunctions } from "@/lib/llm/tools/handlers/chat";
 import {
+  availableFunctions as automateFunctions,
+  updateOpenedTabs,
+} from "@/lib/llm/tools/handlers/automate";
+import { getActiveTab } from "@/helper";
+import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
+import { findMissingProvider, getStageConfig } from "@/lib/llm/model";
+import {
+  buildChatMessages,
   buildT1Messages,
   buildT2Messages,
   buildT3Messages,
   buildT4Messages,
 } from "@/lib/llm/messages";
 import type { StreamSession } from "@/lib/llm/stream";
+import type { ExtensionMessage } from "@/lib/llm/messages";
 import HistorySidebar from "./components/history-sidebar";
 import Hero from "./components/hero";
 import Particles from "./components/particles";
@@ -31,6 +40,7 @@ const App = () => {
   const [statusText, setStatusText] = useState("");
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
+  const [mentions, setMentions] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,11 +74,7 @@ const App = () => {
 
   const checkApiKeys = async () => {
     const { settings, apiKeys } = await getAppSettings();
-    const stages = ["t1", "t2", "t3", "t4"] as const;
-    const missing = stages.some((stage) => {
-      const provider = settings.models[stage]?.provider ?? "openai";
-      return !apiKeys[provider];
-    });
+    const missing = (await findMissingProvider(settings.models, apiKeys)) !== null;
     setMissingApiKeys(missing);
     setPinnedPrompts(settings.pinnedPrompts);
   };
@@ -157,12 +163,12 @@ const App = () => {
         .transaction("conversations", "readwrite")
         .objectStore("conversations")
         .getAll().onsuccess = (event) => {
-        const data = (event.target as IDBRequest).result;
-        const sortedData = data.sort((a: Conversation, b: Conversation) => {
-          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-        });
-        setConversations(sortedData);
-      };
+          const data = (event.target as IDBRequest).result;
+          const sortedData = data.sort((a: Conversation, b: Conversation) => {
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+          });
+          setConversations(sortedData);
+        };
     };
   };
 
@@ -198,15 +204,33 @@ const App = () => {
   };
 
   const attachController = async () => {
-    const currentTabs = await new Promise<chrome.tabs.Tab[]>((resolve) =>
-      chrome.tabs.query({ active: true, currentWindow: true }, resolve)
-    );
-    if (!currentTabs[0]?.id) return;
-    await chrome.runtime.sendMessage({ action: "START_SESSION", tabId: currentTabs[0].id });
+    const tab = await getActiveTab();
+    if (!tab?.id) return;
+    await chrome.runtime.sendMessage({ action: "START_SESSION", tabId: tab.id });
   };
 
   const detachController = async () => {
     await chrome.runtime.sendMessage({ action: "STOP_SESSION" });
+  };
+
+  const automateHandler = async (prompt_text: string, prompt_files: FileFormat[]) => {
+    await attachController();
+    try {
+      const task = await t1Handler(prompt_text, prompt_files);
+      if (task) {
+        const t2Reasoning = await t2Handler(task, prompt_files);
+        if (t2Reasoning) {
+          await t3Handler(task, t2Reasoning);
+          await t4Handler(task, t2Reasoning);
+        }
+      }
+    } finally {
+      try {
+        await detachController();
+      } catch {
+        console.log("Error detaching from tab");
+      }
+    }
   };
 
   const t1Handler = async (prompt_text: string, prompt_files: FileFormat[]) => {
@@ -287,12 +311,12 @@ const App = () => {
         prev.map((msg) =>
           msg.id === `assistant-${messageIdRef.current}`
             ? {
-                ...msg,
-                content: {
-                  ...msg.content,
-                  text: { ...msg.content.text, execution: ["Initializing"] },
-                },
-              }
+              ...msg,
+              content: {
+                ...msg.content,
+                text: { ...msg.content.text, execution: ["Initializing"] },
+              },
+            }
             : msg
         )
       )
@@ -374,7 +398,7 @@ const App = () => {
 
         console.log("toolName:", toolName);
         console.log("toolArgs:", toolArgs);
-        const toolCallResult = await availableFunctions[toolName](toolArgs);
+        const toolCallResult = await automateFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
         iterationMessages.push({
           type: "action.result",
@@ -496,6 +520,106 @@ const App = () => {
     setStreaming((prev) => ({ ...prev, output: false }));
   };
 
+  const chatHandler = async (prompt_text: string, prompt_files: FileFormat[]) => {
+    if (abortControllerRef.current?.signal.aborted) return;
+    setStatusText("GENERATING");
+    setStreaming((prev) => ({ ...prev, response: true }));
+
+    const chatMessages = buildChatMessages(prompt_text, prompt_files, messages);
+    let finish = false;
+    let functionExecState = false;
+
+    while (!finish || functionExecState) {
+      if (abortControllerRef.current?.signal.aborted) return;
+
+      let textResponse = "";
+      const chatToolCalls: Record<string, ToolCall> = {};
+      const chatStream = AI(chatMessages, "chat", abortControllerRef?.current, safeToAbortRef);
+
+      for await (const res of chatStream) {
+        if (res.type === "text.stream") {
+          textResponse += res.text;
+          setMessages((prev) => {
+            const update = prev.map((msg) => {
+              if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+              const response = (msg.content.text?.response ?? "") + res.text;
+              return {
+                ...msg,
+                content: { ...msg.content, text: { ...msg.content.text, response } },
+              };
+            });
+            syncMessages(update);
+            return update;
+          });
+        }
+        if (res.type === "action.call") {
+          for (const [key, value] of Object.entries(res.action)) {
+            chatToolCalls[key] = value;
+          }
+        }
+        if (res.type === "response.completed") {
+          if (!functionExecState) finish = true;
+          setMessages((prev) => syncMessages(prev, true));
+        }
+        if (res.type === "response.error") {
+          throw res.error;
+        }
+      }
+
+      console.log("textResponse:", textResponse);
+      const iterationMessages: ExtensionMessage[] = [];
+      if (textResponse) {
+        iterationMessages.push({
+          type: "response",
+          content: [{ type: "text", text: textResponse }],
+        });
+      }
+
+      functionExecState = false;
+
+      for (const toolCall of Object.values(chatToolCalls)) {
+        const toolName = toolCall.name;
+        console.log("toolCall:", toolCall);
+
+        iterationMessages.push({
+          type: "action.init",
+          id: toolCall.id,
+          name: toolName,
+          arguments: toolCall.arguments,
+        });
+
+        const toolArgs = JSON.parse(toolCall.arguments);
+        const toolCallResult = await chatFunctions[toolName](toolArgs);
+
+        iterationMessages.push({
+          type: "action.result",
+          id: toolCall.id,
+          name: toolName,
+          output: toolCallResult.message,
+        });
+        console.log("toolCallResult:", toolCallResult);
+
+        if (
+          toolName === "captureScreenshot" &&
+          toolCallResult.status === "success" &&
+          toolCallResult.data
+        ) {
+          iterationMessages.push({
+            type: "screenshot",
+            image: toolCallResult.data.image,
+            metadata: toolCallResult.data.metadata,
+          });
+        }
+
+        functionExecState = true;
+      }
+
+      chatMessages.push(...iterationMessages);
+    }
+
+    setStreaming((prev) => ({ ...prev, response: false }));
+  };
+
   const displayError = (error?: unknown) => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     setIsGenerating(false);
@@ -509,30 +633,42 @@ const App = () => {
     if ((!message.trim() && files.length === 0) || isGenerating) return;
 
     const { settings, apiKeys } = await getAppSettings();
-    const stages = ["t1", "t2", "t3", "t4"] as const;
-    const missingProvider = stages.find((stage) => {
-      const provider = settings.models[stage]?.provider ?? "openai";
-      return !apiKeys[provider];
-    });
-    if (missingProvider) {
-      toast.error("Configure API keys in extension settings.");
+    const command = parseSlashCommand(mentions, message);
+    const isAutomate = command === "automate";
+
+    const missingStage = await findMissingProvider(settings.models, apiKeys);
+    if (missingStage) {
+      const provider = getStageConfig(settings.models, missingStage).provider;
+      if (provider === "browser-ai") {
+        toast.error("Download Browser AI in extension settings.");
+      } else {
+        toast.error("Configure API keys in extension settings.");
+      }
       chrome.runtime.openOptionsPage();
       return;
     }
 
     messageIdRef.current = uuid4();
+    const prompt_text = command ? stripSlashCommands(message) : message.trim();
+    const prompt_files = await fileHandler(files);
+    if (!prompt_text && prompt_files.length === 0) {
+      messageIdRef.current = null;
+      toast.error(command ? `Add a message after /${command}` : "Message cannot be empty");
+      return;
+    }
+
     setIsGenerating(true);
     setStatusText("INITIALIZING");
     setErrorText("");
-    if (textareaRef.current) {
-      textareaRef.current.style.color = "#909090";
+    const inputEl = textareaRef.current;
+    if (inputEl) {
+      inputEl.style.color = "#909090";
     }
     abortControllerRef.current = new AbortController();
-    const prompt_text = message.trim();
-    const prompt_files = await fileHandler(files);
+    const wasFirstMessage = isFirstMessage;
 
     try {
-      if (isFirstMessage) {
+      if (wasFirstMessage) {
         setIsChat(true);
         setIsFirstMessage(false);
         conversationIdRef.current = uuid4();
@@ -557,37 +693,30 @@ const App = () => {
         syncMessages(update);
         return update;
       });
-      if (isFirstMessage) {
+      if (wasFirstMessage) {
         await initConversation();
         generateTitle(prompt_text)
           .then(() => fetchConversations())
-          .catch(() => {});
+          .catch(() => { });
       }
-      await attachController();
-      const task = await t1Handler(prompt_text, prompt_files);
-      if (task) {
-        const t2Reasoning = await t2Handler(task, prompt_files);
-        if (t2Reasoning) {
-          await t3Handler(task, t2Reasoning);
-          await t4Handler(task, t2Reasoning);
-        }
+
+      if (isAutomate) {
+        await automateHandler(prompt_text, prompt_files);
+      } else {
+        await chatHandler(prompt_text, prompt_files);
       }
     } catch (error: any) {
       displayError(error);
     } finally {
-      try {
-        await detachController();
-      } catch (e) {
-        console.log("Error detaching from tab");
-      }
       setStreaming({ response: false, execution: false, validation: false, output: false });
       setIsGenerating(false);
       setStatusText("");
       setMessage("");
+      setMentions([]);
       setFiles([]);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-        textareaRef.current.style.color = "#ffffff";
+      if (inputEl) {
+        inputEl.style.height = "auto";
+        inputEl.style.color = "#ffffff";
       }
       messageIdRef.current = null;
       abortControllerRef.current = null;
@@ -628,6 +757,7 @@ const App = () => {
     setStatusText("");
     setErrorText("");
     setMessage("");
+    setMentions([]);
     setFiles([]);
     setIsChat(false);
     textareaRef.current?.focus();
@@ -645,6 +775,7 @@ const App = () => {
       setMessages(conversation.messages);
       conversationIdRef.current = id;
       setMessage("");
+      setMentions([]);
       setFiles([]);
       setErrorText("");
       setCurrentTitle(conversation.title);
@@ -700,7 +831,7 @@ const App = () => {
               textAlign: "center",
             }}
           >
-            API keys not configured.{" "}
+            Models not configured.{" "}
             <button
               style={{
                 color: "#fff",
@@ -727,11 +858,13 @@ const App = () => {
         />
         <InputContainer
           isGenerating={isGenerating}
-          textareaRef={textareaRef as any}
-          fileInputRef={fileInputRef as any}
+          textareaRef={textareaRef}
+          fileInputRef={fileInputRef as React.RefObject<HTMLInputElement>}
           message={message}
+          mentions={mentions}
           files={files}
           setMessage={setMessage}
+          setMentions={setMentions}
           setFiles={setFiles}
           onSendMessage={handleSendMessage}
           onStopGeneration={handleStopGeneration}

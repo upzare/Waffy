@@ -47,11 +47,13 @@ export interface ChatContainerProps {
 
 export interface InputContainerProps {
   isGenerating: boolean;
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   message: string;
+  mentions: string[];
   files: File[];
   setMessage: React.Dispatch<React.SetStateAction<string>>;
+  setMentions: React.Dispatch<React.SetStateAction<string[]>>;
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;
   onSendMessage: () => Promise<void>;
   onStopGeneration: () => Promise<void>;
@@ -122,9 +124,16 @@ export interface Settings {
   models: Partial<Record<StageId, ModelConfig>>;
 }
 
-export type ProviderId = "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter";
+export type ProviderId =
+  | "openai"
+  | "anthropic"
+  | "google"
+  | "xai"
+  | "groq"
+  | "openrouter"
+  | "browser-ai";
 
-export type StageId = "t1" | "t2" | "t3" | "t4" | "title" | "step";
+export type StageId = "title" | "chat" | "t1" | "t2" | "t3" | "t4" | "step";
 
 export interface ModelConfig {
   provider: ProviderId;

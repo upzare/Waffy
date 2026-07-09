@@ -1,13 +1,29 @@
 import { streamText } from "ai";
-import { SYSTEM_PROMPTS } from "./prompts";
-import { MODE_TOOLS } from "./tools";
+import { PROMPTS } from "./prompts";
 import { toCoreMessages, type ExtensionMessage } from "./messages";
 import { convertToolCoordinates } from "./coords";
 import { generateStepLabel } from "./generate";
 import { getStageConfig, resolveModel } from "./model";
+import { CHAT_TOOLS } from "@/lib/llm/tools/chat";
+import { T1_TOOLS, T2_TOOLS, T3_TOOLS } from "@/lib/llm/tools/automate";
 import type { AppSettings, ToolCall } from "@/types";
 
-export type StreamMode = "t1" | "t2" | "t3" | "t4";
+export type StreamMode = "chat" | "t1" | "t2" | "t3" | "t4";
+
+const TOOLS: Record<
+  string,
+  | typeof T1_TOOLS
+  | typeof T2_TOOLS
+  | typeof T3_TOOLS
+  | typeof CHAT_TOOLS
+  | Record<string, never>
+> = {
+  chat: CHAT_TOOLS,
+  t1: T1_TOOLS,
+  t2: T2_TOOLS,
+  t3: T3_TOOLS,
+  t4: {},
+};
 
 export interface StreamSession {
   screenshot: string | null;
@@ -104,9 +120,10 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
     startedAt: Date.now(),
   };
 
-  const model = resolveModel(getStageConfig(settings.settings.models, mode), settings.apiKeys);
-  const system = SYSTEM_PROMPTS[mode] ?? "";
-  const tools = MODE_TOOLS[mode] ?? {};
+  const stageConfig = getStageConfig(settings.settings.models, mode);
+  const model = await resolveModel(stageConfig, settings.apiKeys);
+  const system = PROMPTS[mode] ?? "";
+  const tools = TOOLS[mode] ?? {};
 
   const screenshotState = {
     image: session?.screenshot ?? null,

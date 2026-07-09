@@ -94,6 +94,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ status: "success", value: ratio });
       break;
     }
+    case "GET_PAGE_CONTENT": {
+      const text = document.body?.innerText ?? "";
+      const maxChars = 16000;
+      sendResponse({
+        status: "success",
+        url: window.location.href,
+        title: document.title,
+        text: text.length > maxChars ? text.slice(0, maxChars) + "\n...[truncated]" : text,
+      });
+      break;
+    }
     case "INTERACT_DOM": {
       const name = message.name;
       const args = message.args;

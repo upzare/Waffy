@@ -6,6 +6,7 @@ import { createGroq } from "@ai-sdk/groq";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
 import type { ApiKeys, ModelConfig, ProviderId, StageId } from "@/types";
+import { ensureBrowserAIModelReady, getBrowserAIStatus } from "./browser-ai";
 
 export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
   openai: [
@@ -49,6 +50,7 @@ export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
     "x-ai/grok-4.20-multi-agent",
     "x-ai/grok-4.20",
   ],
+  "browser-ai": ["default"],
 };
 
 export const CUSTOM_MODEL_OPTION = "__custom__";
@@ -58,15 +60,50 @@ export function isPresetModel(provider: ProviderId, model: string): boolean {
 }
 
 export const DEFAULT_MODELS: Record<StageId, ModelConfig> = {
+  title: { provider: "browser-ai", model: "default" },
+  chat: { provider: "browser-ai", model: "default" },
   t1: { provider: "google", model: "gemini-flash-latest" },
   t2: { provider: "google", model: "gemini-3-flash-preview" },
   t3: { provider: "openai", model: "gpt-5-mini" },
   t4: { provider: "openai", model: "gpt-5-mini" },
-  title: { provider: "groq", model: "openai/gpt-oss-120b" },
-  step: { provider: "groq", model: "openai/gpt-oss-120b" },
+  step: { provider: "browser-ai", model: "default" },
 };
 
-export function resolveModel(config: ModelConfig, apiKeys: ApiKeys): LanguageModel {
+export function getStageConfig(
+  models: Partial<Record<StageId, ModelConfig>> | undefined,
+  stage: StageId
+): ModelConfig {
+  return models?.[stage] ?? DEFAULT_MODELS[stage];
+}
+
+export async function findMissingProvider(
+  models: Partial<Record<StageId, ModelConfig>> | undefined,
+  apiKeys: ApiKeys
+): Promise<StageId | null> {
+  let browserAIReady: boolean | null = null;
+
+  for (const stage of Object.keys(DEFAULT_MODELS) as StageId[]) {
+    const { provider } = getStageConfig(models, stage);
+    if (provider === "browser-ai") {
+      browserAIReady ??= (await getBrowserAIStatus()) === "available";
+      if (!browserAIReady) return stage;
+    } else if (!apiKeys[provider]?.trim()) {
+      return stage;
+    }
+  }
+
+  return null;
+}
+
+export async function resolveModel(
+  config: ModelConfig,
+  apiKeys: ApiKeys,
+  onProgress?: (progress: number) => void
+): Promise<LanguageModel> {
+  if (config.provider === "browser-ai") {
+    return ensureBrowserAIModelReady(onProgress);
+  }
+
   const key = apiKeys[config.provider];
   if (!key) {
     throw new Error(`No API key configured for ${config.provider}. Add it in extension settings.`);
@@ -88,11 +125,4 @@ export function resolveModel(config: ModelConfig, apiKeys: ApiKeys): LanguageMod
     default:
       throw new Error(`Unsupported provider: ${config.provider}`);
   }
-}
-
-export function getStageConfig(
-  models: Partial<Record<StageId, ModelConfig>> | undefined,
-  stage: StageId
-): ModelConfig {
-  return models?.[stage] ?? DEFAULT_MODELS[stage];
 }

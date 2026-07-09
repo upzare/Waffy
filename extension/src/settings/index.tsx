@@ -29,7 +29,7 @@ const sections = [
   {
     id: "models",
     label: "Models",
-    description: "Configure which provider and model to use for each pipeline stage.",
+    description: "Configure cloud and local browser models for each stages.",
     icon: Cpu,
   },
   { id: "about", label: "About", description: "Information about Waffy.", icon: Info },

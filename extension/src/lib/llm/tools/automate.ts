@@ -1,6 +1,12 @@
 import { tool } from "ai";
 import { z } from "zod";
 
+export type AutomateToolResult = {
+  status: string;
+  message: string;
+  data?: { type: string; metadata?: Record<string, unknown>; image?: string };
+};
+
 const keyEnum = z.enum([
   "Enter",
   "Backspace",
@@ -139,14 +145,4 @@ export const T3_TOOLS = {
     description: "Call when the task is suspended.",
     inputSchema: z.object({}),
   }),
-};
-
-export const MODE_TOOLS: Record<
-  string,
-  typeof T1_TOOLS | typeof T2_TOOLS | typeof T3_TOOLS | Record<string, never>
-> = {
-  t1: T1_TOOLS,
-  t2: T2_TOOLS,
-  t3: T3_TOOLS,
-  t4: {},
 };
