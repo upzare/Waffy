@@ -281,11 +281,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-chrome.runtime.onInstalled.addListener((event) => {
+chrome.runtime.onInstalled.addListener(() => {
   initClient();
-  if (event.reason === "install") {
-    initSettings();
-  }
+  initSettings();
 });
 
 chrome.commands.onCommand.addListener((command) => {

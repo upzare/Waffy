@@ -6,12 +6,18 @@ import { Settings as SettingsIcon, Key, Cpu, Info } from "lucide-react";
 import { getAppSettings, saveAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
 import { DEFAULT_MODELS } from "@/lib/llm/model";
 import type { ApiKeys, Settings as SettingsType } from "../types";
-import styles from "css/settings/root.module.css";
+import "@/stylesheets/globals.css";
 
 import GeneralSection from "./components/general";
 import ApiKeysSection from "./components/api-keys";
 import ModelsSection from "./components/models";
 import AboutSection from "./components/about";
+import {
+  dangerButton,
+  primaryButton,
+  secondaryButton,
+  thinScroll,
+} from "./styles";
 
 const sections = [
   {
@@ -143,58 +149,80 @@ const Settings = () => {
   };
 
   return (
-    <div className={styles.settingsPage}>
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-surface-0 font-sans text-text-primary md:flex-row">
       <Toaster position="top-center" reverseOrder={false} />
-      <div className={styles.settingsSidebar}>
-        <div className={styles.settingsSidebarHeader}>
-          <img src={logoUrl} alt="Waffy Logo" className={styles.sidebarLogo} />
-          <h1>Extension Settings</h1>
+
+      <aside className="flex shrink-0 flex-col gap-2 border-b border-border bg-surface-1 p-3 md:w-70 md:border-r md:border-b-0 md:px-3 md:py-4">
+        <div className="flex items-center justify-center gap-3 px-2 pb-3 pt-1 md:px-3 md:pb-5 md:pt-2">
+          <img src={logoUrl} alt="Waffy Logo" className="h-9 w-9" />
+          <h1 className="text-xl font-bold tracking-tight">Extension Settings</h1>
         </div>
-        <nav className={styles.sidebarNav}>
+
+        <nav
+          className={`flex flex-1 gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-y-auto md:pb-0 ${thinScroll}`}
+        >
           {sections.map((section) => {
             const Icon = section.icon;
             const isActive = activeSection === section.id;
             return (
               <button
                 key={section.id}
-                className={`${styles.sidebarItem} ${isActive ? styles.sidebarItemActive : ""}`}
+                type="button"
+                className={`flex min-w-18 flex-col items-center gap-2 rounded-md border px-2 py-2.5 text-left transition-colors duration-150 md:w-full md:min-w-0 md:flex-row md:gap-2.5 md:px-3 ${isActive
+                    ? "border-green-border bg-green-dim text-green"
+                    : "border-transparent text-text-secondary hover:bg-white/4 hover:text-text-primary"
+                  }`}
                 onClick={() => {
                   setActiveSection(section.id);
                   window.location.hash = section.id;
                 }}
               >
-                <span className={styles.sidebarItemIcon}>
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${isActive ? "bg-green-dim text-green" : "bg-white/4"
+                    }`}
+                >
                   <Icon size={17} />
                 </span>
-                <span className={styles.sidebarItemLabel}>{section.label}</span>
+                <span className="text-xs font-medium leading-none md:text-sm">{section.label}</span>
               </button>
             );
           })}
         </nav>
-      </div>
-      <div className={styles.settingsMain}>
-        <div className={styles.settingsHeader}>
-          <div className={styles.settingsHeaderTitle}>
-            <h2>{activeSectionMeta.label}</h2>
-            <p className={styles.settingsHeaderDescription}>{activeSectionMeta.description}</p>
+      </aside>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex justify-center border-b border-border bg-black/20 px-5 pb-5 pt-6 md:px-10 md:pt-8">
+          <div className="flex w-full max-w-4xl flex-col gap-1.5">
+            <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
+              {activeSectionMeta.label}
+            </h2>
+            <p className="text-sm leading-normal text-text-secondary">
+              {activeSectionMeta.description}
+            </p>
           </div>
-        </div>
-        <div className={styles.settingsContent}>
-          <div className={styles.sectionContainer}>{renderSection()}</div>
-        </div>
-        <div className={styles.settingsFooter}>
-          <button className={styles.resetButton} onClick={handleReset}>
+        </header>
+
+        <main
+          className={`flex min-h-0 flex-1 flex-col items-center overflow-x-hidden overflow-y-auto px-5 py-6 md:px-10 md:pt-7 md:pb-8 ${thinScroll}`}
+        >
+          <div className="mx-auto w-full min-w-0 max-w-4xl animate-fade-in">
+            {renderSection()}
+          </div>
+        </main>
+
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-1 px-5 py-4 md:gap-4 md:px-10">
+          <button type="button" className={dangerButton} onClick={handleReset}>
             Reset Defaults
           </button>
-          <div className={styles.actionButtons}>
-            <button className={styles.cancelButton} onClick={() => window.close()}>
+          <div className="flex gap-3">
+            <button type="button" className={secondaryButton} onClick={() => window.close()}>
               Cancel
             </button>
-            <button className={styles.saveButton} onClick={handleSave}>
+            <button type="button" className={primaryButton} onClick={handleSave}>
               Save Changes
             </button>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   );

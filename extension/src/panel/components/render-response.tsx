@@ -16,7 +16,6 @@ import {
   CirclePause,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import styles from "css/panel/render-response.module.css";
 
 interface ResponseContent {
   prompt?: string;
@@ -32,7 +31,7 @@ interface RenderResponseProps {
   isInitial?: boolean;
   isExecuting?: boolean;
   isValidating?: boolean;
-  isSummary?: boolean;
+  isOutput?: boolean;
   error?: boolean;
 }
 
@@ -54,7 +53,7 @@ const CodeBlock: NonNullable<Components["code"]> = ({ className = "code", childr
       style={syntaxHighlighterStyle}
       language={match[1]}
       PreTag="div"
-      className={styles.syntaxHighlighter}
+      className="overflow-x-auto"
     >
       {String(children).replace(/\n$/, "")}
     </SyntaxHighlighter>
@@ -66,7 +65,7 @@ const CodeBlock: NonNullable<Components["code"]> = ({ className = "code", childr
 };
 
 const OverflowDiv: NonNullable<Components["div"]> = (props) => (
-  <div className={styles.overflowContainer}>{props.children}</div>
+  <div className="w-full">{props.children}</div>
 );
 
 const RenderResponse: React.FC<RenderResponseProps> = ({
@@ -75,7 +74,7 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
   isInitial = false,
   isExecuting = false,
   isValidating = false,
-  isSummary = false,
+  isOutput = false,
   error = false,
 }) => {
   const [CopyIcon, setCopyIcon] = useState<LucideIcon>(Copy);
@@ -93,8 +92,10 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
   const Pre: NonNullable<Components["pre"]> = ({ children }) => {
     if (!isValidElement<CodeElementProps>(children)) {
       return (
-        <pre className={styles.codeBlock}>
-          <div className={styles.codeContent}>{children}</div>
+        <pre className="my-3 rounded-lg border border-white bg-black">
+          <div className="font-mono text-sm px-2 overflow-x-auto whitespace-pre-wrap mb-[-0.4rem]">
+            {children}
+          </div>
         </pre>
       );
     }
@@ -103,18 +104,20 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
     const language = match ? match[1].toUpperCase() : "TEXT";
 
     return (
-      <pre className={styles.codeBlock}>
-        <div className={styles.codeHeader}>
-          <span className={styles.languageLabel}>{language}</span>
+      <pre className="my-3 rounded-lg border border-white bg-black">
+        <div className="flex justify-between items-center px-2 bg-white text-black text-sm font-mono rounded-t-md">
+          <span className="font-bold text-black">{language}</span>
           <div
-            className={styles.copyButton}
+            className="bg-white cursor-pointer transition-transform duration-300 hover:scale-110 [&_svg]:w-4 [&_svg]:h-4"
             title="Copy Code"
             onClick={() => handleClick(children.props.children)}
           >
             <CopyIcon size={16} />
           </div>
         </div>
-        <div className={styles.codeContent}>{children}</div>
+        <div className="font-mono text-sm px-2 py-1 overflow-x-auto whitespace-pre-wrap mb-[-0.6rem]">
+          {children}
+        </div>
       </pre>
     );
   };
@@ -140,8 +143,8 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
 
   if (error) {
     return (
-      <div className={styles.responseContainer}>
-        <div className={styles.markdownContent}>
+      <div className="w-full">
+        <div className="wrap-break-word w-full">
           <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {content?.prompt}
           </Markdown>
@@ -151,30 +154,33 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
   }
 
   return (
-    <div className={styles.responseContainer}>
-      <div className={styles.markdownContent}>
+    <div className="w-full">
+      <div className="wrap-break-word w-full">
         <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {content?.response}
         </Markdown>
       </div>
 
       {(content?.execution?.length || isExecuting) && (
-        <div className={styles.dropdownContainer}>
-          <div className={styles.dropdownHeader} onClick={toggleExecuting}>
-            <div className={styles.dropdownHeaderLeft}>
+        <div className="mt-4 mb-2 rounded-lg border border-border bg-[rgba(0,0,0,0.3)] overflow-hidden">
+          <div
+            className="flex justify-between items-center p-3 bg-[rgba(0,0,0,0.4)] cursor-pointer transition-[background] duration-300 ease-in-out hover:bg-[rgba(0,0,0,0.5)]"
+            onClick={toggleExecuting}
+          >
+            <div className="flex items-center gap-2">
               {isExecuting ? (
                 <>
-                  <Loader2 size={16} className={styles.dropdownLoadingIcon} />
-                  <span className={styles.dropdownLabel}>Executing Actions</span>
+                  <Loader2 size={16} className="animate-[spin_1.5s_linear_infinite] text-white" />
+                  <span className="font-normal text-xs">Executing Actions</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 size={16} className={styles.dropdownCompleteIcon} />
-                  <span className={styles.dropdownLabel}>Actions Executed</span>
+                  <CheckCircle2 size={16} className="text-white" />
+                  <span className="font-normal text-xs">Actions Executed</span>
                 </>
               )}
             </div>
-            <div className={styles.dropdownToggle}>
+            <div className="text-white transition-transform duration-200 ease-in-out">
               {isExecutingExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
           </div>
@@ -186,47 +192,61 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
       )}
 
       {(content?.validation || isValidating) && (
-        <div className={styles.dropdownContainer}>
-          <div className={styles.dropdownHeader} onClick={toggleValidating}>
-            <div className={styles.dropdownHeaderLeft}>
+        <div className="mt-2 mb-4 rounded-lg border border-border bg-[rgba(0,0,0,0.3)] overflow-hidden">
+          <div
+            className="flex justify-between items-center p-3 bg-[rgba(0,0,0,0.4)] cursor-pointer transition-[background] duration-300 ease-in-out hover:bg-[rgba(0,0,0,0.5)]"
+            onClick={toggleValidating}
+          >
+            <div className="flex items-center gap-2">
               {isValidating ? (
                 <>
-                  <Loader2 size={16} className={styles.dropdownLoadingIcon} />
-                  <span className={styles.dropdownLabel}>Validating Task</span>
+                  <Loader2 size={16} className="animate-[spin_1.5s_linear_infinite] text-white" />
+                  <span className="font-normal text-xs">Validating Task</span>
                 </>
               ) : taskStatus === "success" ? (
                 <>
-                  <CheckCircle2 size={16} className={styles.dropdownCompleteIcon} />
-                  <span className={styles.dropdownLabel}>Task Completed</span>
+                  <CheckCircle2 size={16} className="text-white" />
+                  <span className="font-normal text-xs">Task Completed</span>
                 </>
               ) : taskStatus === "suspended" ? (
                 <>
-                  <CirclePause size={16} className={styles.dropdownCompleteIcon} />
-                  <span className={styles.dropdownLabel}>Task Suspended</span>
+                  <CirclePause size={16} className="text-white" />
+                  <span className="font-normal text-xs">Task Suspended</span>
                 </>
               ) : (
                 <>
-                  <CircleX size={16} className={styles.dropdownCompleteIcon} />
-                  <span className={styles.dropdownLabel}>Task Failed</span>
+                  <CircleX size={16} className="text-white" />
+                  <span className="font-normal text-xs">Task Failed</span>
                 </>
               )}
             </div>
-            <div className={styles.dropdownToggle}>
+            <div className="text-white transition-transform duration-200 ease-in-out">
               {isValidatingExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
           </div>
 
           {isValidatingExpanded && (
-            <div className={styles.dropdownContent}>
-              <div className={styles.dropdownMarkdown}>
+            <div className="p-4 border-t border-[rgba(255,255,255,0.05)] animate-expand-content">
+              <div className="wrap-break-word w-full">
                 <Markdown remarkPlugins={[remarkGfm]} components={validationMarkdownComponents}>
                   {content?.validation || ""}
                 </Markdown>
               </div>
 
               {isValidating && (
-                <div className={styles.loaderContainer}>
-                  <div className={styles.loader} />
+                <div className="flex justify-center p-2">
+                  <div
+                    className="w-8 aspect-[2] animate-dots"
+                    style={
+                      {
+                        "--dots":
+                          "no-repeat radial-gradient(circle closest-side, rgb(0, 200, 83) 90%, transparent)",
+                        background:
+                          "var(--dots) 0% 50%, var(--dots) 50% 50%, var(--dots) 100% 50%",
+                        backgroundSize: "calc(100% / 3) 50%",
+                      } as React.CSSProperties
+                    }
+                  />
                 </div>
               )}
             </div>
@@ -234,19 +254,19 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
         </div>
       )}
 
-      {(content?.output || isSummary) && (
-        <div className={styles.markdownContent}>
+      {(content?.output || isOutput) && (
+        <div className="wrap-break-word w-full">
           <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {content?.output}
           </Markdown>
         </div>
       )}
 
-      {(isInitial || isSummary) && (
-        <div className={styles.loadingIndicator}>
-          <div className={styles.loadingIndicatorDot}></div>
-          <div className={styles.loadingIndicatorDot}></div>
-          <div className={styles.loadingIndicatorDot}></div>
+      {(isInitial || isOutput) && (
+        <div className="relative inline-block m-1 h-6 w-6 animate-spin-loader">
+          <div className="absolute h-full w-[30%] bottom-[5%] left-0 rotate-60 origin-[50%_85%] after:content-[''] after:absolute after:h-0 after:w-full after:pb-[100%] after:bg-[rgb(0,200,83)] after:rounded-full after:bottom-0 after:left-0 after:animate-wobble1 after:[animation-delay:calc(0.95s*-0.3)]"></div>
+          <div className="absolute h-full w-[30%] bottom-[5%] right-0 rotate-[-60deg] origin-[50%_85%] after:content-[''] after:absolute after:h-0 after:w-full after:pb-[100%] after:bg-[rgb(0,200,83)] after:rounded-full after:bottom-0 after:left-0 after:animate-wobble1 after:[animation-delay:calc(0.95s*-0.15)]"></div>
+          <div className="absolute h-full w-[30%] bottom-[-5%] left-0 translate-x-[116.666%] after:content-[''] after:absolute after:h-0 after:w-full after:pb-[100%] after:bg-[rgb(0,200,83)] after:rounded-full after:top-0 after:left-0 after:animate-wobble2"></div>
         </div>
       )}
     </div>

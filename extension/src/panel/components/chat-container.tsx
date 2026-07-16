@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import RenderResponse from "./render-response";
 import { Copy, File, Repeat, X } from "lucide-react";
 import type { ChatContainerProps, FileFormat } from "../../types";
-import styles from "css/panel/chat-container.module.css";
 
 const ChatContainer: React.FC<ChatContainerProps> = ({
   hidden,
@@ -29,16 +28,20 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   return (
     <>
       {isGenerating && !hidden && (
-        <div className={styles.statusBar}>
-          <div className={styles.statusIcon}></div>
-          <span className={styles.statusText}>{statusText}</span>
+        <div className="flex justify-center items-center p-1 gap-1 bg-[#ffffff10] shadow-[0_10px_25px_0_#000000b0] backdrop-brightness-[0.1] z-10">
+          <div className="w-5 h-5 inline-block relative before:content-[''] after:content-[''] before:box-border after:box-border before:w-5 before:h-5 after:w-5 after:h-5 before:rounded-full after:rounded-full before:bg-green-400 after:bg-green-400 before:absolute after:absolute before:left-0 after:left-0 before:top-0 after:top-0 before:animate-iconloader after:animate-iconloader after:[animation-delay:1s] after:opacity-0"></div>
+          <span className="text-xs text-white font-[Arial,Helvetica,sans-serif]">
+            {statusText}
+          </span>
         </div>
       )}
       {errorText && !hidden && (
-        <div className={styles.errorBar}>
-          <span className={styles.errorText}>{errorText}</span>
+        <div className="flex justify-between items-center py-3 px-4 bg-[rgba(255,50,50,0.15)] shadow-[0_10px_25px_0_#000000b0] backdrop-blur-sm z-10">
+          <span className="text-xs text-[#ffcccc] font-[Arial,Helvetica,sans-serif] flex-1">
+            {errorText}
+          </span>
           <button
-            className={styles.errorCloseButton}
+            className="bg-transparent border-none text-[#ffcccc] cursor-pointer flex items-center justify-center p-0 ml-2 transition-colors duration-200 ease-in-out hover:text-white"
             onClick={() => setErrorText("")}
             title="Dismiss"
           >
@@ -47,7 +50,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         </div>
       )}
       <div
-        className={`${styles.chatContainer} ${hidden ? styles.hidden : ""}`}
+        className={`flex flex-col gap-4 items-center z-1 ${hidden
+          ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
+          : "flex-1 overflow-y-auto pb-4"
+          }`}
         ref={chatContainerRef}
         style={{ paddingTop: hidden ? 0 : "1rem" }}
       >
@@ -57,21 +63,30 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
           return (
             <div
               key={index}
-              className={`${styles.message} ${isUser ? styles.user : styles.assistant}`}
+              className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${isUser
+                ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
+                : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
+                }`}
             >
               {!isUser && (
-                <div className={styles.messageActionsContainer}>
-                  <div className={styles.messageActions}>
-                    <button className={styles.messageActionButton} title="Retry">
+                <div className="absolute -top-2.5 right-1 z-5 opacity-0 translate-y-1 transition-[opacity,transform] duration-200 ease-in-out pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
+                  <div className="flex gap-1 bg-[rgba(15,15,15,0.8)] backdrop-blur-sm p-0.5 rounded-md border border-border">
+                    <button
+                      className="flex items-center justify-center w-6.5 h-6.5 rounded bg-transparent border-none text-[rgba(255,255,255,0.7)] cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(0,200,83,0.15)] hover:text-[rgba(0,200,83,1)] active:scale-95"
+                      title="Retry"
+                    >
                       <Repeat size={16} />
                     </button>
-                    <button className={styles.messageActionButton} title="Copy to clipboard">
+                    <button
+                      className="flex items-center justify-center w-6.5 h-6.5 rounded bg-transparent border-none text-[rgba(255,255,255,0.7)] cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(0,200,83,0.15)] hover:text-[rgba(0,200,83,1)] active:scale-95"
+                      title="Copy to clipboard"
+                    >
                       <Copy size={16} />
                     </button>
                   </div>
                 </div>
               )}
-              <div className={styles.messageContent}>
+              <div className="flex-1 whitespace-normal [overflow-wrap:break-word] [word-wrap:break-word] [word-break:break-word] overflow-hidden">
                 {isUser ? (
                   <>
                     {msg.content.text?.prompt}
@@ -80,20 +95,20 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                         {msg.content.files.map((file: FileFormat, fileIndex: number) => (
                           <div
                             key={`${file.payload.name}-${fileIndex}`}
-                            className={styles.messageFilePreview}
+                            className="py-2 px-4 mt-2 mr-4 mb-0.5 ml-0 rounded-md flex items-center gap-1.5 bg-border cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(255,255,255,0.15)]"
                             onClick={() => handleFileClick(file)}
                           >
                             {file.payload.mimeType.startsWith("image/") ? (
                               <img
                                 src={`data:${file.payload.mimeType};base64,${file.payload.content}`}
-                                className={styles.messageFileThubmnail}
+                                className="w-4 h-4 object-contain"
                                 alt={file.payload.name}
                               />
                             ) : (
-                              <File />
+                              <File className="h-4 w-4 stroke-white" />
                             )}
                             <span
-                              className={styles.messageFilePreviewName}
+                              className="flex-1 text-xs overflow-hidden text-ellipsis whitespace-nowrap"
                               title={file.payload.name}
                             >
                               {file.payload.name}
@@ -110,7 +125,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                       isInitial={isLatest && streaming.response}
                       isExecuting={isLatest && streaming.execution}
                       isValidating={isLatest && streaming.validation}
-                      isSummary={isLatest && streaming.output}
+                      isOutput={isLatest && streaming.output}
                       taskStatus={msg.content?.taskStatus}
                     />
                     {msg.content.files && msg.content.files.length > 0 && (
@@ -118,20 +133,20 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                         {msg.content.files.map((file: FileFormat, fileIndex: number) => (
                           <div
                             key={`${file.payload.name}-${fileIndex}`}
-                            className={styles.messageFilePreview}
+                            className="py-2 px-4 mt-2 mr-4 mb-0.5 ml-0 rounded-md flex items-center gap-1.5 bg-border cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(255,255,255,0.15)]"
                             onClick={() => handleFileClick(file)}
                           >
                             {file.payload.mimeType.startsWith("image/") ? (
                               <img
                                 src={`data:${file.payload.mimeType};base64,${file.payload.content}`}
-                                className={styles.messageFileThubmnail}
+                                className="w-4 h-4 object-contain"
                                 alt={file.payload.name}
                               />
                             ) : (
-                              <File />
+                              <File className="h-4 w-4 stroke-white" />
                             )}
                             <span
-                              className={styles.messageFilePreviewName}
+                              className="flex-1 text-xs overflow-hidden text-ellipsis whitespace-nowrap"
                               title={file.payload.name}
                             >
                               {file.payload.name}

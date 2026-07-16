@@ -21,7 +21,6 @@ const PUBLIC_PATH = "/";
 
 const alias = {
   "@": path.resolve(EXTENSION_DIR, "src"),
-  css: path.resolve(EXTENSION_DIR, "src/stylesheets"),
 };
 
 const fileExtensions = ["jpg", "jpeg", "png", "gif", "eot", "otf", "svg", "ttf", "woff", "woff2"];
@@ -48,23 +47,8 @@ const config: webpack.Configuration = {
   module: {
     rules: [
       {
-        test: /\.module.css$/,
-        use: [
-          {
-            loader: "style-loader",
-          },
-          {
-            loader: "css-loader",
-            options: {
-              esModule: true,
-              modules: {
-                namedExport: false,
-                exportLocalsConvention: "camel-case-only",
-              },
-            },
-          },
-        ],
-        exclude: /node_modules/,
+        test: /\.css$/i,
+        use: ["style-loader", "css-loader", "@tailwindcss/webpack"],
       },
       {
         test: new RegExp(".(" + fileExtensions.join("|") + ")$"),

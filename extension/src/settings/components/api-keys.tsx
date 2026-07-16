@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ExternalLink, Eye, EyeOff } from "lucide-react";
 import { hasApiKey, PROVIDERS } from "../providers";
 import type { ApiKeys } from "@/types";
-import styles from "css/settings/api-keys.module.css";
+import { monoInput } from "../styles";
 
 interface ApiKeysSectionProps {
   apiKeys: ApiKeys;
@@ -17,62 +17,70 @@ const ApiKeysSection: React.FC<ApiKeysSectionProps> = ({ apiKeys, setApiKeys }) 
   };
 
   return (
-    <>
-      <div className={styles.providerGrid}>
-        {PROVIDERS.map((provider) => {
-          const isConfigured = hasApiKey(apiKeys, provider.id);
-          const isVisible = visibleKeys[provider.id];
-          const value = apiKeys[provider.id] ?? "";
+    <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+      {PROVIDERS.map((provider) => {
+        const isConfigured = hasApiKey(apiKeys, provider.id);
+        const isVisible = visibleKeys[provider.id];
+        const value = apiKeys[provider.id] ?? "";
 
-          return (
-            <div key={provider.id} className={styles.providerCard}>
-              <div className={styles.providerCardHeader}>
-                <div>
-                  <div className={styles.providerName}>{provider.label}</div>
-                  <div className={styles.providerDescription}>{provider.description}</div>
+        return (
+          <div
+            key={provider.id}
+            className="flex flex-col gap-3.5 rounded-md border border-border bg-surface-2 px-4 py-4.5 transition-colors duration-150 hover:border-border-strong sm:px-5"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold leading-tight text-text-primary">
+                  {provider.label}
                 </div>
-                <span
-                  className={`${styles.statusBadge} ${isConfigured ? styles.statusBadgeActive : ""}`}
-                >
-                  {isConfigured ? "Configured" : "Not Configured"}
-                </span>
+                <div className="mt-0.5 text-xs leading-snug text-text-muted">
+                  {provider.description}
+                </div>
               </div>
-
-              <div className={styles.secretInputWrapper}>
-                <input
-                  className={styles.secretInput}
-                  type={isVisible ? "text" : "password"}
-                  placeholder={provider.placeholder}
-                  value={value}
-                  onChange={(e) =>
-                    setApiKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))
-                  }
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  className={styles.secretToggle}
-                  onClick={() => toggleVisibility(provider.id)}
-                  aria-label={isVisible ? "Hide API key" : "Show API key"}
-                >
-                  {isVisible ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-
-              <a
-                href={provider.docsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={styles.providerDocsLink}
+              <span
+                className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium ${isConfigured
+                    ? "border-green-border bg-green-dim text-green"
+                    : "border-border bg-white/4 text-text-muted"
+                  }`}
               >
-                Get API key <ExternalLink size={13} />
-              </a>
+                {isConfigured ? "Configured" : "Not Configured"}
+              </span>
             </div>
-          );
-        })}
-      </div>
-    </>
+
+            <div className="relative flex items-center">
+              <input
+                className={`${monoInput} pr-10`}
+                type={isVisible ? "text" : "password"}
+                placeholder={provider.placeholder}
+                value={value}
+                onChange={(e) =>
+                  setApiKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))
+                }
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-sm text-text-muted transition-colors duration-150 hover:bg-white/6 hover:text-text-primary"
+                onClick={() => toggleVisibility(provider.id)}
+                aria-label={isVisible ? "Hide API key" : "Show API key"}
+              >
+                {isVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+
+            <a
+              href={provider.docsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex w-fit items-center gap-1 text-xs font-medium text-text-secondary no-underline transition-colors duration-150 hover:text-text-primary hover:underline"
+            >
+              Get API key <ExternalLink size={13} />
+            </a>
+          </div>
+        );
+      })}
+    </div>
   );
 };
 

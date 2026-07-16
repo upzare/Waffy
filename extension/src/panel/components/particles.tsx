@@ -1,6 +1,5 @@
 import { useRef, useEffect } from "react";
 import type { ParticlesProps } from "../../types";
-import styles from "css/panel/particles.module.css";
 
 const Particles = ({
   quantity = 30,
@@ -176,8 +175,8 @@ const Particles = ({
   };
 
   return (
-    <div className={styles.particlesContainer}>
-      <div className={styles.particles} ref={canvasContainerRef} aria-hidden="true">
+    <div className="fixed top-0 left-0 w-full h-full z-1 pointer-events-none">
+      <div className="w-full h-full" ref={canvasContainerRef} aria-hidden="true">
         <canvas ref={canvasRef} />
       </div>
     </div>

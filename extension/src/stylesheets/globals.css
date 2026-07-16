@@ -1,0 +1,297 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-prompt-1: #cb1a1a;
+  --color-prompt-2: #a129bc;
+  --color-prompt-3: #1b45aa;
+  --color-prompt-4: #1cac2b;
+  --color-prompt-5: #22bbb8;
+  --color-prompt-6: #cfc40b;
+
+  --color-green: #00ff80;
+  --color-green-dim: rgba(0, 255, 128, 0.12);
+  --color-green-border: rgba(0, 255, 128, 0.3);
+  --color-red: #ff5c5c;
+  --color-red-dim: rgba(255, 92, 92, 0.1);
+  --color-red-border: rgba(255, 92, 92, 0.35);
+  --color-surface-0: #000000;
+  --color-surface-1: #0e0e0e;
+  --color-surface-2: #141414;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-text-primary: rgba(255, 255, 255, 0.92);
+  --color-text-secondary: rgba(255, 255, 255, 0.6);
+  --color-text-muted: rgba(255, 255, 255, 0.4);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+
+  --animate-fade-in: fadeIn 0.25s ease-out;
+  --animate-fade-in-message: fadeInMessage 0.3s ease-out;
+  --animate-suggestions-gradient: suggestionsGradient 8s ease infinite;
+  --animate-orbit: orbit 8s linear infinite;
+  --animate-orbit-slow: orbit 10s linear infinite;
+  --animate-anim-star: animStar 60s linear infinite;
+  --animate-anim-star-rotate: animStarRotate 90s linear infinite;
+  --animate-l7: l7 1s infinite linear alternate;
+  --animate-dots: dots 1s infinite linear;
+  --animate-expand-content: expandContent 0.3s ease-out;
+  --animate-wobble1: wobble1 0.95s infinite ease-in-out;
+  --animate-wobble2: wobble2 0.95s infinite ease-in-out;
+  --animate-spin-loader: spin 1.4s infinite linear;
+  --animate-iconloader: iconloader 2s linear infinite;
+  --animate-grow-line: growLine 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInMessage {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes suggestionsGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes orbit {
+  from {
+    transform: rotate(0deg) translateX(100px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(100px) rotate(-360deg);
+  }
+}
+
+@keyframes animStar {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-135rem);
+  }
+}
+
+@keyframes animStarRotate {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0);
+  }
+}
+
+@keyframes l7 {
+  0% {
+    background-size:
+      20% 50%,
+      20% 50%,
+      20% 50%;
+  }
+  20% {
+    background-size:
+      20% 20%,
+      20% 50%,
+      20% 50%;
+  }
+  40% {
+    background-size:
+      20% 100%,
+      20% 20%,
+      20% 50%;
+  }
+  60% {
+    background-size:
+      20% 50%,
+      20% 100%,
+      20% 20%;
+  }
+  80% {
+    background-size:
+      20% 50%,
+      20% 50%,
+      20% 100%;
+  }
+  100% {
+    background-size:
+      20% 50%,
+      20% 50%,
+      20% 50%;
+  }
+}
+
+@keyframes dots {
+  20% {
+    background-position:
+      0% 0%,
+      50% 50%,
+      100% 50%;
+  }
+  40% {
+    background-position:
+      0% 100%,
+      50% 0%,
+      100% 50%;
+  }
+  60% {
+    background-position:
+      0% 50%,
+      50% 100%,
+      100% 0%;
+  }
+  80% {
+    background-position:
+      0% 50%,
+      50% 50%,
+      100% 100%;
+  }
+}
+
+@keyframes expandContent {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 1000px;
+    opacity: 1;
+  }
+}
+
+@keyframes wobble1 {
+  0%,
+  100% {
+    transform: translateY(0%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-66%) scale(0.7);
+    opacity: 0.8;
+  }
+}
+
+@keyframes wobble2 {
+  0%,
+  100% {
+    transform: translateY(0%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(66%) scale(0.7);
+    opacity: 0.8;
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes iconloader {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes growLine {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--target-height, 1.2rem);
+  }
+}
+
+@layer base {
+  :root {
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    font-weight: 400;
+    color-scheme: dark;
+    color: rgba(255, 255, 255, 0.95);
+    background-color: #000000;
+    --gradient-colors: #cb1a1a, #a129bc, #1b45aa, #1cac2b, #22bbb8, #cfc40b;
+    --color-1: #cb1a1a;
+    --color-2: #a129bc;
+    --color-3: #1b45aa;
+    --color-4: #1cac2b;
+    --color-5: #22bbb8;
+    --color-6: #cfc40b;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #000;
+    color-scheme: dark;
+  }
+
+  body {
+    min-width: 300px;
+    height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    margin: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(245, 245, 245, 0.3);
+    border-radius: 10px;
+    border: 1px solid rgba(200, 200, 200, 0.1);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 245, 245, 0.5);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}

@@ -6,7 +6,7 @@ import { BROWSER_AI_PROVIDER, getProviderMeta, hasApiKey, PROVIDERS } from "../p
 import type { CloudProviderId } from "../providers";
 import BrowserAISection from "./browser-ai";
 import type { ApiKeys, ModelConfig, ProviderId, Settings, StageId } from "@/types";
-import styles from "css/settings/models.module.css";
+import { alertError, alertInfo, fieldLabel, monoInput, selectInput } from "../styles";
 
 interface ModelsSectionProps {
   settings: Settings;
@@ -36,12 +36,11 @@ const STAGE_GROUPS: StageGroup[] = [
       {
         id: "chat",
         label: "Chat Model",
-        description:
-          "Conversational assistant for chatting and question-answering.",
+        description: "Conversational assistant for chatting and question-answering.",
         recommendation: (
           <>
-            Use the built-in browser model, with vision capability (like Gemini Nano) for free.
-            For more advanced reasoning and querying, switch to a cloud model.
+            Use the built-in browser model, with vision capability (like Gemini Nano) for free. For
+            more advanced reasoning and querying, switch to a cloud model.
           </>
         ),
       },
@@ -65,8 +64,7 @@ const STAGE_GROUPS: StageGroup[] = [
       {
         id: "t2",
         label: "Execution Model",
-        description:
-          "Performs the automation task based on the generated plan",
+        description: "Performs the automation task based on the generated plan",
         recommendation: (
           <>
             Execution works best with vision models that support spatial reasoning and image grounding
@@ -119,43 +117,19 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
   };
 
   const renderBrowserAIWarning = () => {
+    if (browserAIStatus === "available") return null;
+
+    let message = "Download Browser AI in the section above before using it for this stage.";
     if (browserAIStatus === "unsupported") {
-      return (
-        <div className={styles.stageWarning}>
-          <AlertCircle size={15} />
-          <span>Browser AI is not supported in this browser.</span>
-        </div>
-      );
+      message = "Browser AI is not supported in this browser.";
+    } else if (browserAIStatus === "unavailable") {
+      message = "Browser AI is unavailable on this device. Check storage and system requirements.";
     }
-
-    if (browserAIStatus === "unavailable") {
-      return (
-        <div className={styles.stageWarning}>
-          <AlertCircle size={15} />
-          <span>Browser AI is unavailable on this device. Check storage and system requirements.</span>
-        </div>
-      );
-    }
-
-    if (browserAIStatus !== "available") {
-      return (
-        <div className={styles.stageWarning}>
-          <AlertCircle size={15} />
-          <span>Download Browser AI in the section above before using it for this stage.</span>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  const renderStageRecommendation = (recommendation?: React.ReactNode) => {
-    if (!recommendation) return null;
 
     return (
-      <div className={styles.stageNote}>
-        <Info size={15} />
-        <span>{recommendation}</span>
+      <div className={alertError}>
+        <AlertCircle size={15} />
+        <span>{message}</span>
       </div>
     );
   };
@@ -175,50 +149,61 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     const modelPreview = isBrowserAI ? getBrowserAIModelLabel() : config.model || "—";
 
     return (
-      <div className={styles.stageCard} key={id}>
+      <div
+        className="overflow-hidden rounded-md border border-border bg-surface-2 transition-colors duration-150 hover:border-border-strong"
+        key={id}
+      >
         <button
           type="button"
-          className={styles.stageCardHeader}
+          className="flex w-full flex-col items-start gap-2 px-4 py-4 text-left transition-colors duration-150 hover:bg-white/2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5"
           onClick={() => toggleStage(id)}
           aria-expanded={isExpanded}
         >
-          <div className={styles.stageCardTitleGroup}>
-            <span className={styles.stageCardTitle}>{label}</span>
-            <p className={styles.stageCardDescription}>{description}</p>
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-semibold">{label}</span>
+            <p className="mt-0.5 text-xs leading-snug text-text-muted">{description}</p>
           </div>
-          <div className={styles.stageCardPreview}>
-            <span className={styles.stageModelPreview}>
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
+            <span className="min-w-0 flex-1 truncate font-mono text-xs text-text-muted sm:max-w-[220px] sm:flex-none">
               {providerMeta.shortLabel} / {modelPreview}
             </span>
             <ChevronDown
               size={16}
-              className={`${styles.stageChevron} ${isExpanded ? styles.stageChevronOpen : ""}`}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+                }`}
             />
           </div>
         </button>
 
         {isExpanded && (
-          <div className={styles.stageCardBody}>
+          <div className="flex animate-fade-in flex-col gap-4 border-t border-border px-4 py-4 sm:px-5 sm:pb-5">
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
-                <div className={styles.stageWarning}>
+                <div className={alertError}>
                   <AlertCircle size={15} />
-                  <span>No API key for {providerMeta.label}. Add one in the API Keys section.</span>
+                  <span>
+                    No API key for {providerMeta.label}. Add one in the API Keys section.
+                  </span>
                 </div>
               )}
 
-            {renderStageRecommendation(recommendation)}
+            {recommendation && (
+              <div className={alertInfo}>
+                <Info size={15} />
+                <span>{recommendation}</span>
+              </div>
+            )}
 
-            <div className={styles.stageFieldRow}>
-              <div className={styles.stageField}>
-                <label className={styles.fieldLabel} htmlFor={`${id}-provider`}>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-2">
+                <label htmlFor={`${id}-provider`} className={fieldLabel}>
                   Provider
                 </label>
-                <div className={styles.selectWrapper}>
+                <div className="relative">
                   <select
                     id={`${id}-provider`}
-                    className={styles.selectInput}
+                    className={selectInput}
                     value={config.provider}
                     onChange={(e) =>
                       updateStage(id, {
@@ -238,19 +223,22 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={16} className={styles.selectChevron} />
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-text-muted"
+                  />
                 </div>
               </div>
 
               {!isBrowserAI && (
-                <div className={styles.stageField}>
-                  <label className={styles.fieldLabel} htmlFor={`${id}-model`}>
+                <div className="flex min-w-0 flex-col gap-2">
+                  <label htmlFor={`${id}-model`} className={fieldLabel}>
                     Model
                   </label>
-                  <div className={styles.selectWrapper}>
+                  <div className="relative">
                     <select
                       id={`${id}-model`}
-                      className={styles.selectInput}
+                      className={selectInput}
                       value={selectValue}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -268,27 +256,32 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                       ))}
                       <option value={CUSTOM_MODEL_OPTION}>Custom model ID…</option>
                     </select>
-                    <ChevronDown size={16} className={styles.selectChevron} />
+                    <ChevronDown
+                      size={16}
+                      className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-text-muted"
+                    />
                   </div>
                 </div>
               )}
             </div>
 
             {isBrowserAI && (
-              <div className={styles.stageField}>
-                <label className={styles.fieldLabel}>Model</label>
-                <p className={styles.browserAiModelNote}>{getBrowserAIModelLabel()} (on-device)</p>
+              <div className="flex min-w-0 flex-col gap-2">
+                <span className={fieldLabel}>Model</span>
+                <p className="text-sm text-text-secondary">
+                  {getBrowserAIModelLabel()} (on-device)
+                </p>
               </div>
             )}
 
             {isCustom && (
-              <div className={styles.stageField}>
-                <label className={styles.fieldLabel} htmlFor={`${id}-custom`}>
+              <div className="flex min-w-0 flex-col gap-2">
+                <label htmlFor={`${id}-custom`} className={fieldLabel}>
                   Custom model ID
                 </label>
                 <input
                   id={`${id}-custom`}
-                  className={styles.textInput}
+                  className={monoInput}
                   type="text"
                   placeholder="e.g. my-provider/my-model"
                   value={config.model}
@@ -306,12 +299,12 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     <>
       <BrowserAISection onStatusChange={setBrowserAIStatus} />
       {STAGE_GROUPS.map((group) => (
-        <div className={styles.stageGroup} key={group.title}>
-          <div className={styles.stageGroupHeader}>
-            <h3 className={styles.stageGroupTitle}>{group.title}</h3>
-            <p className={styles.stageGroupSubtitle}>{group.subtitle}</p>
+        <div className="mb-7" key={group.title}>
+          <div className="mb-3">
+            <h3 className="mb-0.5 text-sm font-semibold">{group.title}</h3>
+            <p className="text-sm leading-snug text-text-muted">{group.subtitle}</p>
           </div>
-          <div className={styles.stageList}>
+          <div className="flex flex-col gap-2.5">
             {group.stages.map((stage) => renderStageCard(stage))}
           </div>
         </div>
