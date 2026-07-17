@@ -93,11 +93,13 @@ After `npm run dev`, reload the extension in `chrome://extensions/` when you mak
 │   │       ├── client.ts   # Chrome storage & settings
 │   │       ├── background.ts
 │   │       └── content.ts  # Page interaction (clicks, typing, screenshots)
-│   └── public/             # Manifest, icons, static assets
+│   ├── public/             # Manifest, icons, static assets
+│   ├── package.json
+│   ├── webpack.config.ts
+│   └── tsconfig.json
+├── package.json            # Workspace root — run npm commands from here
 ├── build/                  # Production output (load this in Chrome)
-├── package.json
-├── webpack.config.ts
-└── tsconfig.json
+└── .output/                # Zipped release packages
 ```
 
 ## Privacy
