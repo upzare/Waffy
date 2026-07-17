@@ -39,10 +39,13 @@ export interface ChatContainerProps {
   hidden: boolean;
   messages: Message[];
   streaming: StreamingState;
+  streamingMessageId: string | null;
   isGenerating: boolean;
   statusText: string;
   errorText: string;
   setErrorText: (error: string) => void;
+  onRetryMessage: (assistantMessageId: string) => Promise<void>;
+  onRevertMessage: (userMessageId: string) => Promise<void>;
 }
 
 export interface InputContainerProps {
@@ -67,6 +70,8 @@ export interface HistorySidebarProps {
   onRemoveConversation: (id: string) => void;
 }
 
+export type MessageMode = "chat" | "automate";
+
 export interface Message {
   id: string;
   content: {
@@ -81,6 +86,7 @@ export interface Message {
     task?: string;
     taskStatus?: string;
     aborted?: boolean;
+    mode?: MessageMode;
   };
 }
 

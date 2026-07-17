@@ -7,7 +7,7 @@ import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
 import { parseSlashCommand, stripSlashCommands } from "./utils/slash-commands";
-import { fileHandler } from "./utils/file-handler";
+import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import { availableFunctions as chatFunctions } from "@/lib/llm/tools/handlers/chat";
 import {
   availableFunctions as automateFunctions,
@@ -29,7 +29,14 @@ import HistorySidebar from "./components/history-sidebar";
 import Hero from "./components/hero";
 import Particles from "./components/particles";
 import Loader from "./components/loader";
-import type { Message, Conversation, StreamingState, ToolCall, FileFormat } from "../types";
+import type {
+  Message,
+  MessageMode,
+  Conversation,
+  StreamingState,
+  ToolCall,
+  FileFormat,
+} from "../types";
 import "@/stylesheets/globals.css";
 
 const App = () => {
@@ -50,6 +57,7 @@ const App = () => {
     validation: false,
     output: false,
   });
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [missingApiKeys, setMissingApiKeys] = useState(false);
   const [pinnedPrompts, setPinnedPrompts] = useState<string[]>([...DEFAULT_PINNED_PROMPTS]);
 
@@ -60,6 +68,7 @@ const App = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController>(null);
   const safeToAbortRef = useRef<boolean>(false);
+  const generationLockRef = useRef(false);
   const dbSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const db = useRef<IDBDatabase>(null);
@@ -126,17 +135,45 @@ const App = () => {
     };
   };
 
-  const initConversation = async () => {
-    const conversationDB = db.current
-      ?.transaction("conversations", "readwrite")
-      .objectStore("conversations");
-    conversationDB?.add({
-      id: conversationIdRef.current,
-      title: "New Chat",
-      timestamp: new Date(),
-      messages: [],
+  // Resolves with the shared connection, waiting for the initial open if needed.
+  const getDB = () =>
+    new Promise<IDBDatabase | null>((resolve) => {
+      if (db.current) {
+        resolve(db.current);
+        return;
+      }
+      const request = db_request.current;
+      if (!request) {
+        resolve(null);
+        return;
+      }
+      if (request.readyState === "done") {
+        resolve(request.result ?? null);
+        return;
+      }
+      request.addEventListener("success", () => resolve(request.result));
+      request.addEventListener("error", () => resolve(null));
     });
-    fetchConversations();
+
+  const initConversation = async () => {
+    const database = await getDB();
+    if (!database || !conversationIdRef.current) return;
+
+    await new Promise<void>((resolve) => {
+      const tx = database.transaction("conversations", "readwrite");
+      tx.objectStore("conversations").add({
+        id: conversationIdRef.current,
+        title: "New Chat",
+        timestamp: new Date(),
+        messages: [],
+      });
+      tx.oncomplete = () => {
+        void fetchConversations();
+        resolve();
+      };
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    });
   };
 
   const generateTitle = async (prompt: string) => {
@@ -156,50 +193,64 @@ const App = () => {
     }
   };
 
-  const fetchConversations = async () => {
-    const dbr: IDBOpenDBRequest = indexedDB.open("WaffyDB", 1);
-    dbr.onsuccess = (dbEvent) => {
-      (dbEvent.target as IDBOpenDBRequest).result
-        .transaction("conversations", "readwrite")
+  const fetchConversations = async (): Promise<Conversation[]> => {
+    const database = await getDB();
+    if (!database) return [];
+
+    return new Promise((resolve) => {
+      const request = database
+        .transaction("conversations", "readonly")
         .objectStore("conversations")
-        .getAll().onsuccess = (event) => {
-          const data = (event.target as IDBRequest).result;
-          const sortedData = data.sort((a: Conversation, b: Conversation) => {
-            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-          });
-          setConversations(sortedData);
-        };
-    };
+        .getAll();
+      request.onsuccess = () => {
+        const sortedData = (request.result as Conversation[]).sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        setConversations(sortedData);
+        resolve(sortedData);
+      };
+      request.onerror = () => resolve([]);
+    });
   };
 
-  const updateConversationsDB = (updatedMessages: Message[], immediate = false) => {
-    const write = () => {
-      const conversationDB = db.current
-        ?.transaction("conversations", "readwrite")
-        .objectStore("conversations");
-      if (conversationDB && conversationIdRef.current) {
-        conversationDB.get(conversationIdRef.current).onsuccess = (event) => {
-          const data = (event.target as IDBRequest).result;
-          if (data) {
-            data.messages = updatedMessages;
-            conversationDB.put(data);
-          }
+  const updateConversationsDB = (updatedMessages: Message[], immediate = false): Promise<void> => {
+    const write = async () => {
+      const database = await getDB();
+      const conversationId = conversationIdRef.current;
+      if (!database || !conversationId) return;
+
+      await new Promise<void>((resolve) => {
+        const tx = database.transaction("conversations", "readwrite");
+        const store = tx.objectStore("conversations");
+        const getRequest = store.get(conversationId);
+
+        getRequest.onsuccess = () => {
+          const data = getRequest.result;
+          if (!data) return;
+          data.messages = updatedMessages;
+          store.put(data);
         };
-      }
+
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      });
     };
 
     if (immediate) {
       if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
-      write();
-      return;
+      return write();
     }
 
     if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
-    dbSyncTimerRef.current = setTimeout(write, 300);
+    dbSyncTimerRef.current = setTimeout(() => {
+      void write();
+    }, 300);
+    return Promise.resolve();
   };
 
   const syncMessages = (updatedMessages: Message[], immediate = false) => {
-    updateConversationsDB(updatedMessages, immediate);
+    void updateConversationsDB(updatedMessages, immediate);
     return updatedMessages;
   };
 
@@ -213,12 +264,16 @@ const App = () => {
     await chrome.runtime.sendMessage({ action: "STOP_SESSION" });
   };
 
-  const automateHandler = async (prompt_text: string, prompt_files: FileFormat[]) => {
+  const automateHandler = async (
+    prompt_text: string,
+    prompt_files: FileFormat[],
+    conversationMessages: Message[]
+  ) => {
     await attachController();
     try {
-      const task = await t1Handler(prompt_text, prompt_files);
+      const task = await t1Handler(prompt_text, prompt_files, conversationMessages);
       if (task) {
-        const t2Reasoning = await t2Handler(task, prompt_files);
+        const t2Reasoning = await t2Handler(task, prompt_files, conversationMessages);
         if (t2Reasoning) {
           await t3Handler(task, t2Reasoning);
           await t4Handler(task, t2Reasoning);
@@ -233,11 +288,15 @@ const App = () => {
     }
   };
 
-  const t1Handler = async (prompt_text: string, prompt_files: FileFormat[]) => {
+  const t1Handler = async (
+    prompt_text: string,
+    prompt_files: FileFormat[],
+    conversationMessages: Message[]
+  ) => {
     if (abortControllerRef.current?.signal.aborted) return;
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
-    const t1Messages = buildT1Messages(prompt_text, prompt_files, messages);
+    const t1Messages = buildT1Messages(prompt_text, prompt_files, conversationMessages);
     console.log("t1Messages:", t1Messages);
     const responseStream = AI(t1Messages, "t1", abortControllerRef?.current, safeToAbortRef);
     const toolCalls: Record<string, ToolCall> = {};
@@ -286,7 +345,11 @@ const App = () => {
     return false;
   };
 
-  const t2Handler = async (task: string, prompt_files: FileFormat[]) => {
+  const t2Handler = async (
+    task: string,
+    prompt_files: FileFormat[],
+    conversationMessages: Message[]
+  ) => {
     if (abortControllerRef.current?.signal.aborted) return;
     setStatusText("EXECUTING");
     setStreaming((prev) => ({ ...prev, execution: true }));
@@ -322,7 +385,7 @@ const App = () => {
       )
     );
 
-    const t2Messages = buildT2Messages(task, prompt_files, messages);
+    const t2Messages = buildT2Messages(task, prompt_files, conversationMessages);
     console.log("t2History:", t2Messages);
     let t2Reasoning = "";
 
@@ -520,12 +583,16 @@ const App = () => {
     setStreaming((prev) => ({ ...prev, output: false }));
   };
 
-  const chatHandler = async (prompt_text: string, prompt_files: FileFormat[]) => {
+  const chatHandler = async (
+    prompt_text: string,
+    prompt_files: FileFormat[],
+    conversationMessages: Message[]
+  ) => {
     if (abortControllerRef.current?.signal.aborted) return;
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
-    const chatMessages = buildChatMessages(prompt_text, prompt_files, messages);
+    const chatMessages = buildChatMessages(prompt_text, prompt_files, conversationMessages);
     let finish = false;
     let functionExecState = false;
 
@@ -629,99 +696,234 @@ const App = () => {
     setErrorText(errorMessage);
   };
 
-  const handleSendMessage = async () => {
-    if ((!message.trim() && files.length === 0) || isGenerating) return;
-
+  const ensureProvidersConfigured = async () => {
     const { settings, apiKeys } = await getAppSettings();
-    const command = parseSlashCommand(mentions, message);
-    const isAutomate = command === "automate";
-
     const missingStage = await findMissingProvider(settings.models, apiKeys);
-    if (missingStage) {
-      const provider = getStageConfig(settings.models, missingStage).provider;
-      if (provider === "browser-ai") {
-        toast.error("Download Browser AI in extension settings.");
-      } else {
-        toast.error("Configure API keys in extension settings.");
+    if (!missingStage) return true;
+
+    const provider = getStageConfig(settings.models, missingStage).provider;
+    if (provider === "browser-ai") {
+      toast.error("Download Browser AI in extension settings.");
+    } else {
+      toast.error("Configure API keys in extension settings.");
+    }
+    chrome.runtime.openOptionsPage();
+    return false;
+  };
+
+  const sendMessage = async ({
+    promptText,
+    promptFiles,
+    isAutomate,
+    messageId,
+    conversationContext,
+    prepareMessages,
+    clearInput = false,
+  }: {
+    promptText: string;
+    promptFiles: FileFormat[];
+    isAutomate: boolean;
+    messageId: string;
+    conversationContext: Message[];
+    prepareMessages: () => void | Promise<void>;
+    clearInput?: boolean;
+  }) => {
+    if (generationLockRef.current) return;
+    generationLockRef.current = true;
+
+    try {
+      if (!(await ensureProvidersConfigured())) return;
+
+      messageIdRef.current = messageId;
+      setIsGenerating(true);
+      setStreamingMessageId(`assistant-${messageId}`);
+      setStatusText("INITIALIZING");
+      setErrorText("");
+      abortControllerRef.current = new AbortController();
+
+      const inputEl = textareaRef.current;
+      if (clearInput && inputEl) {
+        inputEl.style.color = "#909090";
       }
-      chrome.runtime.openOptionsPage();
+
+      try {
+        await prepareMessages();
+
+        if (isAutomate) {
+          await automateHandler(promptText, promptFiles, conversationContext);
+        } else {
+          await chatHandler(promptText, promptFiles, conversationContext);
+        }
+      } catch (error: unknown) {
+        displayError(error);
+      } finally {
+        setStreaming({ response: false, execution: false, validation: false, output: false });
+        setStreamingMessageId(null);
+        setIsGenerating(false);
+        setStatusText("");
+        if (clearInput) {
+          setMessage("");
+          setMentions([]);
+          setFiles([]);
+          if (inputEl) {
+            inputEl.style.height = "auto";
+            inputEl.style.color = "#ffffff";
+          }
+        }
+        messageIdRef.current = null;
+        abortControllerRef.current = null;
+        safeToAbortRef.current = false;
+        textareaRef.current?.focus();
+      }
+    } finally {
+      generationLockRef.current = false;
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if ((!message.trim() && files.length === 0) || isGenerating || generationLockRef.current) {
       return;
     }
 
-    messageIdRef.current = uuid4();
-    const prompt_text = command ? stripSlashCommands(message) : message.trim();
-    const prompt_files = await fileHandler(files);
-    if (!prompt_text && prompt_files.length === 0) {
-      messageIdRef.current = null;
+    const command = parseSlashCommand(mentions, message);
+    const isAutomate = command === "automate";
+    const messageId = uuid4();
+    const promptText = command ? stripSlashCommands(message) : message.trim();
+    const promptFiles = await fileHandler(files);
+
+    if (!promptText && promptFiles.length === 0) {
       toast.error(command ? `Add a message after /${command}` : "Message cannot be empty");
       return;
     }
 
-    setIsGenerating(true);
-    setStatusText("INITIALIZING");
-    setErrorText("");
-    const inputEl = textareaRef.current;
-    if (inputEl) {
-      inputEl.style.color = "#909090";
-    }
-    abortControllerRef.current = new AbortController();
     const wasFirstMessage = isFirstMessage;
+    const conversationContext = messages;
 
-    try {
-      if (wasFirstMessage) {
-        setIsChat(true);
-        setIsFirstMessage(false);
-        conversationIdRef.current = uuid4();
-      }
-      setMessages((prev) => {
-        const update = [
-          ...prev,
-          {
-            id: `user-${messageIdRef.current}`,
-            content: { text: { prompt: prompt_text }, files: prompt_files },
-          },
-          {
-            id: `assistant-${messageIdRef.current}`,
-            content: {
-              task: "",
-              taskStatus: "",
-              text: { response: "", execution: [], validation: "", output: "" },
-              files: [],
+    await sendMessage({
+      promptText,
+      promptFiles,
+      isAutomate,
+      messageId,
+      conversationContext,
+      clearInput: true,
+      prepareMessages: async () => {
+        if (wasFirstMessage) {
+          setIsChat(true);
+          setIsFirstMessage(false);
+          conversationIdRef.current = uuid4();
+          await initConversation();
+        }
+
+        setMessages((prev) => {
+          const update = [
+            ...prev,
+            {
+              id: `user-${messageId}`,
+              content: { text: { prompt: promptText }, files: promptFiles },
             },
-          },
-        ];
-        syncMessages(update);
-        return update;
-      });
-      if (wasFirstMessage) {
-        await initConversation();
-        generateTitle(prompt_text)
-          .then(() => fetchConversations())
-          .catch(() => { });
-      }
+            {
+              id: `assistant-${messageId}`,
+              content: {
+                task: "",
+                taskStatus: "",
+                text: { response: "", execution: [], validation: "", output: "" },
+                files: [],
+                mode: (isAutomate ? "automate" : "chat") as MessageMode,
+              },
+            },
+          ];
+          syncMessages(update, true);
+          return update;
+        });
 
-      if (isAutomate) {
-        await automateHandler(prompt_text, prompt_files);
-      } else {
-        await chatHandler(prompt_text, prompt_files);
-      }
-    } catch (error: any) {
-      displayError(error);
-    } finally {
-      setStreaming({ response: false, execution: false, validation: false, output: false });
-      setIsGenerating(false);
-      setStatusText("");
-      setMessage("");
-      setMentions([]);
-      setFiles([]);
-      if (inputEl) {
-        inputEl.style.height = "auto";
-        inputEl.style.color = "#ffffff";
-      }
-      messageIdRef.current = null;
-      abortControllerRef.current = null;
-      safeToAbortRef.current = false;
+        if (wasFirstMessage) {
+          generateTitle(promptText)
+            .then(() => fetchConversations())
+            .catch(() => { });
+        }
+      },
+    });
+  };
+
+  const handleRetryMessage = async (assistantMessageId: string) => {
+    if (isGenerating || generationLockRef.current || !assistantMessageId.startsWith("assistant-")) {
+      return;
     }
+
+    const assistantIndex = messages.findIndex((msg) => msg.id === assistantMessageId);
+    if (assistantIndex < 1) return;
+
+    const userMsg = messages[assistantIndex - 1];
+    const assistantMsg = messages[assistantIndex];
+    if (!userMsg?.id.startsWith("user-") || !assistantMsg) return;
+
+    const promptText = userMsg.content.text?.prompt ?? "";
+    const promptFiles = userMsg.content.files ?? [];
+    if (!promptText && promptFiles.length === 0) {
+      toast.error("Cannot retry an empty message");
+      return;
+    }
+
+    const isAutomate = assistantMsg.content.mode === "automate";
+
+    await sendMessage({
+      promptText,
+      promptFiles,
+      isAutomate,
+      messageId: assistantMessageId.slice("assistant-".length),
+      conversationContext: messages.slice(0, assistantIndex - 1),
+      prepareMessages: () => {
+        setMessages((prev) => {
+          const update = prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                ...msg,
+                content: {
+                  task: "",
+                  taskStatus: "",
+                  text: { response: "", execution: [], validation: "", output: "" },
+                  files: [],
+                  mode: (isAutomate ? "automate" : "chat") as MessageMode,
+                },
+              }
+              : msg
+          );
+          syncMessages(update, true);
+          return update;
+        });
+      },
+    });
+  };
+
+  const handleRevertMessage = async (userMessageId: string) => {
+    if (isGenerating || generationLockRef.current || !userMessageId.startsWith("user-")) return;
+
+    const userIndex = messages.findIndex((msg) => msg.id === userMessageId);
+    if (userIndex < 0) return;
+
+    const userMsg = messages[userIndex];
+    const promptText = userMsg.content.text?.prompt ?? "";
+    const promptFiles = userMsg.content.files ?? [];
+    const remainingMessages = messages.slice(0, userIndex);
+    const conversationId = conversationIdRef.current;
+
+    setMessages(remainingMessages);
+    await updateConversationsDB(remainingMessages, true);
+    if (conversationId) {
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, messages: remainingMessages }
+            : conversation
+        )
+      );
+    }
+
+    setMentions([]);
+    setMessage(promptText);
+    setFiles(await fileFormatsToFiles(promptFiles));
+    setErrorText("");
+    textareaRef.current?.focus();
   };
 
   const handleStopGeneration = async () => {
@@ -765,8 +967,8 @@ const App = () => {
 
   const handleSelectConversation = async (id: string) => {
     if (id === conversationIdRef.current) return;
-    await fetchConversations();
-    const conversation = conversations.find((c) => c.id === id);
+    const latestConversations = await fetchConversations();
+    const conversation = latestConversations.find((c) => c.id === id);
     if (conversation) {
       await handleStopGeneration();
       setMessages([]);
@@ -851,10 +1053,13 @@ const App = () => {
           hidden={!isChat}
           messages={messages}
           streaming={streaming}
+          streamingMessageId={streamingMessageId}
           isGenerating={isGenerating}
           statusText={statusText}
           errorText={errorText}
           setErrorText={setErrorText}
+          onRetryMessage={handleRetryMessage}
+          onRevertMessage={handleRevertMessage}
         />
         <InputContainer
           isGenerating={isGenerating}
