@@ -33,6 +33,8 @@ Load the `build/` directory as an unpacked extension in `chrome://extensions/`, 
 
    ```bash
    bun run build
+   ```
+
 ```
 
 3. Write a clear PR description explaining what changed and why.
@@ -65,3 +67,4 @@ Please do **not** open public issues for security vulnerabilities. See [SECURITY
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE).
+```
