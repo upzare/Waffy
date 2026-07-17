@@ -132,13 +132,7 @@ export interface Settings {
 }
 
 export type ProviderId =
-  | "openai"
-  | "anthropic"
-  | "google"
-  | "xai"
-  | "groq"
-  | "openrouter"
-  | "browser-ai";
+  "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai";
 
 export type StageId = "title" | "chat" | "t1" | "t2" | "t3" | "t4" | "step";
 

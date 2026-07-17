@@ -10,23 +10,27 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
 }) => {
   return (
     <div
-      className={`fixed top-0 w-72 h-screen bg-[rgba(10,10,10,0.9)] backdrop-blur-[10px] border-l border-border transition-[right] duration-300 ease-in-out z-1000 flex flex-col overflow-hidden ${visible ? "right-0" : "right-[-300px]"
-        }`}
+      className={`fixed top-0 w-72 h-screen bg-[rgba(10,10,10,0.9)] backdrop-blur-[10px] border-l border-border transition-[right] duration-300 ease-in-out z-1000 flex flex-col overflow-hidden ${
+        visible ? "right-0" : "right-[-300px]"
+      }`}
     >
       <div className="p-4 border-b border-border">
         <h3 className="m-0 text-lg text-white">Conversation History</h3>
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         {conversations.length === 0 ? (
-          <div className="p-4 text-center text-[rgba(255,255,255,0.5)]">No conversation history</div>
+          <div className="p-4 text-center text-[rgba(255,255,255,0.5)]">
+            No conversation history
+          </div>
         ) : (
           conversations.map((conv) => (
             <div
               key={conv.id}
-              className={`flex items-center justify-between p-3 rounded-md mb-2 transition-all duration-200 cursor-pointer ${conv.id === currentConversationId
-                ? "bg-[rgba(0,200,83,0.1)] border-l-[3px] border-l-[rgba(0,200,83,0.7)]"
-                : "bg-[rgba(255,255,255,0.05)] hover:bg-border"
-                }`}
+              className={`flex items-center justify-between p-3 rounded-md mb-2 transition-all duration-200 cursor-pointer ${
+                conv.id === currentConversationId
+                  ? "bg-[rgba(0,200,83,0.1)] border-l-[3px] border-l-[rgba(0,200,83,0.7)]"
+                  : "bg-[rgba(255,255,255,0.05)] hover:bg-border"
+              }`}
               role="button"
               tabIndex={0}
               onClick={() => onSelectConversation(conv.id)}

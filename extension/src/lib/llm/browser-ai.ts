@@ -3,11 +3,7 @@ import type { BrowserAIChatSettings } from "@browser-ai/core";
 import type { LanguageModel } from "ai";
 
 export type BrowserAIStatus =
-  | "unsupported"
-  | "unavailable"
-  | "downloadable"
-  | "downloading"
-  | "available";
+  "unsupported" | "unavailable" | "downloadable" | "downloading" | "available";
 
 type RawAvailability = "unavailable" | "downloadable" | "downloading" | "available";
 

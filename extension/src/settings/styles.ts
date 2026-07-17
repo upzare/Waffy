@@ -1,7 +1,6 @@
 /** Shared Tailwind class strings for the settings UI. */
 
-export const panel =
-  "mb-4 rounded-md border border-border bg-surface-2 px-4 py-5 sm:px-5";
+export const panel = "mb-4 rounded-md border border-border bg-surface-2 px-4 py-5 sm:px-5";
 
 export const panelTitle = "mb-1 text-base font-semibold tracking-tight";
 

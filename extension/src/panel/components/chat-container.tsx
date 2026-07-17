@@ -104,9 +104,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       {isGenerating && !hidden && (
         <div className="flex justify-center items-center p-1 gap-1 bg-[#ffffff10] shadow-[0_10px_25px_0_#000000b0] backdrop-brightness-[0.1] z-10">
           <div className="w-5 h-5 inline-block relative before:content-[''] after:content-[''] before:box-border after:box-border before:w-5 before:h-5 after:w-5 after:h-5 before:rounded-full after:rounded-full before:bg-green-400 after:bg-green-400 before:absolute after:absolute before:left-0 after:left-0 before:top-0 after:top-0 before:animate-iconloader after:animate-iconloader after:[animation-delay:1s] after:opacity-0"></div>
-          <span className="text-xs text-white font-[Arial,Helvetica,sans-serif]">
-            {statusText}
-          </span>
+          <span className="text-xs text-white font-[Arial,Helvetica,sans-serif]">{statusText}</span>
         </div>
       )}
       {errorText && !hidden && (
@@ -124,10 +122,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         </div>
       )}
       <div
-        className={`flex flex-col gap-4 items-center z-1 ${hidden
-          ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
-          : "flex-1 overflow-y-auto pb-4"
-          }`}
+        className={`flex flex-col gap-4 items-center z-1 ${
+          hidden
+            ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
+            : "flex-1 overflow-y-auto pb-4"
+        }`}
         ref={chatContainerRef}
         onScroll={handleScroll}
         style={{ paddingTop: hidden ? 0 : "1rem" }}
@@ -140,10 +139,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
           return (
             <div
               key={msg.id}
-              className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${isUser
-                ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
-                : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
-                }`}
+              className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${
+                isUser
+                  ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
+                  : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
+              }`}
             >
               <div className="absolute -top-2.5 right-1 z-5 opacity-0 translate-y-1 transition-[opacity,transform] duration-200 ease-in-out pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
                 <div className="flex gap-1 bg-[rgba(15,15,15,0.8)] backdrop-blur-sm p-0.5 rounded-md border border-border">

@@ -12,12 +12,7 @@ import GeneralSection from "./components/general";
 import ApiKeysSection from "./components/api-keys";
 import ModelsSection from "./components/models";
 import AboutSection from "./components/about";
-import {
-  dangerButton,
-  primaryButton,
-  secondaryButton,
-  thinScroll,
-} from "./styles";
+import { dangerButton, primaryButton, secondaryButton, thinScroll } from "./styles";
 
 const sections = [
   {
@@ -168,10 +163,11 @@ const Settings = () => {
               <button
                 key={section.id}
                 type="button"
-                className={`flex min-w-18 flex-col items-center gap-2 rounded-md border px-2 py-2.5 text-left transition-colors duration-150 md:w-full md:min-w-0 md:flex-row md:gap-2.5 md:px-3 ${isActive
+                className={`flex min-w-18 flex-col items-center gap-2 rounded-md border px-2 py-2.5 text-left transition-colors duration-150 md:w-full md:min-w-0 md:flex-row md:gap-2.5 md:px-3 ${
+                  isActive
                     ? "border-green-border bg-green-dim text-green"
                     : "border-transparent text-text-secondary hover:bg-white/4 hover:text-text-primary"
-                  }`}
+                }`}
                 onClick={() => {
                   setActiveSection(section.id);
                   window.location.hash = section.id;
@@ -179,8 +175,9 @@ const Settings = () => {
                 aria-current={isActive ? "page" : undefined}
               >
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${isActive ? "bg-green-dim text-green" : "bg-white/4"
-                    }`}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${
+                    isActive ? "bg-green-dim text-green" : "bg-white/4"
+                  }`}
                 >
                   <Icon size={17} />
                 </span>
@@ -206,9 +203,7 @@ const Settings = () => {
         <main
           className={`flex min-h-0 flex-1 flex-col items-center overflow-x-hidden overflow-y-auto px-5 py-6 md:px-10 md:pt-7 md:pb-8 ${thinScroll}`}
         >
-          <div className="mx-auto w-full min-w-0 max-w-4xl animate-fade-in">
-            {renderSection()}
-          </div>
+          <div className="mx-auto w-full min-w-0 max-w-4xl animate-fade-in">{renderSection()}</div>
         </main>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-1 px-5 py-4 md:gap-4 md:px-10">

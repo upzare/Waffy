@@ -246,8 +246,7 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
                       {
                         "--dots":
                           "no-repeat radial-gradient(circle closest-side, rgb(0, 200, 83) 90%, transparent)",
-                        background:
-                          "var(--dots) 0% 50%, var(--dots) 50% 50%, var(--dots) 100% 50%",
+                        background: "var(--dots) 0% 50%, var(--dots) 50% 50%, var(--dots) 100% 50%",
                         backgroundSize: "calc(100% / 3) 50%",
                       } as React.CSSProperties
                     }

@@ -31,13 +31,13 @@ Add API keys in **Extension settings → API Keys** after installation. For brow
 
 Waffy runs a multi-stage pipeline. Each stage can use a different model:
 
-| Stage | Purpose | Model guidance |
-| ----- | ------- | -------------- |
-| Planning | Decides whether to automate and drafts a task plan | Fast text models work well |
-| **Execution** | Drives browser actions from screenshots | Use a **vision model with spatial reasoning and image grounding** — it must identify UI element coordinates on screenshots. Recommended: **gemini-3.5-flash** (Google AI Studio or OpenRouter). Browser built-in AI is not recommended here. |
-| Validation | Checks whether the task succeeded | Fast text models work well |
-| Output | Summarizes results for you | Fast text models work well |
-| Title / Step | Short UI labels | Browser built-in AI works well (default) |
+| Stage         | Purpose                                            | Model guidance                                                                                                                                                                                                                               |
+| ------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Planning      | Decides whether to automate and drafts a task plan | Fast text models work well                                                                                                                                                                                                                   |
+| **Execution** | Drives browser actions from screenshots            | Use a **vision model with spatial reasoning and image grounding** — it must identify UI element coordinates on screenshots. Recommended: **gemini-3.5-flash** (Google AI Studio or OpenRouter). Browser built-in AI is not recommended here. |
+| Validation    | Checks whether the task succeeded                  | Fast text models work well                                                                                                                                                                                                                   |
+| Output        | Summarizes results for you                         | Fast text models work well                                                                                                                                                                                                                   |
+| Title / Step  | Short UI labels                                    | Browser built-in AI works well (default)                                                                                                                                                                                                     |
 
 ## Getting started
 
