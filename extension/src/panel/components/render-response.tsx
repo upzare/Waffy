@@ -107,13 +107,14 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
       <pre className="my-3 rounded-lg border border-white bg-black">
         <div className="flex justify-between items-center px-2 bg-white text-black text-sm font-mono rounded-t-md">
           <span className="font-bold text-black">{language}</span>
-          <div
-            className="bg-white cursor-pointer transition-transform duration-300 hover:scale-110 [&_svg]:w-4 [&_svg]:h-4"
+          <button
+            type="button"
+            className="bg-white cursor-pointer transition-transform duration-300 hover:scale-110 [&_svg]:w-4 [&_svg]:h-4 border-none p-0"
             title="Copy Code"
             onClick={() => handleClick(children.props.children)}
           >
             <CopyIcon size={16} />
-          </div>
+          </button>
         </div>
         <div className="font-mono text-sm px-2 py-1 overflow-x-auto whitespace-pre-wrap mb-[-0.6rem]">
           {children}
@@ -163,9 +164,11 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
 
       {(content?.execution?.length || isExecuting) && (
         <div className="mt-4 mb-2 rounded-lg border border-border bg-[rgba(0,0,0,0.3)] overflow-hidden">
-          <div
-            className="flex justify-between items-center p-3 bg-[rgba(0,0,0,0.4)] cursor-pointer transition-[background] duration-300 ease-in-out hover:bg-[rgba(0,0,0,0.5)]"
+          <button
+            type="button"
+            className="w-full flex justify-between items-center p-3 bg-[rgba(0,0,0,0.4)] cursor-pointer transition-[background] duration-300 ease-in-out hover:bg-[rgba(0,0,0,0.5)] border-none text-white"
             onClick={toggleExecuting}
+            aria-expanded={isExecutingExpanded}
           >
             <div className="flex items-center gap-2">
               {isExecuting ? (
@@ -183,7 +186,7 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
             <div className="text-white transition-transform duration-200 ease-in-out">
               {isExecutingExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
-          </div>
+          </button>
 
           {isExecutingExpanded && (
             <DropdownSteps steps={content?.execution || []} isExecuting={isExecuting} />
@@ -193,9 +196,11 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
 
       {(content?.validation || isValidating) && (
         <div className="mt-2 mb-4 rounded-lg border border-border bg-[rgba(0,0,0,0.3)] overflow-hidden">
-          <div
-            className="flex justify-between items-center p-3 bg-[rgba(0,0,0,0.4)] cursor-pointer transition-[background] duration-300 ease-in-out hover:bg-[rgba(0,0,0,0.5)]"
+          <button
+            type="button"
+            className="w-full flex justify-between items-center p-3 bg-[rgba(0,0,0,0.4)] cursor-pointer transition-[background] duration-300 ease-in-out hover:bg-[rgba(0,0,0,0.5)] border-none text-white"
             onClick={toggleValidating}
+            aria-expanded={isValidatingExpanded}
           >
             <div className="flex items-center gap-2">
               {isValidating ? (
@@ -223,7 +228,7 @@ const RenderResponse: React.FC<RenderResponseProps> = ({
             <div className="text-white transition-transform duration-200 ease-in-out">
               {isValidatingExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
-          </div>
+          </button>
 
           {isValidatingExpanded && (
             <div className="p-4 border-t border-[rgba(255,255,255,0.05)] animate-expand-content">

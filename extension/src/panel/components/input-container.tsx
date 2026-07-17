@@ -66,7 +66,9 @@ function InputContainer({
 
   useEffect(() => {
     const hasContent = message.length > 0 || mentions.length > 0;
-    if (hadInputContentRef.current && !hasContent) {
+    // Only bump key when transitioning from content to completely empty
+    // AND both message and mentions are empty (indicates a send/clear action)
+    if (hadInputContentRef.current && !hasContent && message === "" && mentions.length === 0) {
       setMentionRootKey((key) => key + 1);
       setMentionOpen(false);
     }

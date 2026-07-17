@@ -127,7 +127,14 @@ const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) =
 
         {showProgress && (
           <div className="flex flex-col gap-1.5">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/6">
+            <div
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Model download progress"
+              className="h-1.5 w-full overflow-hidden rounded-full bg-white/6"
+            >
               <div
                 className="h-full rounded-full bg-green transition-[width] duration-200"
                 style={{ width: `${progressPercent}%` }}

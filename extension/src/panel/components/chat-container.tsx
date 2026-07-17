@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import RenderResponse from "./render-response";
-import { Copy, File, Repeat, X } from "lucide-react";
+import { File, X } from "lucide-react";
 import type { ChatContainerProps, FileFormat } from "../../types";
 
 const ChatContainer: React.FC<ChatContainerProps> = ({
@@ -68,24 +68,6 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                 : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
                 }`}
             >
-              {!isUser && (
-                <div className="absolute -top-2.5 right-1 z-5 opacity-0 translate-y-1 transition-[opacity,transform] duration-200 ease-in-out pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
-                  <div className="flex gap-1 bg-[rgba(15,15,15,0.8)] backdrop-blur-sm p-0.5 rounded-md border border-border">
-                    <button
-                      className="flex items-center justify-center w-6.5 h-6.5 rounded bg-transparent border-none text-[rgba(255,255,255,0.7)] cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(0,200,83,0.15)] hover:text-[rgba(0,200,83,1)] active:scale-95"
-                      title="Retry"
-                    >
-                      <Repeat size={16} />
-                    </button>
-                    <button
-                      className="flex items-center justify-center w-6.5 h-6.5 rounded bg-transparent border-none text-[rgba(255,255,255,0.7)] cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(0,200,83,0.15)] hover:text-[rgba(0,200,83,1)] active:scale-95"
-                      title="Copy to clipboard"
-                    >
-                      <Copy size={16} />
-                    </button>
-                  </div>
-                </div>
-              )}
               <div className="flex-1 whitespace-normal [overflow-wrap:break-word] [word-wrap:break-word] [word-break:break-word] overflow-hidden">
                 {isUser ? (
                   <>
@@ -93,9 +75,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                     {msg.content.files && msg.content.files.length > 0 && (
                       <>
                         {msg.content.files.map((file: FileFormat, fileIndex: number) => (
-                          <div
+                          <button
                             key={`${file.payload.name}-${fileIndex}`}
-                            className="py-2 px-4 mt-2 mr-4 mb-0.5 ml-0 rounded-md flex items-center gap-1.5 bg-border cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(255,255,255,0.15)]"
+                            type="button"
+                            className="py-2 px-4 mt-2 mr-4 mb-0.5 ml-0 rounded-md flex items-center gap-1.5 bg-border cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(255,255,255,0.15)] border-none text-white w-auto"
                             onClick={() => handleFileClick(file)}
                           >
                             {file.payload.mimeType.startsWith("image/") ? (
@@ -113,7 +96,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                             >
                               {file.payload.name}
                             </span>
-                          </div>
+                          </button>
                         ))}
                       </>
                     )}
@@ -131,9 +114,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                     {msg.content.files && msg.content.files.length > 0 && (
                       <>
                         {msg.content.files.map((file: FileFormat, fileIndex: number) => (
-                          <div
+                          <button
                             key={`${file.payload.name}-${fileIndex}`}
-                            className="py-2 px-4 mt-2 mr-4 mb-0.5 ml-0 rounded-md flex items-center gap-1.5 bg-border cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(255,255,255,0.15)]"
+                            type="button"
+                            className="py-2 px-4 mt-2 mr-4 mb-0.5 ml-0 rounded-md flex items-center gap-1.5 bg-border cursor-pointer transition-all duration-200 ease-in-out hover:bg-[rgba(255,255,255,0.15)] border-none text-white w-auto"
                             onClick={() => handleFileClick(file)}
                           >
                             {file.payload.mimeType.startsWith("image/") ? (
@@ -151,7 +135,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                             >
                               {file.payload.name}
                             </span>
-                          </div>
+                          </button>
                         ))}
                       </>
                     )}

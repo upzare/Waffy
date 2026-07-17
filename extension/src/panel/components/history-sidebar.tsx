@@ -27,7 +27,15 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                 ? "bg-[rgba(0,200,83,0.1)] border-l-[3px] border-l-[rgba(0,200,83,0.7)]"
                 : "bg-[rgba(255,255,255,0.05)] hover:bg-border"
                 }`}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectConversation(conv.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectConversation(conv.id);
+                }
+              }}
             >
               <div className="flex-1 overflow-hidden">
                 <span

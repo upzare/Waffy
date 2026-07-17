@@ -5,10 +5,13 @@ import type { HeroProps } from "../../types";
 const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => {
   const suggestedPrompts = pinnedPrompts.filter((prompt) => prompt.trim().length > 0);
 
+  if (hidden) {
+    return null;
+  }
+
   return (
     <div
-      className={`relative z-10 flex flex-col items-center justify-start overflow-auto bg-transparent transition-all duration-500 ease-out ${hidden ? "m-0 max-h-0 max-w-0 p-0 opacity-0" : "py-[4vh]"
-        }`}
+      className="relative z-10 flex flex-col items-center justify-start overflow-auto bg-transparent transition-all duration-500 ease-out py-[4vh]"
     >
       <div className="max-w-full px-4 text-center">
         <h1 className="text-3xl font-extrabold">What can I do for you?</h1>

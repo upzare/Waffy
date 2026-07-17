@@ -176,6 +176,7 @@ const Settings = () => {
                   setActiveSection(section.id);
                   window.location.hash = section.id;
                 }}
+                aria-current={isActive ? "page" : undefined}
               >
                 <span
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${isActive ? "bg-green-dim text-green" : "bg-white/4"

@@ -114,6 +114,7 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
                   : "border-border bg-black/25 text-text-secondary hover:bg-white/4 hover:text-text-primary"
                 }`}
               onClick={() => setTheme(value)}
+              aria-pressed={theme === value}
             >
               <Icon size={18} />
               <span>{label}</span>
