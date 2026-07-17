@@ -15,10 +15,10 @@
     "extension"
   ],
   "scripts": {
-    "build": "npm run build --workspace=extension",
-    "dev": "npm run dev --workspace=extension",
-    "start": "npm run start --workspace=extension",
-    "stats": "npm run stats --workspace=extension",
+    "build": "bun run --filter waffy-extension build",
+    "dev": "bun run --filter waffy-extension dev",
+    "start": "bun run --filter waffy-extension start",
+    "stats": "bun run --filter waffy-extension stats",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   }

@@ -43,7 +43,7 @@ Waffy runs a multi-stage pipeline. Each stage can use a different model:
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+
+- [Bun](https://bun.sh/) 1.0+
 - Google Chrome (or a Chromium-based browser)
 
 ### Build from source
@@ -51,8 +51,8 @@ Waffy runs a multi-stage pipeline. Each stage can use a different model:
 ```bash
 git clone https://github.com/upzare/Waffy.git
 cd Waffy
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
@@ -74,11 +74,11 @@ This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
 ## Development
 
 ```bash
-npm run dev    # watch mode — rebuilds on file changes
-npm run start  # dev server with hot reload
+bun run dev    # watch mode — rebuilds on file changes
+bun run start  # dev server with hot reload
 ```
 
-After `npm run dev`, reload the extension in `chrome://extensions/` when you make changes.
+After `bun run dev`, reload the extension in `chrome://extensions/` when you make changes.
 
 ## Project structure
 
@@ -97,7 +97,7 @@ After `npm run dev`, reload the extension in `chrome://extensions/` when you mak
 │   ├── package.json
 │   ├── webpack.config.ts
 │   └── tsconfig.json
-├── package.json            # Workspace root — run npm commands from here
+├── package.json            # Workspace root — run bun commands from here
 ├── build/                  # Production output (load this in Chrome)
 └── .output/                # Zipped release packages
 ```
