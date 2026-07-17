@@ -169,6 +169,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                       <button
                         className={actionButtonClass}
                         title="Copy to clipboard"
+                        disabled={isGenerating}
                         onClick={() => handleCopyMessage(msg)}
                       >
                         <Copy size={16} />

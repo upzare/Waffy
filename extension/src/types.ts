@@ -55,6 +55,7 @@ export interface InputContainerProps {
   message: string;
   mentions: string[];
   files: File[];
+  inputResetKey: number;
   setMessage: React.Dispatch<React.SetStateAction<string>>;
   setMentions: React.Dispatch<React.SetStateAction<string[]>>;
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;

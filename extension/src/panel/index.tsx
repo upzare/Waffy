@@ -63,6 +63,7 @@ const App = () => {
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentTitle, setCurrentTitle] = useState("New Chat");
+  const [inputResetKey, setInputResetKey] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -765,15 +766,17 @@ const App = () => {
           setMessage("");
           setMentions([]);
           setFiles([]);
+          setInputResetKey((key) => key + 1);
           if (inputEl) {
             inputEl.style.height = "auto";
             inputEl.style.color = "#ffffff";
           }
+        } else {
+          textareaRef.current?.focus();
         }
         messageIdRef.current = null;
         abortControllerRef.current = null;
         safeToAbortRef.current = false;
-        textareaRef.current?.focus();
       }
     } finally {
       generationLockRef.current = false;
@@ -962,7 +965,7 @@ const App = () => {
     setMentions([]);
     setFiles([]);
     setIsChat(false);
-    textareaRef.current?.focus();
+    setInputResetKey((key) => key + 1);
   };
 
   const handleSelectConversation = async (id: string) => {
@@ -982,7 +985,7 @@ const App = () => {
       setErrorText("");
       setCurrentTitle(conversation.title);
       setIsChat(true);
-      textareaRef.current?.focus();
+      setInputResetKey((key) => key + 1);
     }
   };
 
@@ -1068,6 +1071,7 @@ const App = () => {
           message={message}
           mentions={mentions}
           files={files}
+          inputResetKey={inputResetKey}
           setMessage={setMessage}
           setMentions={setMentions}
           setFiles={setFiles}
