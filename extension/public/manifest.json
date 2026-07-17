@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Waffy - AI Copilot for Web",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Automate your browser with AI. Browse, click and complete multi-step workflows with models you like. Free and open source.",
   "icons": {
     "64": "assets/icons/icon64.png",
@@ -16,8 +16,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.bundle.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.bundle.js"
+      ]
     }
   ],
   "options_page": "settings.html",
@@ -32,12 +36,26 @@
   "side_panel": {
     "default_path": "panel.html"
   },
-  "permissions": ["storage", "tabs", "sidePanel", "activeTab", "debugger"],
-  "host_permissions": ["http://*/*", "https://*/*", "<all_urls>"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "sidePanel",
+    "activeTab",
+    "debugger"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "<all_urls>"
+  ],
   "web_accessible_resources": [
     {
-      "resources": ["shared/cursor.png"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "shared/cursor.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "author": "Waffy AI"
