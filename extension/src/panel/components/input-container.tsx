@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { CircleStop, File, Paperclip, Send, X } from "lucide-react";
 import { MentionRoot, MentionInput, MentionContent, MentionItem } from "@diceui/mention";
@@ -21,6 +21,7 @@ function InputContainer({
   message,
   mentions,
   files,
+  inputResetKey,
   setMessage,
   setMentions,
   setFiles,
@@ -30,10 +31,6 @@ function InputContainer({
   const canSend = message.trim().length > 0 || files.length > 0;
   const [mentionOpen, setMentionOpen] = useState(false);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
-
-  // Remount MentionRoot after programmatic clears — its internal highlight
-  const [mentionRootKey, setMentionRootKey] = useState(0);
-  const hadInputContentRef = useRef(false);
 
   const setTextareaRef = (el: HTMLTextAreaElement | null) => {
     (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
@@ -64,16 +61,12 @@ function InputContainer({
     }
   }, [message, mentions]);
 
+  // After a programmatic remount, restore focus (focus before remount is lost).
   useEffect(() => {
-    const hasContent = message.length > 0 || mentions.length > 0;
-    // Only bump key when transitioning from content to completely empty
-    // AND both message and mentions are empty (indicates a send/clear action)
-    if (hadInputContentRef.current && !hasContent && message === "" && mentions.length === 0) {
-      setMentionRootKey((key) => key + 1);
-      setMentionOpen(false);
-    }
-    hadInputContentRef.current = hasContent;
-  }, [message, mentions]);
+    if (inputResetKey === 0) return;
+    setMentionOpen(false);
+    textareaRef.current?.focus();
+  }, [inputResetKey, textareaRef]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (mentionOpen && (e.key === "Enter" || e.key === "Tab")) return;
@@ -115,7 +108,7 @@ function InputContainer({
     <div className="z-10 mt-auto border-t border-white/8 bg-black/70 px-4 py-3.5 backdrop-blur-md">
       <div className="relative flex items-center rounded-xl border border-white/9 bg-white/4">
         <MentionRoot
-          key={mentionRootKey}
+          key={inputResetKey}
           className="relative w-full [&_[data-tag]]:rounded-sm [&_[data-tag]]:bg-[rgba(0,200,83,0.18)] [&_[data-tag]]:text-transparent [&_[data-tag]:empty]:bg-transparent [&_[data-tag]]:[box-decoration-break:clone] [&_[data-tag]]:[-webkit-box-decoration-break:clone]"
           trigger="/"
           modal

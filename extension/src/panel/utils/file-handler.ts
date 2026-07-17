@@ -19,3 +19,15 @@ export const fileHandler = async (fileList: File[]): Promise<FileFormat[]> => {
   }
   return files;
 };
+
+export const fileFormatsToFiles = async (fileFormats: FileFormat[]): Promise<File[]> => {
+  const files: File[] = [];
+  for (const file of fileFormats) {
+    const response = await fetch(
+      `data:${file.payload.mimeType};base64,${file.payload.content}`
+    );
+    const blob = await response.blob();
+    files.push(new File([blob], file.payload.name, { type: file.payload.mimeType }));
+  }
+  return files;
+};
