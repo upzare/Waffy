@@ -10,9 +10,7 @@ const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => 
   }
 
   return (
-    <div
-      className="relative z-10 flex flex-col items-center justify-start overflow-auto bg-transparent transition-all duration-500 ease-out py-[4vh]"
-    >
+    <div className="relative z-10 flex flex-col items-center justify-start overflow-auto bg-transparent transition-all duration-500 ease-out py-[4vh]">
       <div className="max-w-full px-4 text-center">
         <h1 className="text-3xl font-extrabold">What can I do for you?</h1>
 
@@ -49,9 +47,7 @@ const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => 
 
       {suggestedPrompts.length > 0 && (
         <div className="mt-8 w-full max-w-full px-4">
-          <h2 className="mb-6 text-center text-xl font-medium text-white/80">
-            Try asking
-          </h2>
+          <h2 className="mb-6 text-center text-xl font-medium text-white/80">Try asking</h2>
           <div className="flex flex-col items-center justify-center gap-4">
             {suggestedPrompts.map((prompt, index) => (
               <SuggestedPromptButton

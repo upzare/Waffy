@@ -67,8 +67,8 @@ const STAGE_GROUPS: StageGroup[] = [
         description: "Performs the automation task based on the generated plan",
         recommendation: (
           <>
-            Execution works best with vision models that support spatial reasoning and image grounding
-            — they can identify UI element coordinates on screenshots. Recommended model:{" "}
+            Execution works best with vision models that support spatial reasoning and image
+            grounding — they can identify UI element coordinates on screenshots. Recommended model:{" "}
             <strong>gemini-3.5-flash</strong> or similar.
           </>
         ),
@@ -78,7 +78,11 @@ const STAGE_GROUPS: StageGroup[] = [
         label: "Validation Model",
         description: "Validates that the task completed or not",
       },
-      { id: "t4", label: "Output Model", description: "Generates a summary of the task completion" },
+      {
+        id: "t4",
+        label: "Output Model",
+        description: "Generates a summary of the task completion",
+      },
       {
         id: "step",
         label: "Step Generation Model",
@@ -169,8 +173,9 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             </span>
             <ChevronDown
               size={16}
-              className={`shrink-0 text-text-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
-                }`}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${
+                isExpanded ? "rotate-180" : ""
+              }`}
             />
           </div>
         </button>
@@ -180,13 +185,13 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
-                <div className={alertError}>
-                  <AlertCircle size={15} />
-                  <span>
-                    No API key for {providerMeta.label}. Add one in the API Keys section.
-                  </span>
-                </div>
-              )}
+                  <div className={alertError}>
+                    <AlertCircle size={15} />
+                    <span>
+                      No API key for {providerMeta.label}. Add one in the API Keys section.
+                    </span>
+                  </div>
+                )}
 
             {recommendation && (
               <div className={alertInfo}>

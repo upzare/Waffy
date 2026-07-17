@@ -33,7 +33,11 @@ const captureScreenshot = async () => {
     });
   })
     .then((data) => {
-      const screenshot = data as { type: string; metadata?: Record<string, unknown>; image?: string };
+      const screenshot = data as {
+        type: string;
+        metadata?: Record<string, unknown>;
+        image?: string;
+      };
       return {
         status: "success",
         message: "Success: Screenshot captured.",

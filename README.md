@@ -31,19 +31,19 @@ Add API keys in **Extension settings → API Keys** after installation. For brow
 
 Waffy runs a multi-stage pipeline. Each stage can use a different model:
 
-| Stage | Purpose | Model guidance |
-| ----- | ------- | -------------- |
-| Planning | Decides whether to automate and drafts a task plan | Fast text models work well |
-| **Execution** | Drives browser actions from screenshots | Use a **vision model with spatial reasoning and image grounding** — it must identify UI element coordinates on screenshots. Recommended: **gemini-3.5-flash** (Google AI Studio or OpenRouter). Browser built-in AI is not recommended here. |
-| Validation | Checks whether the task succeeded | Fast text models work well |
-| Output | Summarizes results for you | Fast text models work well |
-| Title / Step | Short UI labels | Browser built-in AI works well (default) |
+| Stage         | Purpose                                            | Model guidance                                                                                                                                                                                                                               |
+| ------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Planning      | Decides whether to automate and drafts a task plan | Fast text models work well                                                                                                                                                                                                                   |
+| **Execution** | Drives browser actions from screenshots            | Use a **vision model with spatial reasoning and image grounding** — it must identify UI element coordinates on screenshots. Recommended: **gemini-3.5-flash** (Google AI Studio or OpenRouter). Browser built-in AI is not recommended here. |
+| Validation    | Checks whether the task succeeded                  | Fast text models work well                                                                                                                                                                                                                   |
+| Output        | Summarizes results for you                         | Fast text models work well                                                                                                                                                                                                                   |
+| Title / Step  | Short UI labels                                    | Browser built-in AI works well (default)                                                                                                                                                                                                     |
 
 ## Getting started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+
+- [Bun](https://bun.sh/) 1.0+
 - Google Chrome (or a Chromium-based browser)
 
 ### Build from source
@@ -51,8 +51,8 @@ Waffy runs a multi-stage pipeline. Each stage can use a different model:
 ```bash
 git clone https://github.com/upzare/Waffy.git
 cd Waffy
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
@@ -74,11 +74,11 @@ This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
 ## Development
 
 ```bash
-npm run dev    # watch mode — rebuilds on file changes
-npm run start  # dev server with hot reload
+bun run dev    # watch mode — rebuilds on file changes
+bun run start  # dev server with hot reload
 ```
 
-After `npm run dev`, reload the extension in `chrome://extensions/` when you make changes.
+After `bun run dev`, reload the extension in `chrome://extensions/` when you make changes.
 
 ## Project structure
 
@@ -93,11 +93,13 @@ After `npm run dev`, reload the extension in `chrome://extensions/` when you mak
 │   │       ├── client.ts   # Chrome storage & settings
 │   │       ├── background.ts
 │   │       └── content.ts  # Page interaction (clicks, typing, screenshots)
-│   └── public/             # Manifest, icons, static assets
+│   ├── public/             # Manifest, icons, static assets
+│   ├── package.json
+│   ├── webpack.config.ts
+│   └── tsconfig.json
+├── package.json            # Workspace root — run bun commands from here
 ├── build/                  # Production output (load this in Chrome)
-├── package.json
-├── webpack.config.ts
-└── tsconfig.json
+└── .output/                # Zipped release packages
 ```
 
 ## Privacy

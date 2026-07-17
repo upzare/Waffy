@@ -19,12 +19,12 @@ const syncOpenedTabs = (): Promise<void> => {
 };
 
 const disableOverlay = (tabId: number) => {
-  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "HIDE_OVERLAY" }).catch(() => { });
+  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "HIDE_OVERLAY" }).catch(() => {});
   overlayInfo[tabId] = false;
 };
 
 const enableOverlay = (tabId: number) => {
-  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "SHOW_OVERLAY" }).catch(() => { });
+  chrome.tabs.sendMessage(tabId, { type: "INTERACT_DOM", name: "SHOW_OVERLAY" }).catch(() => {});
   overlayInfo[tabId] = true;
 };
 
@@ -78,7 +78,7 @@ const detachDebugger = async (tabId: number): Promise<void> => {
     await chrome.debugger.sendCommand({ tabId }, "Page.disable");
     await chrome.debugger.sendCommand({ tabId }, "DOM.disable");
     await chrome.debugger.sendCommand({ tabId }, "Overlay.disable");
-  } catch (_) { }
+  } catch (_) {}
   return new Promise((resolve) => {
     chrome.debugger.detach({ tabId }, () => resolve());
   });

@@ -109,10 +109,11 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
             <button
               key={value}
               type="button"
-              className={`flex flex-col items-center gap-2 rounded-sm border px-2 py-3.5 text-sm font-medium transition-colors duration-150 ${theme === value
+              className={`flex flex-col items-center gap-2 rounded-sm border px-2 py-3.5 text-sm font-medium transition-colors duration-150 ${
+                theme === value
                   ? "border-green-border bg-green-dim text-green"
                   : "border-border bg-black/25 text-text-secondary hover:bg-white/4 hover:text-text-primary"
-                }`}
+              }`}
               onClick={() => setTheme(value)}
               aria-pressed={theme === value}
             >

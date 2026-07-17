@@ -375,12 +375,12 @@ const App = () => {
         prev.map((msg) =>
           msg.id === `assistant-${messageIdRef.current}`
             ? {
-              ...msg,
-              content: {
-                ...msg.content,
-                text: { ...msg.content.text, execution: ["Initializing"] },
-              },
-            }
+                ...msg,
+                content: {
+                  ...msg.content,
+                  text: { ...msg.content.text, execution: ["Initializing"] },
+                },
+              }
             : msg
         )
       )
@@ -842,7 +842,7 @@ const App = () => {
         if (wasFirstMessage) {
           generateTitle(promptText)
             .then(() => fetchConversations())
-            .catch(() => { });
+            .catch(() => {});
         }
       },
     });
@@ -880,15 +880,15 @@ const App = () => {
           const update = prev.map((msg) =>
             msg.id === assistantMessageId
               ? {
-                ...msg,
-                content: {
-                  task: "",
-                  taskStatus: "",
-                  text: { response: "", execution: [], validation: "", output: "" },
-                  files: [],
-                  mode: (isAutomate ? "automate" : "chat") as MessageMode,
-                },
-              }
+                  ...msg,
+                  content: {
+                    task: "",
+                    taskStatus: "",
+                    text: { response: "", execution: [], validation: "", output: "" },
+                    files: [],
+                    mode: (isAutomate ? "automate" : "chat") as MessageMode,
+                  },
+                }
               : msg
           );
           syncMessages(update, true);

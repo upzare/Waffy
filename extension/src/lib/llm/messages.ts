@@ -197,8 +197,10 @@ export function toCoreMessages(
         appendToolResult(messages, msg);
         break;
       case "screenshot":
-        if (mode === "chat" && msg.image) appendChatScreenshotMessage(messages, msg, screenshotState);
-        if (mode === "t2" && msg.image) appendExecutionScreenshotMessage(messages, msg, screenshotState);
+        if (mode === "chat" && msg.image)
+          appendChatScreenshotMessage(messages, msg, screenshotState);
+        if (mode === "t2" && msg.image)
+          appendExecutionScreenshotMessage(messages, msg, screenshotState);
         break;
     }
   }

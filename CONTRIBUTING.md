@@ -20,8 +20,8 @@ Thank you for your interest in contributing to Waffy. This project is maintained
 ```bash
 git clone https://github.com/upzare/Waffy.git
 cd Waffy
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 Load the `build/` directory as an unpacked extension in `chrome://extensions/`, then reload the extension after changes.
@@ -32,8 +32,10 @@ Load the `build/` directory as an unpacked extension in `chrome://extensions/`, 
 2. Make your changes and verify the extension still builds:
 
    ```bash
-   npm run build
+   bun run build
    ```
+
+```
 
 3. Write a clear PR description explaining what changed and why.
 4. Link any related issues (e.g. `Fixes #123`).
@@ -65,3 +67,4 @@ Please do **not** open public issues for security vulnerabilities. See [SECURITY
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE).
+```

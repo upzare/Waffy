@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import webpack from "webpack";
 import CopyWebpackPlugin from "copy-webpack-plugin";
 import HtmlWebpackPlugin from "html-webpack-plugin";
@@ -11,7 +12,8 @@ import LicensePlugin from "webpack-license-plugin";
 import ReactRefreshTypeScript from "react-refresh-typescript";
 import { defineReactCompilerLoaderOption, reactCompilerLoader } from "react-compiler-webpack";
 
-const EXTENSION_DIR = path.resolve(process.cwd(), "extension");
+const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.resolve(EXTENSION_DIR, "..");
 
 const MANIFEST = JSON.parse(
   fs.readFileSync(path.join(EXTENSION_DIR, "public", "manifest.json"), "utf8")
@@ -39,7 +41,7 @@ const config: webpack.Configuration = {
 
   output: {
     filename: "[name].bundle.js",
-    path: path.resolve(process.cwd(), "build"),
+    path: path.resolve(ROOT_DIR, "build"),
     clean: true,
     publicPath: PUBLIC_PATH,
   },
@@ -122,7 +124,7 @@ const config: webpack.Configuration = {
     new webpack.EnvironmentPlugin(["NODE_ENV"]),
     new ZipPlugin({
       filename: `${MANIFEST.name}-${MANIFEST.version}.zip`,
-      path: path.join(process.cwd(), ".output"),
+      path: path.join(ROOT_DIR, ".output"),
     }) as any,
     new LicensePlugin({
       outputFilename: "licenses.json",
@@ -133,7 +135,7 @@ const config: webpack.Configuration = {
       patterns: [
         {
           from: path.resolve(EXTENSION_DIR, "public"),
-          to: path.join(process.cwd(), "build"),
+          to: path.join(ROOT_DIR, "build"),
           force: true,
         },
       ],

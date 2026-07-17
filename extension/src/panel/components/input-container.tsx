@@ -5,13 +5,7 @@ import { MentionRoot, MentionInput, MentionContent, MentionItem } from "@diceui/
 import type { InputContainerProps } from "../../types";
 import { hasSlashCommand, SLASH_COMMANDS } from "../utils/slash-commands";
 
-const SUPPORTED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "text/plain",
-  "application/pdf",
-];
+const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
 
 function InputContainer({
@@ -101,8 +95,7 @@ function InputContainer({
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const actionBtn =
-    "rounded-md p-2 transition-colors duration-200 disabled:opacity-40";
+  const actionBtn = "rounded-md p-2 transition-colors duration-200 disabled:opacity-40";
 
   return (
     <div className="z-10 mt-auto border-t border-white/8 bg-black/70 px-4 py-3.5 backdrop-blur-md">

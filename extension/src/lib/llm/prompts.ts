@@ -286,11 +286,11 @@ You will be given three inputs: \`PREVIOUS REASONING\`, \`CURRENT REASONING\`, a
 * It must be clean, direct, and ready for immediate display in a UI.`;
 
 export const PROMPTS = {
-    title: TITLE_PROMPT,
-    chat: CHAT_PROMPT,
-    t1: T1_PROMPT,
-    t2: T2_PROMPT,
-    t3: T3_PROMPT,
-    t4: T4_PROMPT,
-    step: STEP_PROMPT,
+  title: TITLE_PROMPT,
+  chat: CHAT_PROMPT,
+  t1: T1_PROMPT,
+  t2: T2_PROMPT,
+  t3: T3_PROMPT,
+  t4: T4_PROMPT,
+  step: STEP_PROMPT,
 };

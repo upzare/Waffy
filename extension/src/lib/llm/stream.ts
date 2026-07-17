@@ -12,11 +12,7 @@ export type StreamMode = "chat" | "t1" | "t2" | "t3" | "t4";
 
 const TOOLS: Record<
   string,
-  | typeof T1_TOOLS
-  | typeof T2_TOOLS
-  | typeof T3_TOOLS
-  | typeof CHAT_TOOLS
-  | Record<string, never>
+  typeof T1_TOOLS | typeof T2_TOOLS | typeof T3_TOOLS | typeof CHAT_TOOLS | Record<string, never>
 > = {
   chat: CHAT_TOOLS,
   t1: T1_TOOLS,
