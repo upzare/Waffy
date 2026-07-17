@@ -1,51 +1,58 @@
 import SuggestedPromptButton from "./suggested-prompt-button";
 import { BookOpen, Bot, Globe, MessageSquare } from "lucide-react";
 import type { HeroProps } from "../../types";
-import styles from "css/panel/hero.module.css";
 
 const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => {
   const suggestedPrompts = pinnedPrompts.filter((prompt) => prompt.trim().length > 0);
 
+  if (hidden) {
+    return null;
+  }
+
   return (
-    <div className={`${styles.heroSection} ${hidden ? styles.hidden : ""}`}>
-      <div className={styles.heroContent}>
-        <h1 className={styles.heroTitle}>What can I do for you?</h1>
+    <div
+      className="relative z-10 flex flex-col items-center justify-start overflow-auto bg-transparent transition-all duration-500 ease-out py-[4vh]"
+    >
+      <div className="max-w-full px-4 text-center">
+        <h1 className="text-3xl font-extrabold">What can I do for you?</h1>
 
-        <div className={styles.capabilitiesContainer}>
-          <div className={styles.capabilityItem}>
-            <div className={styles.capabilityIcon}>
-              <Globe />
+        <div className="mt-4 flex flex-wrap justify-center gap-6">
+          <div className="group flex flex-col items-center gap-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-300 ease-in-out group-hover:-translate-y-0.5 group-hover:bg-white/10">
+              <Globe className="h-6 w-6 stroke-white" />
             </div>
-            <div className={styles.capabilityLabel}>Browse</div>
+            <div className="text-sm text-white/70">Browse</div>
           </div>
 
-          <div className={styles.capabilityItem}>
-            <div className={styles.capabilityIcon}>
-              <BookOpen />
+          <div className="group flex flex-col items-center gap-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-300 ease-in-out group-hover:-translate-y-0.5 group-hover:bg-white/10">
+              <BookOpen className="h-6 w-6 stroke-white" />
             </div>
-            <div className={styles.capabilityLabel}>Research</div>
+            <div className="text-sm text-white/70">Research</div>
           </div>
 
-          <div className={styles.capabilityItem}>
-            <div className={styles.capabilityIcon}>
-              <Bot />
+          <div className="group flex flex-col items-center gap-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-300 ease-in-out group-hover:-translate-y-0.5 group-hover:bg-white/10">
+              <Bot className="h-6 w-6 stroke-white" />
             </div>
-            <div className={styles.capabilityLabel}>Automate</div>
+            <div className="text-sm text-white/70">Automate</div>
           </div>
 
-          <div className={styles.capabilityItem}>
-            <div className={styles.capabilityIcon}>
-              <MessageSquare />
+          <div className="group flex flex-col items-center gap-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-300 ease-in-out group-hover:-translate-y-0.5 group-hover:bg-white/10">
+              <MessageSquare className="h-6 w-6 stroke-white" />
             </div>
-            <div className={styles.capabilityLabel}>Chat</div>
+            <div className="text-sm text-white/70">Chat</div>
           </div>
         </div>
       </div>
 
       {suggestedPrompts.length > 0 && (
-        <div className={styles.suggestedPromptsContainer}>
-          <h2 className={styles.suggestedPromptsTitle}>Try asking</h2>
-          <div className={styles.suggestedPrompts}>
+        <div className="mt-8 w-full max-w-full px-4">
+          <h2 className="mb-6 text-center text-xl font-medium text-white/80">
+            Try asking
+          </h2>
+          <div className="flex flex-col items-center justify-center gap-4">
             {suggestedPrompts.map((prompt, index) => (
               <SuggestedPromptButton
                 key={index}

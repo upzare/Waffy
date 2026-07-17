@@ -30,7 +30,7 @@ import Hero from "./components/hero";
 import Particles from "./components/particles";
 import Loader from "./components/loader";
 import type { Message, Conversation, StreamingState, ToolCall, FileFormat } from "../types";
-import styles from "css/panel/root.module.css";
+import "@/stylesheets/globals.css";
 
 const App = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -815,7 +815,7 @@ const App = () => {
         onSelectConversation={handleSelectConversation}
         onRemoveConversation={handleItemRemove}
       />
-      <div className={styles.container}>
+      <div className="w-full h-screen flex flex-col relative overflow-hidden">
         <Header
           currentConversationId={conversationIdRef.current}
           currentTitle={currentTitle}

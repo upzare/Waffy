@@ -281,10 +281,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-chrome.runtime.onInstalled.addListener((event) => {
-  initClient();
-  if (event.reason === "install") {
-    initSettings();
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    await Promise.all([initClient(), initSettings()]);
+  } catch (error) {
+    console.error("Failed to initialize extension:", error);
   }
 });
 

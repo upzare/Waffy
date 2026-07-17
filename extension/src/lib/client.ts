@@ -36,19 +36,34 @@ const defaultApiKeys: ApiKeys = {};
 
 export const initSettings = async () => {
   const localStorage = await Browser.storage.local.get();
-  if (!localStorage.settings) {
-    await Browser.storage.local.set({
-      settings: JSON.stringify(defaultSettings),
-      apiKeys: JSON.stringify(defaultApiKeys),
-    });
+  const updates: Record<string, string> = {};
+  if (!localStorage.settings || localStorage.settings === "undefined") {
+    updates.settings = JSON.stringify(defaultSettings);
+  }
+  if (!localStorage.apiKeys || localStorage.apiKeys === "undefined") {
+    updates.apiKeys = JSON.stringify(defaultApiKeys);
+  }
+  if (Object.keys(updates).length > 0) {
+    await Browser.storage.local.set(updates);
+  }
+};
+
+const parseStoredJson = <T>(value: unknown, fallback: T): T => {
+  if (typeof value !== "string" || value === "" || value === "undefined") {
+    return fallback;
+  }
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
   }
 };
 
 export const getLocalStorage = async () => {
   const localStorage = await Browser.storage.local.get();
-  localStorage.client = JSON.parse(localStorage.client as string);
-  localStorage.settings = JSON.parse(localStorage.settings as string);
-  localStorage.apiKeys = JSON.parse((localStorage.apiKeys as string) || "{}");
+  localStorage.client = parseStoredJson(localStorage.client, null);
+  localStorage.settings = parseStoredJson(localStorage.settings, {});
+  localStorage.apiKeys = parseStoredJson(localStorage.apiKeys, {});
   return localStorage;
 };
 
