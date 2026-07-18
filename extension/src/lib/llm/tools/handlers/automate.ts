@@ -1,3 +1,5 @@
+import Browser from "webextension-polyfill";
+import type { Tabs } from "webextension-polyfill";
 import { isInaccessiblePage } from "@/helper";
 import { AutomateToolResult } from "../automate";
 
@@ -22,6 +24,8 @@ const sleep = async (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
+const getSessionTab = async () => (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as Tabs.Tab | undefined;
+
 const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) => {
   chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
     type: "mousePressed",
@@ -40,324 +44,280 @@ const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) 
   });
 };
 
-export const updateOpenedTabs = () => {
-  return new Promise<void>((resolve) => {
-    chrome.tabs.query({}, (tabs) => {
-      if (chrome.runtime.lastError) {
-        resolve();
-        return;
-      }
-      chrome.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs }, () => {
-        resolve();
-      });
-    });
-  });
+export const updateOpenedTabs = async () => {
+  try {
+    const tabs = await Browser.tabs.query({});
+    await Browser.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs });
+  } catch {
+    // ignore
+  }
 };
 
-const fetchScreen = async () => {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      if (isInaccessiblePage(tab.url)) {
-        reject(
-          `Cannot capture screen on "${tab.url}". Browser internal pages cannot be accessed or automated.`
-        );
-        return;
-      }
-      const devicePixelRatio = await chrome.tabs
-        .sendMessage(tab.id, { type: "GET_DEVICE_PIXEL_RATIO" })
-        .then((res) => res.value)
-        .catch((err) => window.devicePixelRatio);
-      const meta = {
-        url: tab.url,
-        title: tab.title,
-        pixelRatio: devicePixelRatio,
-        loading_status: tab.status,
+const fetchScreen = async (): Promise<AutomateToolResult> => {
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    if (isInaccessiblePage(tab.url)) {
+      return {
+        status: "error",
+        message:
+          "Error: " +
+          `Cannot capture screen on "${tab.url}". Browser internal pages cannot be accessed or automated.`,
       };
+    }
+    const devicePixelRatio = await Browser.tabs
+      .sendMessage(tab.id, { type: "GET_DEVICE_PIXEL_RATIO" })
+      .then((res) => (res as { value: number }).value)
+      .catch(() => window.devicePixelRatio);
+    const meta = {
+      url: tab.url,
+      title: tab.title,
+      pixelRatio: devicePixelRatio,
+      loading_status: tab.status,
+    };
+    const base64Image = await new Promise<string>((resolve, reject) => {
       chrome.debugger.sendCommand(
         { tabId: tab.id },
         "Page.captureScreenshot",
         { format: "jpeg", quality: 10, fromSurface: true },
         (response?: { data?: string }) => {
-          if (chrome.runtime.lastError) {
+          if (chrome.runtime.lastError || !response?.data) {
             reject(
-              `Failed to capture screen. The page may be restricted or the debugger is not attached.`
+              new Error(
+                "Failed to capture screen. The page may be restricted or the debugger is not attached."
+              )
             );
             return;
           }
-          const base64Image = response?.data;
-          resolve({ meta, base64Image });
+          resolve(response.data);
         }
       );
     });
-  })
-    .then((data) => {
-      const { meta, base64Image } = data as { meta: Record<string, string>; base64Image: string };
-      return {
-        status: "success",
-        message: "Success: Screen fetched",
-        data: { type: "screenshot", metadata: meta, image: base64Image },
-      };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+    return {
+      status: "success",
+      message: "Success: Screen fetched",
+      data: { type: "screenshot", metadata: meta, image: base64Image },
+    };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
 const findNewTabFromClick = async (sourceTabId: number, tabIdsBefore: Set<number | undefined>) => {
-  const tabsAfter = await new Promise<chrome.tabs.Tab[]>((resolve) =>
-    chrome.tabs.query({}, resolve)
-  );
+  const tabsAfter = await Browser.tabs.query({});
   const newTabs = tabsAfter.filter((t) => t.id && !tabIdsBefore.has(t.id));
   if (newTabs.length === 1) return newTabs[0];
   return newTabs.find((t) => t.openerTabId === sourceTabId);
 };
 
-const click = async ({ x, y }: { x: number; y: number }) => {
+const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolResult> => {
   console.log("CLICK: ", x, y);
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      const sourceTabId = tab.id;
-      const tabsBefore = await new Promise<chrome.tabs.Tab[]>((resolve) =>
-        chrome.tabs.query({}, resolve)
-      );
-      const tabIdsBefore = new Set(tabsBefore.map((t) => t.id));
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    const sourceTabId = tab.id;
+    const tabsBefore = await Browser.tabs.query({});
+    const tabIdsBefore = new Set(tabsBefore.map((t) => t.id));
 
-      chrome.tabs.sendMessage(tab.id, {
-        type: "INTERACT_DOM",
-        name: "DISPLAY_POINTER",
-        args: { x, y },
-      });
-      await _click({ x, y, tabId: tab.id });
-
-      await sleep(500);
-      const newTab = await findNewTabFromClick(sourceTabId, tabIdsBefore);
-
-      if (newTab?.id) {
-        await updateOpenedTabs();
-        await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: newTab.id });
-        chrome.tabs.update(newTab.id, { active: true });
-        resolve(
-          `Click initiated. A new tab was opened (Tab ID: ${newTab.id}). Switched to the new tab.`
-        );
-      } else if (chrome.runtime.lastError) {
-        reject("Failed to click on coordinates");
-      } else {
-        resolve("Click initiated");
-      }
+    void Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "DISPLAY_POINTER",
+      args: { x, y },
     });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+    await _click({ x, y, tabId: tab.id });
+
+    await sleep(500);
+    const newTab = await findNewTabFromClick(sourceTabId, tabIdsBefore);
+
+    if (newTab?.id) {
+      await updateOpenedTabs();
+      await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: newTab.id });
+      await Browser.tabs.update(newTab.id, { active: true });
+      return {
+        status: "success",
+        message: `Success: Click initiated. A new tab was opened (Tab ID: ${newTab.id}). Switched to the new tab.`,
+      };
+    }
+    return { status: "success", message: "Success: Click initiated" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const keyPress = async ({ key }: { key: KEY_TYPES }) => {
+const keyPress = async ({ key }: { key: KEY_TYPES }): Promise<AutomateToolResult> => {
   console.log("KEYPRESS: ", key);
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-        type: "keyDown",
-        windowsVirtualKeyCode: KEY_CODES[key],
-        key: key,
-        code: key,
-        text: "\r",
-      });
-      sleep(50);
-      await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-        type: "keyUp",
-        windowsVirtualKeyCode: KEY_CODES[key],
-        key: key,
-        code: key,
-        text: "\r",
-      });
-      if (chrome.runtime.lastError) {
-        reject("Failed to press key");
-      } else {
-        resolve("Key pressed");
-      }
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
+      type: "keyDown",
+      windowsVirtualKeyCode: KEY_CODES[key],
+      key: key,
+      code: key,
+      text: "\r",
     });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
+    await sleep(50);
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
+      type: "keyUp",
+      windowsVirtualKeyCode: KEY_CODES[key],
+      key: key,
+      code: key,
+      text: "\r",
     });
+    return { status: "success", message: "Success: Key pressed" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const typeText = async ({ x, y, text }: { x: number; y: number; text: string }) => {
+const typeText = async ({
+  x,
+  y,
+  text,
+}: {
+  x: number;
+  y: number;
+  text: string;
+}): Promise<AutomateToolResult> => {
   console.log("TYPETEXT: ", x, y, text);
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      chrome.tabs.sendMessage(tab.id, {
-        type: "INTERACT_DOM",
-        name: "DISPLAY_POINTER",
-        args: { x, y, timeout: text.length * 150 + 500 },
-      });
-      await _click({ x, y, tabId: tab.id });
-      await sleep(100);
-      for await (const char of text) {
-        if (char === "\n") {
-          keyPress({ key: "Enter" });
-          continue;
-        }
-        await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-          type: "keyDown",
-          text: char,
-        });
-        await sleep(25);
-        await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-          type: "keyUp",
-          text: char,
-        });
-        await sleep(10);
-      }
-      if (chrome.runtime.lastError) {
-        reject("Failed to send keystrokes");
-      } else {
-        resolve("Text typed successfully");
-      }
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    void Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "DISPLAY_POINTER",
+      args: { x, y, timeout: text.length * 150 + 500 },
     });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
-};
-
-const clearValue = async ({ x, y }: { x: number; y: number }) => {
-  console.log("CLEARVALUE: ", x, y);
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
+    await _click({ x, y, tabId: tab.id });
+    await sleep(100);
+    for await (const char of text) {
+      if (char === "\n") {
+        await keyPress({ key: "Enter" });
+        continue;
       }
-      chrome.tabs.sendMessage(tab.id, {
-        type: "INTERACT_DOM",
-        name: "DISPLAY_POINTER",
-        args: { x, y },
-      });
-      await _click({ x, y, tabId: tab.id });
-      await sleep(100);
-      await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-        type: "char",
-        commands: ["SelectAll"],
-      });
-      await sleep(100);
       await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
         type: "keyDown",
-        key: "Backspace",
-        code: "Backspace",
-        windowsVirtualKeyCode: 8,
+        text: char,
       });
-      await sleep(50);
+      await sleep(25);
       await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
         type: "keyUp",
-        key: "Backspace",
-        code: "Backspace",
-        windowsVirtualKeyCode: 8,
+        text: char,
       });
-      if (chrome.runtime.lastError) {
-        reject("Failed to clear value");
-      } else {
-        resolve("Value cleared successfully");
-      }
-    });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+      await sleep(10);
+    }
+    return { status: "success", message: "Success: Text typed successfully" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const getOption = async ({ x, y }: { x: number; y: number }) => {
+const clearValue = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolResult> => {
+  console.log("CLEARVALUE: ", x, y);
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    void Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "DISPLAY_POINTER",
+      args: { x, y },
+    });
+    await _click({ x, y, tabId: tab.id });
+    await sleep(100);
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
+      type: "char",
+      commands: ["SelectAll"],
+    });
+    await sleep(100);
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
+      type: "keyDown",
+      key: "Backspace",
+      code: "Backspace",
+      windowsVirtualKeyCode: 8,
+    });
+    await sleep(50);
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
+      type: "keyUp",
+      key: "Backspace",
+      code: "Backspace",
+      windowsVirtualKeyCode: 8,
+    });
+    return { status: "success", message: "Success: Value cleared successfully" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
+};
+
+const getOption = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolResult> => {
   console.log("GETOPTION: ", x, y);
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      chrome.tabs.sendMessage(tab.id, {
-        type: "INTERACT_DOM",
-        name: "DISPLAY_POINTER",
-        args: { x, y },
-      });
-      await _click({ x, y, tabId: tab.id });
-      await chrome.tabs
-        .sendMessage(tab.id, { type: "INTERACT_DOM", name: "GET_OPTION", args: {} })
-        .then((res) => {
-          if (res.status === "success") resolve(res.value);
-          else reject(res.value);
-        })
-        .catch((error) => {
-          reject(error.value);
-        });
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    void Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "DISPLAY_POINTER",
+      args: { x, y },
     });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+    await _click({ x, y, tabId: tab.id });
+    const res = (await Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "GET_OPTION",
+      args: {},
+    })) as { status: string; value: string };
+    if (res.status === "success") {
+      return { status: "success", message: "Success: " + res.value };
+    }
+    return { status: "error", message: "Error: " + res.value };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const setOption = async ({ x, y, value }: { x: number; y: number; value: string }) => {
+const setOption = async ({
+  x,
+  y,
+  value,
+}: {
+  x: number;
+  y: number;
+  value: string;
+}): Promise<AutomateToolResult> => {
   console.log("SETOPTION: ", x, y, value);
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      chrome.tabs.sendMessage(tab.id, {
-        type: "INTERACT_DOM",
-        name: "DISPLAY_POINTER",
-        args: { x, y },
-      });
-      await _click({ x, y, tabId: tab.id });
-      await chrome.tabs
-        .sendMessage(tab.id, { type: "INTERACT_DOM", name: "SET_OPTION", args: { value } })
-        .then((res) => {
-          if (res.status === "success") resolve(res.value);
-          else reject(res.value);
-        })
-        .catch((error) => {
-          reject(error.value);
-        });
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    void Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "DISPLAY_POINTER",
+      args: { x, y },
     });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+    await _click({ x, y, tabId: tab.id });
+    const res = (await Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "SET_OPTION",
+      args: { value },
+    })) as { status: string; value: string };
+    if (res.status === "success") {
+      return { status: "success", message: "Success: " + res.value };
+    }
+    return { status: "error", message: "Error: " + res.value };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
 const scroll = async ({
@@ -370,214 +330,138 @@ const scroll = async ({
   y: number;
   xDistance: number;
   yDistance: number;
-}) => {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      chrome.tabs.sendMessage(tab.id, {
-        type: "INTERACT_DOM",
-        name: "DISPLAY_POINTER",
-        args: { x, y },
-      });
-      await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.synthesizeScrollGesture", {
-        x,
-        y,
-        xDistance: -xDistance,
-        yDistance: -yDistance,
-      });
-      if (chrome.runtime.lastError) {
-        reject("Failed to scroll");
-      } else {
-        resolve("Scroll initiated");
-      }
+}): Promise<AutomateToolResult> => {
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    void Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "DISPLAY_POINTER",
+      args: { x, y },
     });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.synthesizeScrollGesture", {
+      x,
+      y,
+      xDistance: -xDistance,
+      yDistance: -yDistance,
     });
+    return { status: "success", message: "Success: Scroll initiated" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const loadingState = async () => {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
+const loadingState = async (): Promise<AutomateToolResult> => {
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    const readyState = await new Promise<string>((resolve, reject) => {
       chrome.debugger.sendCommand(
         { tabId: tab.id },
         "Runtime.evaluate",
         { expression: "document.readyState" },
         (result?: { result?: { value: string } }) => {
           if (chrome.runtime.lastError) {
-            reject("Failed to get the state of the page");
+            reject(new Error("Failed to get the state of the page"));
           } else {
-            const readyState = result?.result?.value;
-            if (readyState === "complete") {
-              resolve("Page is fully loaded");
-            } else {
-              resolve("Page is under loading");
-            }
+            resolve(result?.result?.value ?? "");
           }
         }
       );
     });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+    if (readyState === "complete") {
+      return { status: "success", message: "Success: Page is fully loaded" };
+    }
+    return { status: "success", message: "Success: Page is under loading" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const goto = async ({ url }: { url: string }) => {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      chrome.tabs.update(tab.id, { url: url }, (updatedTab) => {
-        if (chrome.runtime.lastError) {
-          reject("Failed to navigating to URL");
-        } else {
-          resolve("Navigated to URL successfully");
-        }
-      });
-    });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+const goto = async ({ url }: { url: string }): Promise<AutomateToolResult> => {
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    await Browser.tabs.update(tab.id, { url });
+    return { status: "success", message: "Success: Navigated to URL successfully" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const getOpenedTabs = async () => {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.query({}, async (tabs) => {
-      if (chrome.runtime.lastError) {
-        reject("Failed to get the open tabs");
-        return;
-      }
-      await chrome.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs });
-      const result = tabs.map((tab) => ({
-        id: tab.id,
-        title: tab.title,
-        url: tab.url,
-        active: tab.active,
-      }));
-      resolve(result);
-    });
-  })
-    .then((tabs) => {
-      return { status: "success", message: JSON.stringify(tabs) };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+const getOpenedTabs = async (): Promise<AutomateToolResult> => {
+  try {
+    const tabs = await Browser.tabs.query({});
+    await Browser.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs });
+    const result = tabs.map((tab: Tabs.Tab) => ({
+      id: tab.id,
+      title: tab.title,
+      url: tab.url,
+      active: tab.active,
+    }));
+    return { status: "success", message: JSON.stringify(result) };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const openTab = async ({ url }: { url: string }) => {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.create({ url: url }, async (tab) => {
-      await updateOpenedTabs();
-      await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
-      if (chrome.runtime.lastError) {
-        reject("Failed to open the URL");
-      } else {
-        resolve("URL opened in new tab successfully");
-      }
-    });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+const openTab = async ({ url }: { url: string }): Promise<AutomateToolResult> => {
+  try {
+    const tab = await Browser.tabs.create({ url });
+    await updateOpenedTabs();
+    await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
+    return { status: "success", message: "Success: URL opened in new tab successfully" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const switchTab = async ({ tabId }: { tabId: number }) => {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.update(tabId, { active: true }, async (tab) => {
-      await updateOpenedTabs();
-      await chrome.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
-      if (chrome.runtime.lastError) {
-        reject("Failed to switch tab");
-      } else {
-        resolve("Tab switched successfully");
-      }
-    });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+const switchTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResult> => {
+  try {
+    const tab = await Browser.tabs.update(tabId, { active: true });
+    await updateOpenedTabs();
+    await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
+    return { status: "success", message: "Success: Tab switched successfully" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const closeTab = async ({ tabId }: { tabId: number }) => {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.remove(tabId, () => {
-      if (chrome.runtime.lastError) {
-        reject("Failed to close the tab");
-      } else {
-        resolve("Tab closed successfully");
-      }
-    });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+const closeTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResult> => {
+  try {
+    await Browser.tabs.remove(tabId);
+    return { status: "success", message: "Success: Tab closed successfully" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const reload = async () => {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) {
-        reject("Tab not found");
-        return;
-      }
-      chrome.tabs.reload(tab.id, () => {
-        if (chrome.runtime.lastError) {
-          reject("Failed to reload the page");
-        } else {
-          resolve("Reloaded the page successfully");
-        }
-      });
-    });
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+const reload = async (): Promise<AutomateToolResult> => {
+  try {
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    await Browser.tabs.reload(tab.id);
+    return { status: "success", message: "Success: Reloaded the page successfully" };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
-const wait = async ({ ms }: { ms: number }) => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(`Waited for ${ms} milliseconds`), ms);
-  })
-    .then((res) => {
-      return { status: "success", message: "Success: " + res };
-    })
-    .catch((error) => {
-      return { status: "error", message: "Error: " + error };
-    });
+const wait = async ({ ms }: { ms: number }): Promise<AutomateToolResult> => {
+  try {
+    await sleep(ms);
+    return { status: "success", message: `Success: Waited for ${ms} milliseconds` };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
 };
 
 export const availableFunctions: { [key: string]: (args: any) => Promise<AutomateToolResult> } = {

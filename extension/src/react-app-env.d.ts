@@ -3,8 +3,6 @@
 declare module "*.css";
 
 declare global {
-  const chrome: typeof chrome;
-
   interface Window {
     ai: {
       [key: string]: {

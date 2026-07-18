@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { v4 as uuid4 } from "uuid";
 import toast, { Toaster } from "react-hot-toast";
+import Browser from "webextension-polyfill";
 import { AI, createTitle } from "@/lib/agent";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
@@ -94,12 +95,12 @@ const App = () => {
     fetchConversations();
     checkApiKeys();
 
-    const onMessage = (request: { action?: string }) => {
-      if (request.action === "RELOAD_PANEL") {
+    const onMessage = (request: unknown) => {
+      if ((request as { action?: string })?.action === "RELOAD_PANEL") {
         window.location.reload();
       }
     };
-    chrome.runtime.onMessage.addListener(onMessage);
+    Browser.runtime.onMessage.addListener(onMessage);
 
     const handleMouseMove = (e: MouseEvent) => {
       const threshold = window.innerWidth - 10;
@@ -116,7 +117,7 @@ const App = () => {
 
     document.addEventListener("mousemove", handleMouseMove);
     return () => {
-      chrome.runtime.onMessage.removeListener(onMessage);
+      Browser.runtime.onMessage.removeListener(onMessage);
       document.removeEventListener("mousemove", handleMouseMove);
       if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
     };
@@ -258,11 +259,11 @@ const App = () => {
   const attachController = async () => {
     const tab = await getActiveTab();
     if (!tab?.id) return;
-    await chrome.runtime.sendMessage({ action: "START_SESSION", tabId: tab.id });
+    await Browser.runtime.sendMessage({ action: "START_SESSION", tabId: tab.id });
   };
 
   const detachController = async () => {
-    await chrome.runtime.sendMessage({ action: "STOP_SESSION" });
+    await Browser.runtime.sendMessage({ action: "STOP_SESSION" });
   };
 
   const automateHandler = async (
@@ -362,10 +363,11 @@ const App = () => {
     };
 
     await updateOpenedTabs();
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) throw new Error("Tab not found");
-      await chrome.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: tab.id });
-    });
+    const overlayTab = (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as {
+      id?: number;
+    } | null;
+    if (!overlayTab || !overlayTab.id) throw new Error("Tab not found");
+    await Browser.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: overlayTab.id });
 
     let responded = true;
     let finish = false;
@@ -491,9 +493,13 @@ const App = () => {
     }
 
     setStreaming((prev) => ({ ...prev, execution: false }));
-    chrome.runtime.sendMessage({ action: "GET_TAB" }, async (tab) => {
-      if (!tab || !tab.id) throw new Error("Tab not found");
-      await chrome.runtime.sendMessage({ action: "DISABLE_OVERLAY", tabId: tab.id });
+    const disableOverlayTab = (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as {
+      id?: number;
+    } | null;
+    if (!disableOverlayTab || !disableOverlayTab.id) throw new Error("Tab not found");
+    await Browser.runtime.sendMessage({
+      action: "DISABLE_OVERLAY",
+      tabId: disableOverlayTab.id,
     });
 
     return t2Reasoning;
@@ -708,7 +714,7 @@ const App = () => {
     } else {
       toast.error("Configure API keys in extension settings.");
     }
-    chrome.runtime.openOptionsPage();
+    void Browser.runtime.openOptionsPage();
     return false;
   };
 
@@ -1045,7 +1051,7 @@ const App = () => {
                 border: "none",
                 cursor: "pointer",
               }}
-              onClick={() => chrome.runtime.openOptionsPage()}
+              onClick={() => void Browser.runtime.openOptionsPage()}
             >
               Open Settings
             </button>

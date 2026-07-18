@@ -1,6 +1,6 @@
 # Waffy
 
-Waffy is an open-source Chrome extension that brings AI-powered browser automation to your side panel. Describe what you want in natural language — Waffy can browse pages, click elements, fill forms, extract data, and complete multi-step workflows using vision-capable models and tool calling.
+Waffy is an open-source browser extension that brings AI-powered browser automation to your side panel. Describe what you want in natural language — Waffy can browse pages, click elements, fill forms, extract data, and complete multi-step workflows using vision-capable models and tool calling.
 
 ## Features
 
@@ -44,7 +44,7 @@ Waffy runs a multi-stage pipeline. Each stage can use a different model:
 ### Prerequisites
 
 - [Bun](https://bun.sh/) 1.0+
-- Google Chrome (or a Chromium-based browser)
+- A Chromium-based browser (Chrome, Brave, Edge, Opera, etc.)
 
 ### Build from source
 
@@ -57,9 +57,9 @@ bun run build
 
 This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
 
-### Load the extension in Chrome
+### Load the extension
 
-1. Open `chrome://extensions/`
+1. Open the extensions page for your browser:
 2. Enable **Developer mode**
 3. Click **Load unpacked** and select the `build/` folder
 4. Click the Waffy icon in the toolbar, or press `Ctrl+I` to open the side panel

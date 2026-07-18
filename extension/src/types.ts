@@ -113,7 +113,9 @@ export interface ToggleMessage {
 
 export interface DomMessage {
   type: string;
-  dom: string;
+  name?: string;
+  args?: Record<string, any>;
+  dom?: string;
 }
 
 export interface ParticlesProps {

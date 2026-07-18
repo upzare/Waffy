@@ -1,9 +1,10 @@
+import Browser from "webextension-polyfill";
 import { Plus, Settings } from "lucide-react";
 import type { HeaderProps } from "../../types";
 
 const Header: React.FC<HeaderProps> = ({ currentConversationId, currentTitle, onNewChat }) => {
   const openSettings = () => {
-    chrome.runtime.openOptionsPage();
+    void Browser.runtime.openOptionsPage();
   };
 
   return (

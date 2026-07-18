@@ -99,7 +99,7 @@ const Settings = () => {
       };
       await saveAppSettings(merged, apiKeys);
       setSettings(merged);
-      chrome.runtime.sendMessage({ action: "RELOAD_PANEL" });
+      void Browser.runtime.sendMessage({ action: "RELOAD_PANEL" });
       toast.success("Settings saved successfully");
     } catch (error) {
       console.error("Error saving settings:", error);

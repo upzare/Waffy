@@ -1,3 +1,4 @@
+import Browser from "webextension-polyfill";
 import type { DomMessage } from "../types";
 
 async function initOverlay() {
@@ -87,38 +88,35 @@ function disableOverlay() {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  switch ((message as DomMessage).type) {
+Browser.runtime.onMessage.addListener((message: any) => {
+  const msg = message as DomMessage;
+  switch (msg.type) {
     case "GET_DEVICE_PIXEL_RATIO": {
       const ratio = window.devicePixelRatio;
-      sendResponse({ status: "success", value: ratio });
-      break;
+      return Promise.resolve({ status: "success", value: ratio });
     }
     case "GET_PAGE_CONTENT": {
       const text = document.body?.innerText ?? "";
       const maxChars = 16000;
-      sendResponse({
+      return Promise.resolve({
         status: "success",
         url: window.location.href,
         title: document.title,
         text: text.length > maxChars ? text.slice(0, maxChars) + "\n...[truncated]" : text,
       });
-      break;
     }
     case "INTERACT_DOM": {
-      const name = message.name;
-      const args = message.args;
+      const name = msg.name;
+      const args = msg.args ?? {};
       switch (name) {
         case "GET_OPTION": {
           const element = document.activeElement as HTMLSelectElement;
           if (element && element.tagName.toLowerCase() === "select") {
             const options = Array.from(element.options).map((option) => option.value);
-            const message = "Available options -> " + options.join(", ");
-            sendResponse({ status: "success", value: message });
-          } else {
-            sendResponse({ status: "error", value: "Element is not a select element" });
+            const optionsMessage = "Available options -> " + options.join(", ");
+            return Promise.resolve({ status: "success", value: optionsMessage });
           }
-          break;
+          return Promise.resolve({ status: "error", value: "Element is not a select element" });
         }
         case "SET_OPTION": {
           const element = document.activeElement as HTMLSelectElement;
@@ -127,21 +125,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const options = Array.from(element.options).map((option) => option.value);
             if (options.includes(value)) {
               element.value = value;
-              sendResponse({ status: "success", value: "Value set successfully" });
-            } else {
-              sendResponse({ status: "error", value: "Value not found" });
+              return Promise.resolve({ status: "success", value: "Value set successfully" });
             }
-          } else {
-            sendResponse({ status: "error", value: "Element is not a select element" });
+            return Promise.resolve({ status: "error", value: "Value not found" });
           }
-          break;
+          return Promise.resolve({ status: "error", value: "Element is not a select element" });
         }
         case "DISPLAY_POINTER": {
-          (async () => {
+          return (async () => {
             const { x, y, timeout } = args;
             const pointer = document.createElement("img");
             pointer.id = "waffy-pointer";
-            pointer.src = chrome.runtime.getURL("shared/cursor.png");
+            pointer.src = Browser.runtime.getURL("shared/cursor.png");
             pointer.style.position = "fixed";
             pointer.style.left = `${x}px`;
             pointer.style.top = `${y}px`;
@@ -152,36 +147,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             document.body.appendChild(pointer);
             await new Promise((resolve) => setTimeout(resolve, timeout || 1500));
             pointer.remove();
-            sendResponse({ status: "success", value: "Pointer displayed" });
+            return { status: "success", value: "Pointer displayed" };
           })();
-          break;
         }
         case "SHOW_OVERLAY": {
           enableOverlay();
-          sendResponse({ status: "success", value: "Overlay Enabled" });
-          break;
+          return Promise.resolve({ status: "success", value: "Overlay Enabled" });
         }
         case "HIDE_OVERLAY": {
           disableOverlay();
-          sendResponse({ status: "success", value: "Overlay Disabled" });
-          break;
+          return Promise.resolve({ status: "success", value: "Overlay Disabled" });
         }
         default:
-          sendResponse({ status: "error", value: "Invalid function name" });
-          break;
+          return Promise.resolve({ status: "error", value: "Invalid function name" });
       }
-      break;
     }
   }
-  return true;
+  return undefined;
 });
 
-initOverlay().then(() => {
-  chrome.runtime.sendMessage({ action: "GET_OVERLAY_STATUS" }, (response) => {
-    if (response.status === "enabled") {
+initOverlay().then(async () => {
+  try {
+    const response = (await Browser.runtime.sendMessage({
+      action: "GET_OVERLAY_STATUS",
+    })) as { status?: string } | undefined;
+    if (response?.status === "enabled") {
       enableOverlay();
     } else {
       disableOverlay();
     }
-  });
+  } catch {
+    disableOverlay();
+  }
 });
