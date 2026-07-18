@@ -128,13 +128,13 @@ function InputContainer({
               className="!static !inset-auto !w-full !transform-none box-border max-h-56 overflow-y-auto rounded-md border border-white/8 bg-[#101010]/96 p-1.5 shadow-lg backdrop-blur-md data-[state=closed]:hidden"
               avoidCollisions={false}
             >
-              <p className="p-2 text-xs font-medium tracking-wider text-white/35 uppercase">
+              <p className="p-1.5 text-xs font-medium tracking-wider text-white/35 uppercase">
                 Commands
               </p>
               {SLASH_COMMANDS.map(({ value, description }) => (
                 <MentionItem
                   key={value}
-                  className="group cursor-pointer rounded py-1 transition-colors duration-150 data-[highlighted]:bg-white/[0.06]"
+                  className="group cursor-pointer rounded p-0.5 transition-colors duration-150 data-[highlighted]:bg-white/[0.06]"
                   value={value}
                   label={value}
                 >
