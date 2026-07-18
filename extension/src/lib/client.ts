@@ -5,11 +5,12 @@ import type { ApiKeys, AppSettings, Settings } from "@/types";
 export const initClient = async () => {
   const localStorage = await Browser.storage.local.get();
   if (!localStorage.client) {
+    const manifest = Browser.runtime.getManifest() as { version: string; version_name?: string };
     Browser.storage.local.set({
       client: JSON.stringify({
         client_id: crypto.randomUUID(),
-        package: chrome.runtime.getManifest().version_name,
-        version: chrome.runtime.getManifest().version,
+        package: manifest.version_name ?? manifest.version,
+        version: manifest.version,
         os: navigator.platform,
         browser: navigator.userAgent,
       }),

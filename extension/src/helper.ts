@@ -1,11 +1,34 @@
-export const isInaccessiblePage = (url?: string) =>
-  !url || url.startsWith("chrome://") || url.startsWith("chrome-extension://");
+import Browser from "webextension-polyfill";
+import type { Tabs } from "webextension-polyfill";
 
-export async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
-  const current = await chrome.tabs.query({ active: true, currentWindow: true });
+/** Internal / extension pages that content scripts and automation cannot access. */
+const INACCESSIBLE_URL_PREFIXES = [
+  "chrome://",
+  "chrome-extension://",
+  "chrome-search://",
+  "chrome-devtools://",
+  "devtools://",
+  "brave://",
+  "edge://",
+  "extension://",
+  "opera://",
+  "vivaldi://",
+  "arc://",
+  "about:",
+  "moz-extension://",
+  "view-source:",
+  "data:",
+  "blob:",
+] as const;
+
+export const isInaccessiblePage = (url?: string) =>
+  !url || INACCESSIBLE_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
+
+export async function getActiveTab(): Promise<Tabs.Tab | undefined> {
+  const current = await Browser.tabs.query({ active: true, currentWindow: true });
   if (current[0]?.id) return current[0];
 
-  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ["normal"] });
+  const windows = await Browser.windows.getAll({ populate: true, windowTypes: ["normal"] });
   for (const win of windows) {
     const tab = win.tabs?.find((t) => t.active);
     if (tab?.id) return tab;

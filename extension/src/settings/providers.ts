@@ -24,7 +24,7 @@ export const BROWSER_AI_PROVIDER: BrowserAIProviderMeta = {
   id: "browser-ai",
   label: "Browser AI",
   shortLabel: "Browser AI",
-  description: "On-device Chrome/Edge models. No API key required.",
+  description: "On-device Chromium models (Chrome/Edge/Brave when available). No API key required.",
   placeholder: "",
   docsUrl: "https://www.browser-ai.dev/docs/ai-sdk-v6/core/installation",
 };

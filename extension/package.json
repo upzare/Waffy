@@ -1,7 +1,7 @@
 {
   "name": "waffy-extension",
   "version": "0.0.0",
-  "description": "AI-powered browser automation Chrome extension",
+  "description": "AI-powered browser automation for Chromium browsers",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

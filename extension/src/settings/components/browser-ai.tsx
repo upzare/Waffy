@@ -94,8 +94,9 @@ const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) =
 
         {status === "unsupported" && (
           <p className="text-xs leading-snug text-text-muted">
-            Your browser does not support the built-in Prompt API. Use Chrome with Gemini Nano or
-            Edge with the Prompt API flag enabled.
+            Your browser does not support the built-in Prompt API. Use a Chromium browser with
+            on-device AI (Chrome with Gemini Nano, Edge with the Prompt API flag, or Brave when
+            supported).
           </p>
         )}
 
