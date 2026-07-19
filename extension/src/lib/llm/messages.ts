@@ -31,15 +31,7 @@ type ToolResultContent = {
   type: "tool-result";
   toolCallId: string;
   toolName: string;
-  output:
-  | { type: "text"; value: string }
-  | {
-    type: "content";
-    value: Array<
-      | { type: "text"; text: string }
-      | { type: "file-data"; data: string; mediaType: string }
-    >;
-  };
+  output: unknown;
 };
 
 function filePayloadToPart(payload: FileFormat["payload"]) {
@@ -115,7 +107,7 @@ function toToolResult(
         type: "content",
         value: [
           { type: "text", text: formatToolResultText(msg) },
-          { type: "file-data", data: image, mediaType: "image/jpeg" },
+          { type: "image-data", data: image, mediaType: "image/jpeg" },
         ],
       },
     };
@@ -170,7 +162,7 @@ function appendToolResult(
   screenshotState: ScreenshotState
 ) {
   const toolResult = toToolResult(msg, screenshotState);
-  messages.push({ role: "tool", content: [toolResult] });
+  messages.push({ role: "tool", content: [toolResult] } as ModelMessage);
 }
 
 export function keepLatestScreenshotOnly(messages: ExtensionMessage[]): void {
