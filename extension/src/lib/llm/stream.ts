@@ -132,7 +132,7 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
     const result = streamText({
       model,
       system,
-      messages: toCoreMessages(messages, mode, screenshotState),
+      messages: toCoreMessages(messages, screenshotState),
       tools:
         Object.keys(tools).length > 0
           ? (tools as Parameters<typeof streamText>[0]["tools"])

@@ -23,6 +23,7 @@ import {
   buildT2Messages,
   buildT3Messages,
   buildT4Messages,
+  keepLatestScreenshotOnly,
 } from "@/lib/llm/messages";
 import type { StreamSession } from "@/lib/llm/stream";
 import type { ExtensionMessage } from "@/lib/llm/messages";
@@ -377,12 +378,12 @@ const App = () => {
         prev.map((msg) =>
           msg.id === `assistant-${messageIdRef.current}`
             ? {
-                ...msg,
-                content: {
-                  ...msg.content,
-                  text: { ...msg.content.text, execution: ["Initializing"] },
-                },
-              }
+              ...msg,
+              content: {
+                ...msg.content,
+                text: { ...msg.content.text, execution: ["Initializing"] },
+              },
+            }
             : msg
         )
       )
@@ -398,6 +399,7 @@ const App = () => {
 
       let reasoning = "";
       const executionToolCalls: Record<string, ToolCall> = {};
+      keepLatestScreenshotOnly(t2Messages);
       const executionModelStream = AI(
         t2Messages,
         "t2",
@@ -441,7 +443,7 @@ const App = () => {
         }
       }
 
-      const iterationMessages: any[] = [];
+      const iterationMessages: ExtensionMessage[] = [];
       if (reasoning) {
         iterationMessages.push({
           type: "response",
@@ -466,23 +468,23 @@ const App = () => {
         console.log("toolArgs:", toolArgs);
         const toolCallResult = await automateFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
+
+        const screenshotData =
+          toolCallResult.data?.type === "screenshot"
+            ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
+            : {};
+
         iterationMessages.push({
           type: "action.result",
           id: toolCall.id,
           name: toolName,
           output: toolCallResult.message,
+          ...screenshotData,
         });
 
-        if (
-          toolName === "fetchScreen" &&
-          toolCallResult.status === "success" &&
-          toolCallResult.data
-        ) {
-          iterationMessages.push(toolCallResult.data);
-          if (toolCallResult.data.image) {
-            t2SessionRef.current.screenshot = toolCallResult.data.image;
-            t2SessionRef.current.screenshotMetadata = toolCallResult.data.metadata ?? null;
-          }
+        if (screenshotData.data?.image) {
+          t2SessionRef.current.screenshot = screenshotData.data.image;
+          t2SessionRef.current.screenshotMetadata = screenshotData.data.metadata ?? null;
         }
         functionExecState = true;
       }
@@ -664,26 +666,20 @@ const App = () => {
 
         const toolArgs = JSON.parse(toolCall.arguments);
         const toolCallResult = await chatFunctions[toolName](toolArgs);
+        console.log("toolCallResult:", toolCallResult);
+
+        const screenshotData =
+          toolCallResult.data?.type === "screenshot"
+            ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
+            : {};
 
         iterationMessages.push({
           type: "action.result",
           id: toolCall.id,
           name: toolName,
           output: toolCallResult.message,
+          ...screenshotData,
         });
-        console.log("toolCallResult:", toolCallResult);
-
-        if (
-          toolName === "captureScreenshot" &&
-          toolCallResult.status === "success" &&
-          toolCallResult.data
-        ) {
-          iterationMessages.push({
-            type: "screenshot",
-            image: toolCallResult.data.image,
-            metadata: toolCallResult.data.metadata,
-          });
-        }
 
         functionExecState = true;
       }
@@ -848,7 +844,7 @@ const App = () => {
         if (wasFirstMessage) {
           generateTitle(promptText)
             .then(() => fetchConversations())
-            .catch(() => {});
+            .catch(() => { });
         }
       },
     });
@@ -886,15 +882,15 @@ const App = () => {
           const update = prev.map((msg) =>
             msg.id === assistantMessageId
               ? {
-                  ...msg,
-                  content: {
-                    task: "",
-                    taskStatus: "",
-                    text: { response: "", execution: [], validation: "", output: "" },
-                    files: [],
-                    mode: (isAutomate ? "automate" : "chat") as MessageMode,
-                  },
-                }
+                ...msg,
+                content: {
+                  task: "",
+                  taskStatus: "",
+                  text: { response: "", execution: [], validation: "", output: "" },
+                  files: [],
+                  mode: (isAutomate ? "automate" : "chat") as MessageMode,
+                },
+              }
               : msg
           );
           syncMessages(update, true);
