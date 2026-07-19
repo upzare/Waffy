@@ -230,10 +230,10 @@
 
 @keyframes growLine {
   from {
-    height: 0;
+    transform: scaleY(0);
   }
   to {
-    height: var(--target-height, 1.2rem);
+    transform: scaleY(1);
   }
 }
 

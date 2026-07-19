@@ -4,14 +4,18 @@ import type { Message, FileFormat } from "@/types";
 type ContentPart =
   { type: "text"; text: string } | { type: "file"; payload: FileFormat["payload"] };
 
+export type ToolResultData = {
+  image?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export type ExtensionMessage =
   | { type: "prompt"; content?: ContentPart[] }
   | { type: "response"; content?: ContentPart[] }
   | { type: "action.init"; id: string; name: string; arguments?: string }
-  | { type: "action.result"; id: string; name: string; output?: string }
-  | { type: "screenshot"; image?: string; metadata?: Record<string, unknown> };
+  | { type: "action.result"; id: string; name: string; output?: string; data?: ToolResultData; };
 
-export interface ScreenshotState {
+export type ScreenshotState = {
   image: string | null;
   metadata: Record<string, unknown> | null;
 }
@@ -27,7 +31,7 @@ type ToolResultContent = {
   type: "tool-result";
   toolCallId: string;
   toolName: string;
-  output: { type: "text"; value: string };
+  output: unknown;
 };
 
 function filePayloadToPart(payload: FileFormat["payload"]) {
@@ -73,14 +77,47 @@ function toToolCall(msg: Extract<ExtensionMessage, { type: "action.init" }>): To
   };
 }
 
+function formatScreenshotMetadata(metadata: Record<string, unknown>): string {
+  return `<PAGE_METADATA><URL>${metadata.url ?? ""}</URL><TITLE>${metadata.title ?? ""}</TITLE><LOADING_STATUS>${metadata.loading_status ?? ""}</LOADING_STATUS></PAGE_METADATA>`;
+}
+
+function formatToolResultText(msg: Extract<ExtensionMessage, { type: "action.result" }>): string {
+  const output = msg.output ?? "";
+  const metadata = msg.data?.metadata;
+  const isScreenshotTool = msg.name === "fetchScreen" || msg.name === "captureScreenshot";
+  if (!isScreenshotTool || !metadata) return output;
+
+  return [output, formatScreenshotMetadata(metadata)].filter(Boolean).join("\n");
+}
+
 function toToolResult(
-  msg: Extract<ExtensionMessage, { type: "action.result" }>
+  msg: Extract<ExtensionMessage, { type: "action.result" }>,
+  screenshotState: ScreenshotState
 ): ToolResultContent {
+  const image = msg.data?.image;
+  if (image) {
+    screenshotState.image = image;
+    screenshotState.metadata = msg.data?.metadata ?? null;
+
+    return {
+      type: "tool-result",
+      toolCallId: msg.id,
+      toolName: msg.name,
+      output: {
+        type: "content",
+        value: [
+          { type: "text", text: formatToolResultText(msg) },
+          { type: "image-data", data: image, mediaType: "image/jpeg" },
+        ],
+      },
+    };
+  }
+
   return {
     type: "tool-result",
     toolCallId: msg.id,
     toolName: msg.name,
-    output: { type: "text", value: msg.output ?? "" },
+    output: { type: "text", value: formatToolResultText(msg) },
   };
 }
 
@@ -121,63 +158,32 @@ function appendToolCall(
 
 function appendToolResult(
   messages: ModelMessage[],
-  msg: Extract<ExtensionMessage, { type: "action.result" }>
-) {
-  const toolResult = toToolResult(msg);
-  messages.push({ role: "tool", content: [toolResult] });
-}
-
-function formatChatScreenshotPrompt(metadata: Record<string, unknown>): string {
-  const CHAT_SCREENSHOT_PROMPT_PREFIX =
-    "<SYSTEM>This is the output of the \`captureScreenshot()\` tool call. It contains page metadata and a screenshot of the visible tab.</SYSTEM>";
-
-  return `${CHAT_SCREENSHOT_PROMPT_PREFIX}<PAGE_METADATA><URL>${metadata.url ?? ""}</URL><TITLE>${metadata.title ?? ""}</TITLE><LOADING_STATUS>${metadata.loading_status ?? ""}</LOADING_STATUS></PAGE_METADATA>`;
-}
-
-function appendChatScreenshotMessage(
-  messages: ModelMessage[],
-  msg: Extract<ExtensionMessage, { type: "screenshot" }>,
+  msg: Extract<ExtensionMessage, { type: "action.result" }>,
   screenshotState: ScreenshotState
 ) {
-  screenshotState.image = msg.image ?? null;
-  screenshotState.metadata = msg.metadata ?? null;
-
-  messages.push({
-    role: "user",
-    content: [
-      { type: "text", text: formatChatScreenshotPrompt(msg.metadata ?? {}) },
-      { type: "image", image: `data:image/jpeg;base64,${msg.image}` },
-    ],
-  });
+  const toolResult = toToolResult(msg, screenshotState);
+  messages.push({ role: "tool", content: [toolResult] } as ModelMessage);
 }
 
-function formatExecutionScreenshotPrompt(metadata: Record<string, unknown>): string {
-  const SCREENSHOT_PROMPT_PREFIX =
-    "<SYSTEM>This is the output of the `fetchScreen()` tool call. It contains the page metadata, and the image. You can use this information to perform actions on the page.</SYSTEM>";
+export function keepLatestScreenshotOnly(messages: ExtensionMessage[]): void {
+  let latestIndex = -1;
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.type === "action.result" && msg.data?.image) {
+      latestIndex = i;
+    }
+  }
 
-  return `${SCREENSHOT_PROMPT_PREFIX}<PAGE_METADATA><URL>${metadata.url ?? ""}</URL><TITLE>${metadata.title ?? ""}</TITLE><LOADING_STATUS>${metadata.loading_status ?? ""}</LOADING_STATUS></PAGE_METADATA>`;
-}
-
-function appendExecutionScreenshotMessage(
-  messages: ModelMessage[],
-  msg: Extract<ExtensionMessage, { type: "screenshot" }>,
-  screenshotState: ScreenshotState
-) {
-  screenshotState.image = msg.image ?? null;
-  screenshotState.metadata = msg.metadata ?? null;
-
-  messages.push({
-    role: "user",
-    content: [
-      { type: "text", text: formatExecutionScreenshotPrompt(msg.metadata ?? {}) },
-      { type: "image", image: `data:image/jpeg;base64,${msg.image}` },
-    ],
-  });
+  for (let i = 0; i < latestIndex; i++) {
+    const msg = messages[i];
+    if (msg.type === "action.result" && msg.data?.image) {
+      delete msg.data;
+    }
+  }
 }
 
 export function toCoreMessages(
   extensionMessages: ExtensionMessage[],
-  mode: string,
   screenshotState: ScreenshotState
 ): ModelMessage[] {
   const messages: ModelMessage[] = [];
@@ -194,13 +200,7 @@ export function toCoreMessages(
         appendToolCall(messages, msg);
         break;
       case "action.result":
-        appendToolResult(messages, msg);
-        break;
-      case "screenshot":
-        if (mode === "chat" && msg.image)
-          appendChatScreenshotMessage(messages, msg, screenshotState);
-        if (mode === "t2" && msg.image)
-          appendExecutionScreenshotMessage(messages, msg, screenshotState);
+        appendToolResult(messages, msg, screenshotState);
         break;
     }
   }
