@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
+import { Streamdown } from "streamdown";
 import RenderResponse from "./render-response";
 import { Copy, File, Repeat, Undo2, X } from "lucide-react";
 import type { ChatContainerProps, FileFormat, Message } from "../../types";
@@ -179,7 +180,14 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               <div className="flex-1 whitespace-normal wrap-break-word overflow-hidden">
                 {isUser ? (
                   <>
-                    {msg.content.text?.prompt}
+                    <Streamdown
+                      mode="static"
+                      className="wrap-break-word w-full"
+                      controls={false}
+                      lineNumbers={false}
+                    >
+                      {msg.content.text?.prompt ?? ""}
+                    </Streamdown>
                     {files.length > 0 && (
                       <MessageFiles files={files} onFileClick={handleFileClick} />
                     )}

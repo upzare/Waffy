@@ -1,4 +1,9 @@
 @import "tailwindcss";
+@import "streamdown/styles.css";
+
+/* Streamdown utility classes live in its JS bundles — scan them for Tailwind. */
+@source "../../../node_modules/streamdown/dist/*.js";
+@source "../../../node_modules/@streamdown/code/dist/*.js";
 
 @theme {
   --font-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -51,6 +56,7 @@
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -62,6 +68,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -72,9 +79,11 @@
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -84,6 +93,7 @@
   from {
     transform: rotate(0deg) translateX(100px) rotate(0deg);
   }
+
   to {
     transform: rotate(360deg) translateX(100px) rotate(-360deg);
   }
@@ -93,6 +103,7 @@
   from {
     transform: translateY(0);
   }
+
   to {
     transform: translateY(-135rem);
   }
@@ -102,6 +113,7 @@
   from {
     transform: rotate(360deg);
   }
+
   to {
     transform: rotate(0);
   }
@@ -114,30 +126,35 @@
       20% 50%,
       20% 50%;
   }
+
   20% {
     background-size:
       20% 20%,
       20% 50%,
       20% 50%;
   }
+
   40% {
     background-size:
       20% 100%,
       20% 20%,
       20% 50%;
   }
+
   60% {
     background-size:
       20% 50%,
       20% 100%,
       20% 20%;
   }
+
   80% {
     background-size:
       20% 50%,
       20% 50%,
       20% 100%;
   }
+
   100% {
     background-size:
       20% 50%,
@@ -153,18 +170,21 @@
       50% 50%,
       100% 50%;
   }
+
   40% {
     background-position:
       0% 100%,
       50% 0%,
       100% 50%;
   }
+
   60% {
     background-position:
       0% 50%,
       50% 100%,
       100% 0%;
   }
+
   80% {
     background-position:
       0% 50%,
@@ -178,6 +198,7 @@
     max-height: 0;
     opacity: 0;
   }
+
   to {
     max-height: 1000px;
     opacity: 1;
@@ -185,11 +206,13 @@
 }
 
 @keyframes wobble1 {
+
   0%,
   100% {
     transform: translateY(0%) scale(1);
     opacity: 1;
   }
+
   50% {
     transform: translateY(-66%) scale(0.7);
     opacity: 0.8;
@@ -197,11 +220,13 @@
 }
 
 @keyframes wobble2 {
+
   0%,
   100% {
     transform: translateY(0%) scale(1);
     opacity: 1;
   }
+
   50% {
     transform: translateY(66%) scale(0.7);
     opacity: 0.8;
@@ -212,6 +237,7 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -222,6 +248,7 @@
     transform: scale(0);
     opacity: 1;
   }
+
   100% {
     transform: scale(1);
     opacity: 0;
@@ -232,6 +259,7 @@
   from {
     transform: scaleY(0);
   }
+
   to {
     transform: scaleY(1);
   }
@@ -294,4 +322,26 @@
   ::-webkit-scrollbar-corner {
     background: transparent;
   }
+}
+
+/* Outside @layer so these beat Streamdown's Tailwind `border` utilities. */
+[data-streamdown="code-block-actions"] {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+}
+
+[data-streamdown="code-block-copy-button"],
+[data-streamdown="code-block-download-button"] {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Untagged fences have an empty language — show "text" in the header. */
+[data-streamdown="code-block-header"][data-language=""] span:empty::before {
+  content: "text";
 }
