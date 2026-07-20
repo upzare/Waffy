@@ -14,7 +14,7 @@ export async function createTitle(prompt: string) {
 
 export async function* AI(
   messages: ExtensionMessage[],
-  handler: StreamMode,
+  mode: StreamMode,
   abortController: AbortController | null,
   safeToAbortRef: React.RefObject<boolean>,
   session?: StreamSession
@@ -24,7 +24,7 @@ export async function* AI(
 
   try {
     yield* runStream({
-      mode: handler,
+      mode,
       messages,
       settings: { settings, apiKeys },
       abortSignal: abortController?.signal,

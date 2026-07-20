@@ -1,7 +1,7 @@
 import Browser from "webextension-polyfill";
-import type { ChatToolResult } from "../chat";
+import type { ResearchToolResult } from "../research";
 
-const getPageInfo = async (): Promise<ChatToolResult> => {
+const getPageInfo = async (): Promise<ResearchToolResult> => {
   try {
     const response = (await Browser.runtime.sendMessage({ action: "GET_PAGE_INFO" })) as {
       status?: string;
@@ -19,7 +19,7 @@ const getPageInfo = async (): Promise<ChatToolResult> => {
   }
 };
 
-const captureScreenshot = async (): Promise<ChatToolResult> => {
+const captureScreenshot = async (): Promise<ResearchToolResult> => {
   try {
     const response = (await Browser.runtime.sendMessage({
       action: "CAPTURE_VISIBLE_TAB",
@@ -49,7 +49,7 @@ const captureScreenshot = async (): Promise<ChatToolResult> => {
   }
 };
 
-const getPageContent = async (): Promise<ChatToolResult> => {
+const getPageContent = async (): Promise<ResearchToolResult> => {
   try {
     const response = (await Browser.runtime.sendMessage({ action: "GET_PAGE_CONTENT" })) as {
       status?: string;
@@ -67,7 +67,7 @@ const getPageContent = async (): Promise<ChatToolResult> => {
   }
 };
 
-export const availableFunctions: { [key: string]: (args: any) => Promise<ChatToolResult> } = {
+export const availableFunctions: { [key: string]: (args: any) => Promise<ResearchToolResult> } = {
   getPageInfo: getPageInfo,
   captureScreenshot: captureScreenshot,
   getPageContent: getPageContent,
