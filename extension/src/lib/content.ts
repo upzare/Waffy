@@ -96,13 +96,11 @@ Browser.runtime.onMessage.addListener((message: any) => {
       return Promise.resolve({ status: "success", value: ratio });
     }
     case "GET_PAGE_CONTENT": {
-      const text = document.body?.innerText ?? "";
-      const maxChars = 16000;
       return Promise.resolve({
         status: "success",
         url: window.location.href,
         title: document.title,
-        text: text.length > maxChars ? text.slice(0, maxChars) + "\n...[truncated]" : text,
+        html: document.documentElement.outerHTML,
       });
     }
     case "INTERACT_DOM": {

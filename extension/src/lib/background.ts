@@ -2,6 +2,7 @@ import Browser from "webextension-polyfill";
 import type { Runtime, Tabs } from "webextension-polyfill";
 import { initClient, initSettings } from "./client";
 import { getActiveTab, isInaccessiblePage } from "@/helper";
+import { htmlToMarkdown } from "./html-to-markdown";
 
 const overlayInfo: Record<number, boolean> = {};
 
@@ -243,7 +244,7 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
           })) as {
             status?: string;
             value?: string;
-            text?: string;
+            html?: string;
             url?: string;
             title?: string;
           };
@@ -253,10 +254,17 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
               message: response?.value ?? "Failed to read page content.",
             };
           }
-          const text = String(response.text ?? "").slice(0, 16000);
+          const pageUrl = response.url ?? "";
+          const { title, markdown } = htmlToMarkdown(
+            String(response.html ?? ""),
+            pageUrl,
+            response.title ?? ""
+          );
+          const maxChars = 16000;
+          const content = markdown.length > maxChars ? markdown.slice(0, maxChars) + "\n...[truncated]" : markdown;
           return {
             status: "success",
-            message: `URL: ${response.url}\nTitle: ${response.title}\n\nContent:\n${text}`,
+            message: `URL: ${pageUrl}\nTitle: ${title}\n\nContent:\n${content}`,
           };
         } catch (e) {
           return { status: "error", message: String(e) };
