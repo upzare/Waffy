@@ -2,6 +2,7 @@ import Browser from "webextension-polyfill";
 import type { Tabs } from "webextension-polyfill";
 import { isInaccessiblePage } from "@/helper";
 import { AutomateToolResult } from "../automate";
+import { webSearch } from "./web-search";
 
 const KEY_CODES = {
   Enter: 13,
@@ -100,6 +101,36 @@ const fetchScreen = async (): Promise<AutomateToolResult> => {
       message: "Success: Screen fetched",
       data: { type: "screenshot", metadata: meta, image: base64Image },
     };
+  } catch (error) {
+    return { status: "error", message: "Error: " + error };
+  }
+};
+
+const getPageContent = async (): Promise<AutomateToolResult> => {
+  try {
+    const tab = await getSessionTab();
+    if (!tab?.id) {
+      return { status: "error", message: "Error: Tab not found" };
+    }
+    if (isInaccessiblePage(tab.url)) {
+      return {
+        status: "error",
+        message:
+          "Error: " +
+          `Cannot read "${tab.url}". Browser internal pages cannot be accessed or automated.`,
+      };
+    }
+    const response = (await Browser.runtime.sendMessage({
+      action: "GET_PAGE_CONTENT",
+      tabId: tab.id,
+    })) as { status?: string; message?: string };
+    if (!response || response.status === "error") {
+      return {
+        status: "error",
+        message: "Error: " + (response?.message ?? "Failed to get page content."),
+      };
+    }
+    return { status: "success", message: response.message as string };
   } catch (error) {
     return { status: "error", message: "Error: " + error };
   }
@@ -466,6 +497,7 @@ const wait = async ({ ms }: { ms: number }): Promise<AutomateToolResult> => {
 
 export const availableFunctions: { [key: string]: (args: any) => Promise<AutomateToolResult> } = {
   fetchScreen: fetchScreen,
+  getPageContent: getPageContent,
   click: click,
   typeText: typeText,
   clearValue: clearValue,
@@ -481,4 +513,5 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<Automat
   closeTab: closeTab,
   reload: reload,
   wait: wait,
+  webSearch: webSearch,
 };

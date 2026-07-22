@@ -1,7 +1,7 @@
 import Browser from "webextension-polyfill";
 import type { Runtime, Tabs } from "webextension-polyfill";
 import { initClient, initSettings } from "./client";
-import { getActiveTab, isInaccessiblePage } from "@/helper";
+import { isInaccessiblePage } from "@/helper";
 import { htmlToMarkdown } from "./html-to-markdown";
 
 const overlayInfo: Record<number, boolean> = {};
@@ -294,9 +294,12 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     case "GET_PAGE_INFO": {
       return (async () => {
         try {
-          const tab = await getActiveTab();
-          if (!tab) {
-            return { status: "error", message: "No active tab found." };
+          if (typeof request.tabId !== "number") {
+            return { status: "error", message: "tabId is required." };
+          }
+          const tab = await Browser.tabs.get(request.tabId);
+          if (!tab?.id) {
+            return { status: "error", message: "No tab found." };
           }
           if (isInaccessiblePage(tab.url)) {
             return {
@@ -315,10 +318,14 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     }
     case "CAPTURE_VISIBLE_TAB": {
       return (async () => {
+        let previousTabId: number | undefined;
         try {
-          const tab = await getActiveTab();
+          if (typeof request.tabId !== "number") {
+            return { status: "error", message: "tabId is required." };
+          }
+          const tab = await Browser.tabs.get(request.tabId);
           if (!tab?.id || tab.windowId == null) {
-            return { status: "error", message: "No active tab found." };
+            return { status: "error", message: "No tab found." };
           }
           if (isInaccessiblePage(tab.url)) {
             return {
@@ -326,22 +333,41 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
               message: `Cannot capture "${tab.url}". Browser internal pages are not accessible.`,
             };
           }
+
+          // captureVisibleTab only captures the focused tab in a window.
+          if (!tab.active) {
+            const [focused] = await Browser.tabs.query({
+              active: true,
+              windowId: tab.windowId,
+            });
+            previousTabId = focused?.id;
+            await Browser.tabs.update(tab.id, { active: true });
+            await sleep(100);
+          }
+
           const dataUrl = await Browser.tabs.captureVisibleTab(tab.windowId, {
             format: "jpeg",
             quality: 50,
           });
           const base64Image = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+          const captured = await Browser.tabs.get(tab.id);
           return {
             status: "success",
             image: base64Image,
             metadata: {
-              url: tab.url ?? "",
-              title: tab.title ?? "",
-              loading_status: tab.status ?? "",
+              url: captured.url ?? tab.url ?? "",
+              title: captured.title ?? tab.title ?? "",
+              loading_status: captured.status ?? tab.status ?? "",
             },
           };
         } catch (e) {
           return { status: "error", message: String(e) };
+        } finally {
+          if (previousTabId != null) {
+            try {
+              await Browser.tabs.update(previousTabId, { active: true });
+            } catch (_) {}
+          }
         }
       })();
     }
@@ -351,9 +377,12 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     case "GET_PAGE_CONTENT": {
       return (async () => {
         try {
-          const tab = await getActiveTab();
+          if (typeof request.tabId !== "number") {
+            return { status: "error", message: "tabId is required." };
+          }
+          const tab = await Browser.tabs.get(request.tabId);
           if (!tab?.id) {
-            return { status: "error", message: "No active tab found." };
+            return { status: "error", message: "No tab found." };
           }
           if (isInaccessiblePage(tab.url)) {
             return {

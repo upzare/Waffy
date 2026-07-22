@@ -1,10 +1,18 @@
 import Browser from "webextension-polyfill";
-import type { ResearchToolResult } from "../research";
+import { getActiveTab } from "@/helper";
 import { webSearch } from "./web-search";
+import type { ResearchToolResult } from "../research";
 
 const getPageInfo = async (): Promise<ResearchToolResult> => {
   try {
-    const response = (await Browser.runtime.sendMessage({ action: "GET_PAGE_INFO" })) as {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      return { status: "error", message: "Error: No active tab found." };
+    }
+    const response = (await Browser.runtime.sendMessage({
+      action: "GET_PAGE_INFO",
+      tabId: tab.id,
+    })) as {
       status?: string;
       message?: string;
     };
@@ -22,8 +30,13 @@ const getPageInfo = async (): Promise<ResearchToolResult> => {
 
 const captureScreenshot = async (): Promise<ResearchToolResult> => {
   try {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      return { status: "error", message: "Error: No active tab found." };
+    }
     const response = (await Browser.runtime.sendMessage({
       action: "CAPTURE_VISIBLE_TAB",
+      tabId: tab.id,
     })) as {
       status?: string;
       message?: string;
@@ -52,7 +65,14 @@ const captureScreenshot = async (): Promise<ResearchToolResult> => {
 
 const getPageContent = async (): Promise<ResearchToolResult> => {
   try {
-    const response = (await Browser.runtime.sendMessage({ action: "GET_PAGE_CONTENT" })) as {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      return { status: "error", message: "Error: No active tab found." };
+    }
+    const response = (await Browser.runtime.sendMessage({
+      action: "GET_PAGE_CONTENT",
+      tabId: tab.id,
+    })) as {
       status?: string;
       message?: string;
     };
