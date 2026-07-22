@@ -34,25 +34,25 @@
   --radius-sm: 6px;
   --radius-md: 8px;
 
-  --animate-fade-in: fadeIn 0.25s ease-out;
-  --animate-fade-in-message: fadeInMessage 0.3s ease-out;
-  --animate-suggestions-gradient: suggestionsGradient 8s ease infinite;
+  --animate-fade-in: fade-in 0.25s ease-out;
+  --animate-fade-in-message: fade-in-message 0.3s ease-out;
+  --animate-suggestions-gradient: suggestions-gradient 8s ease infinite;
   --animate-orbit: orbit 8s linear infinite;
   --animate-orbit-slow: orbit 10s linear infinite;
-  --animate-anim-star: animStar 60s linear infinite;
-  --animate-anim-star-rotate: animStarRotate 90s linear infinite;
+  --animate-anim-star: anim-star 60s linear infinite;
+  --animate-anim-star-rotate: anim-star-rotate 90s linear infinite;
   --animate-l7: l7 1s infinite linear alternate;
   --animate-dots: dots 1s infinite linear;
-  --animate-expand-content: expandContent 0.3s ease-out;
+  --animate-expand-content: expand-content 0.3s ease-out;
   --animate-wobble1: wobble1 0.95s infinite ease-in-out;
   --animate-wobble2: wobble2 0.95s infinite ease-in-out;
   --animate-spin-loader: spin 1.4s infinite linear;
   --animate-iconloader: iconloader 2s linear infinite;
-  --animate-grow-line: growLine 0.5s ease-out forwards;
+  --animate-grow-line: grow-line 0.5s ease-out forwards;
   --animate-shimmer: shimmer 2s ease-in-out infinite;
 }
 
-@keyframes fadeIn {
+@keyframes fade-in {
   from {
     opacity: 0;
     transform: translateY(6px);
@@ -64,7 +64,7 @@
   }
 }
 
-@keyframes fadeInMessage {
+@keyframes fade-in-message {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -76,7 +76,7 @@
   }
 }
 
-@keyframes suggestionsGradient {
+@keyframes suggestions-gradient {
   0% {
     background-position: 0% 50%;
   }
@@ -100,7 +100,7 @@
   }
 }
 
-@keyframes animStar {
+@keyframes anim-star {
   from {
     transform: translateY(0);
   }
@@ -110,7 +110,7 @@
   }
 }
 
-@keyframes animStarRotate {
+@keyframes anim-star-rotate {
   from {
     transform: rotate(360deg);
   }
@@ -194,7 +194,7 @@
   }
 }
 
-@keyframes expandContent {
+@keyframes expand-content {
   from {
     max-height: 0;
     opacity: 0;
@@ -256,7 +256,7 @@
   }
 }
 
-@keyframes growLine {
+@keyframes grow-line {
   from {
     transform: scaleY(0);
   }
@@ -287,20 +287,20 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: shimmerText 2s ease-in-out infinite;
+  animation: shimmer-text 2s ease-in-out infinite;
 }
 
 .tool-activity-enter {
   animation:
-    toolActivityIn 0.28s ease-out forwards,
-    shimmerText 2s ease-in-out 0.28s infinite;
+    tool-activity-in 0.28s ease-out forwards,
+    shimmer-text 2s ease-in-out 0.28s infinite;
 }
 
 .tool-activity-exit {
-  animation: toolActivityOut 0.28s ease-in forwards;
+  animation: tool-activity-out 0.28s ease-in forwards;
 }
 
-@keyframes shimmerText {
+@keyframes shimmer-text {
   0% {
     background-position: 100% 0;
   }
@@ -310,7 +310,7 @@
   }
 }
 
-@keyframes toolActivityIn {
+@keyframes tool-activity-in {
   from {
     transform: translateY(100%);
     opacity: 0;
@@ -322,7 +322,7 @@
   }
 }
 
-@keyframes toolActivityOut {
+@keyframes tool-activity-out {
   from {
     opacity: 1;
   }
