@@ -9,9 +9,17 @@ export type HtmlToMarkdownResult = {
 
 const turndown = new TurndownService();
 
-/**
- * Extract main page content with Readability and convert to Markdown.
- */
+// Keep text only — drop media (incl. base64 data URIs).
+turndown.addRule("stripMedia", {
+  filter: (node) => {
+    const tag = node.nodeName.toLowerCase();
+    return ["img", "picture", "svg", "video", "audio", "source", "canvas"].includes(tag);
+  },
+  replacement: () => "",
+});
+
+
+// Extract main page content with Readability and convert to Markdown.
 export function htmlToMarkdown(
   html: string,
   pageUrl: string,

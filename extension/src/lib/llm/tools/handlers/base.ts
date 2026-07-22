@@ -1,5 +1,6 @@
 import Browser from "webextension-polyfill";
 import type { BaseToolResult } from "../base";
+import { webSearch } from "./web-search";
 
 const getPageInfo = async (): Promise<BaseToolResult> => {
   try {
@@ -71,4 +72,5 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<BaseToo
   getPageInfo: getPageInfo,
   captureScreenshot: captureScreenshot,
   getPageContent: getPageContent,
+  webSearch: webSearch,
 };

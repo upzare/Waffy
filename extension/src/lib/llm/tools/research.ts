@@ -23,4 +23,11 @@ export const RESEARCH_TOOLS = {
       "Read the main content of the currently active browser tab as Markdown. No URL or pasted text needed — it always targets the active tab. Call this immediately to summarize or research the current page. Prefer over captureScreenshot for text tasks.",
     inputSchema: z.object({}),
   }),
+  webSearch: tool({
+    description:
+      "Search the web via Google AI Mode. Returns the AI-generated answer as Markdown. Use for current events, topics beyond the current page, or when the user asks to search.",
+    inputSchema: z.object({
+      query: z.string().describe("Google search query"),
+    }),
+  }),
 };
