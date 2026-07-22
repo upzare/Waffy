@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Waffy - AI Copilot for Web",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Automate your browser with AI. Browse, click and complete multi-step workflows with models you like. Free and open source.",
   "icons": {
     "64": "assets/icons/icon64.png",
