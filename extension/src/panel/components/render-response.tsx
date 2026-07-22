@@ -41,7 +41,7 @@ const ACTIVITY_SCROLL_MS = 250;
 const streamdownPlugins = { code };
 const streamdownControls = {
   code: { copy: true, download: false },
-  table: true,
+  table: false,
   mermaid: false,
 } as const;
 
@@ -65,13 +65,14 @@ const MarkdownContent = ({
   isAnimating?: boolean;
 }) => (
   <Streamdown
-    className="wrap-break-word w-full leading-[1.75] text-[rgba(255,255,255,0.92)]"
+    className="wrap-break-word w-full leading-[1.75] text-text-primary"
     plugins={streamdownPlugins}
     isAnimating={isAnimating}
     animated={isAnimating}
     shikiTheme={["github-dark", "github-dark"]}
     lineNumbers={false}
     controls={streamdownControls}
+    linkSafety={{ enabled: false }}
   >
     {children ?? ""}
   </Streamdown>
