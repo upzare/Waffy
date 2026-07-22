@@ -184,6 +184,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                       className="wrap-break-word w-full"
                       controls={false}
                       lineNumbers={false}
+                      linkSafety={{ enabled: false }}
                     >
                       {msg.content.text?.prompt ?? ""}
                     </Streamdown>
