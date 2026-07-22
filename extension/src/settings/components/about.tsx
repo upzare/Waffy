@@ -1,5 +1,6 @@
 import React from "react";
 import { ExternalLink, Globe } from "lucide-react";
+import Browser from "webextension-polyfill";
 
 interface AboutSectionProps {
   logoUrl: string;
@@ -7,12 +8,14 @@ interface AboutSectionProps {
 
 const LINKS = [
   { href: "https://waffy.io", label: "Official Website", icon: Globe },
+  { href: "https://github.com/upzare/Waffy", label: "View on GitHub", icon: ExternalLink },
   { href: "https://waffy.io/terms", label: "Terms of Service", icon: ExternalLink },
   { href: "https://waffy.io/privacy", label: "Privacy Policy", icon: ExternalLink },
-  { href: "https://x.com/WaffyHQ", label: "Follow on Twitter", icon: ExternalLink },
 ];
 
 const AboutSection: React.FC<AboutSectionProps> = ({ logoUrl }) => {
+  const version = Browser.runtime.getManifest().version;
+
   return (
     <>
       <div className="mb-5 px-2 pb-6 pt-6 text-center sm:px-4 sm:pt-8">
@@ -22,7 +25,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({ logoUrl }) => {
         <h2 className="mb-1 text-2xl font-bold tracking-tight">Waffy</h2>
         <p className="mb-3 text-sm text-text-secondary">Your AI Copilot for Web</p>
         <span className="inline-block rounded-full border border-border bg-white/5 px-2.5 py-1 text-xs font-semibold text-text-muted">
-          Version 1.0.0
+          Version {version}
         </span>
       </div>
 

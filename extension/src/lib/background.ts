@@ -1,7 +1,8 @@
 import Browser from "webextension-polyfill";
 import type { Runtime, Tabs } from "webextension-polyfill";
 import { initClient, initSettings } from "./client";
-import { getActiveTab, isInaccessiblePage } from "@/helper";
+import { isInaccessiblePage } from "@/helper";
+import { htmlToMarkdown } from "./html-to-markdown";
 
 const overlayInfo: Record<number, boolean> = {};
 
@@ -97,7 +98,6 @@ Browser.tabs.onCreated.addListener(async (tab) => {
 });
 
 Browser.tabs.onUpdated.addListener((tabId, _changeInfo, tab) => {
-  console.log("Tab updates:", tab);
   if (!active || isInaccessiblePage(tab.url)) return;
   attachDebugger(tabId).catch((e) => console.error("Error attaching debugger:", e));
 });
@@ -119,6 +119,126 @@ const stopSession = async () => {
   for (const tab of tabs) {
     if (isInaccessiblePage(tab.url) || !tab.id) continue;
     await detachDebugger(tab.id);
+  }
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const formatPageMarkdown = (
+  html: string,
+  pageUrl: string,
+  fallbackTitle: string,
+  header?: string,
+  maxChars = 8000,
+) => {
+  const { title, markdown } = htmlToMarkdown(html, pageUrl, fallbackTitle);
+  const content =
+    markdown.length > maxChars
+      ? markdown.slice(0, maxChars) + "\n...[truncated]"
+      : markdown;
+  if (!content.trim()) {
+    return { status: "error" as const, message: "Page had no extractable content." };
+  }
+  const prefix = header ? `${header}\n` : "";
+  return {
+    status: "success" as const,
+    message: `${prefix}URL: ${pageUrl}\nTitle: ${title}\n\nContent:\n${content}`,
+  };
+};
+
+const waitForTabComplete = (tabId: number, timeoutMs = 15000): Promise<void> =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      Browser.tabs.onUpdated.removeListener(listener);
+      fn();
+    };
+
+    const timer = setTimeout(() => {
+      finish(() => reject(new Error("Timed out waiting for Google AI Mode page to load.")));
+    }, timeoutMs);
+
+    const listener = (updatedTabId: number, changeInfo: Tabs.OnUpdatedChangeInfoType) => {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        finish(() => resolve());
+      }
+    };
+
+    Browser.tabs.onUpdated.addListener(listener);
+
+    void Browser.tabs.get(tabId).then((tab) => {
+      if (tab.status === "complete") {
+        finish(() => resolve());
+      }
+    });
+  });
+
+const waitAiModeFromTab = async (tabId: number) => {
+  let lastError: unknown;
+  for (let i = 0; i < 8; i++) {
+    try {
+      return (await Browser.tabs.sendMessage(tabId, {
+        type: "WAIT_AI_MODE_CONTENT",
+      })) as {
+        status?: string;
+        value?: string;
+        html?: string;
+        url?: string;
+        title?: string;
+      };
+    } catch (e) {
+      lastError = e;
+      await sleep(250);
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Content script not ready on Google AI Mode tab.");
+};
+
+const fetchGoogleAiMode = async (query: string) => {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return { status: "error", message: "Search query is required." };
+  }
+
+  let searchTabId: number | undefined;
+
+  try {
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}&udm=50&hl=en`;
+    const searchTab = await Browser.tabs.create({ url: searchUrl, active: false });
+    if (!searchTab.id) {
+      return { status: "error", message: "Failed to open Google AI Mode tab." };
+    }
+    searchTabId = searchTab.id;
+
+    await waitForTabComplete(searchTabId);
+    const response = await waitAiModeFromTab(searchTabId);
+    if (!response || response.status === "error" || !response.html) {
+      return {
+        status: "error",
+        message: response?.value ?? "Failed to read Google AI Mode response.",
+      };
+    }
+
+    return formatPageMarkdown(
+      response.html,
+      response.url ?? searchUrl,
+      response.title ?? "",
+      `Query: ${trimmed}`
+    );
+  } catch (e) {
+    return { status: "error", message: String(e) };
+  } finally {
+    if (searchTabId != null) {
+      try {
+        await Browser.tabs.remove(searchTabId);
+      } catch (_) { }
+    }
   }
 };
 
@@ -174,9 +294,12 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     case "GET_PAGE_INFO": {
       return (async () => {
         try {
-          const tab = await getActiveTab();
-          if (!tab) {
-            return { status: "error", message: "No active tab found." };
+          if (typeof request.tabId !== "number") {
+            return { status: "error", message: "tabId is required." };
+          }
+          const tab = await Browser.tabs.get(request.tabId);
+          if (!tab?.id) {
+            return { status: "error", message: "No tab found." };
           }
           if (isInaccessiblePage(tab.url)) {
             return {
@@ -195,10 +318,14 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     }
     case "CAPTURE_VISIBLE_TAB": {
       return (async () => {
+        let previousTabId: number | undefined;
         try {
-          const tab = await getActiveTab();
+          if (typeof request.tabId !== "number") {
+            return { status: "error", message: "tabId is required." };
+          }
+          const tab = await Browser.tabs.get(request.tabId);
           if (!tab?.id || tab.windowId == null) {
-            return { status: "error", message: "No active tab found." };
+            return { status: "error", message: "No tab found." };
           }
           if (isInaccessiblePage(tab.url)) {
             return {
@@ -206,31 +333,56 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
               message: `Cannot capture "${tab.url}". Browser internal pages are not accessible.`,
             };
           }
+
+          // captureVisibleTab only captures the focused tab in a window.
+          if (!tab.active) {
+            const [focused] = await Browser.tabs.query({
+              active: true,
+              windowId: tab.windowId,
+            });
+            previousTabId = focused?.id;
+            await Browser.tabs.update(tab.id, { active: true });
+            await sleep(100);
+          }
+
           const dataUrl = await Browser.tabs.captureVisibleTab(tab.windowId, {
             format: "jpeg",
             quality: 50,
           });
           const base64Image = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+          const captured = await Browser.tabs.get(tab.id);
           return {
             status: "success",
             image: base64Image,
             metadata: {
-              url: tab.url ?? "",
-              title: tab.title ?? "",
-              loading_status: tab.status ?? "",
+              url: captured.url ?? tab.url ?? "",
+              title: captured.title ?? tab.title ?? "",
+              loading_status: captured.status ?? tab.status ?? "",
             },
           };
         } catch (e) {
           return { status: "error", message: String(e) };
+        } finally {
+          if (previousTabId != null) {
+            try {
+              await Browser.tabs.update(previousTabId, { active: true });
+            } catch (_) {}
+          }
         }
       })();
+    }
+    case "FETCH_GOOGLE_AI_MODE": {
+      return fetchGoogleAiMode(request.query);
     }
     case "GET_PAGE_CONTENT": {
       return (async () => {
         try {
-          const tab = await getActiveTab();
+          if (typeof request.tabId !== "number") {
+            return { status: "error", message: "tabId is required." };
+          }
+          const tab = await Browser.tabs.get(request.tabId);
           if (!tab?.id) {
-            return { status: "error", message: "No active tab found." };
+            return { status: "error", message: "No tab found." };
           }
           if (isInaccessiblePage(tab.url)) {
             return {
@@ -243,21 +395,17 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
           })) as {
             status?: string;
             value?: string;
-            text?: string;
+            html?: string;
             url?: string;
             title?: string;
           };
-          if (!response || response.status === "error") {
+          if (!response || response.status === "error" || !response.html) {
             return {
               status: "error",
               message: response?.value ?? "Failed to read page content.",
             };
           }
-          const text = String(response.text ?? "").slice(0, 16000);
-          return {
-            status: "success",
-            message: `URL: ${response.url}\nTitle: ${response.title}\n\nContent:\n${text}`,
-          };
+          return formatPageMarkdown(response.html, response.url ?? "", response.title ?? "");
         } catch (e) {
           return { status: "error", message: String(e) };
         }

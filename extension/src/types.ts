@@ -42,6 +42,7 @@ export interface ChatContainerProps {
   streamingMessageId: string | null;
   isGenerating: boolean;
   statusText: string;
+  toolActivityText: string | null;
   errorText: string;
   setErrorText: (error: string) => void;
   onRetryMessage: (assistantMessageId: string) => Promise<void>;
@@ -71,7 +72,7 @@ export interface HistorySidebarProps {
   onRemoveConversation: (id: string) => void;
 }
 
-export type MessageMode = "chat" | "automate";
+export type MessageMode = "base" | "research" | "automate";
 
 export interface Message {
   id: string;
@@ -136,7 +137,7 @@ export interface Settings {
 export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai";
 
-export type StageId = "title" | "chat" | "t1" | "t2" | "t3" | "t4" | "step";
+export type StageId = "base" | "research" | "title" | "t1" | "t2" | "t3" | "t4" | "step";
 
 export interface ModelConfig {
   provider: ProviderId;

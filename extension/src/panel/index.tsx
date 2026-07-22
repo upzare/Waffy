@@ -7,9 +7,11 @@ import { AI, createTitle } from "@/lib/agent";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
-import { parseSlashCommand, stripSlashCommands } from "./utils/slash-commands";
+import { parseSlashCommand, resolveMode, stripSlashCommands } from "./utils/slash-commands";
+import { getToolActivityLabel } from "./utils/tool-activity";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
-import { availableFunctions as chatFunctions } from "@/lib/llm/tools/handlers/chat";
+import { availableFunctions as baseFunctions } from "@/lib/llm/tools/handlers/base";
+import { availableFunctions as researchFunctions } from "@/lib/llm/tools/handlers/research";
 import {
   availableFunctions as automateFunctions,
   updateOpenedTabs,
@@ -18,7 +20,8 @@ import { getActiveTab } from "@/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
 import { findMissingProvider, getStageConfig } from "@/lib/llm/model";
 import {
-  buildChatMessages,
+  buildBaseMessages,
+  buildResearchMessages,
   buildT1Messages,
   buildT2Messages,
   buildT3Messages,
@@ -47,6 +50,7 @@ const App = () => {
   const [isChat, setIsChat] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusText, setStatusText] = useState("");
+  const [toolActivityText, setToolActivityText] = useState<string | null>(null);
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
   const [mentions, setMentions] = useState<string[]>([]);
@@ -592,7 +596,7 @@ const App = () => {
     setStreaming((prev) => ({ ...prev, output: false }));
   };
 
-  const chatHandler = async (
+  const baseHandler = async (
     prompt_text: string,
     prompt_files: FileFormat[],
     conversationMessages: Message[]
@@ -601,7 +605,7 @@ const App = () => {
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
-    const chatMessages = buildChatMessages(prompt_text, prompt_files, conversationMessages);
+    const baseMessages = buildBaseMessages(prompt_text, prompt_files, conversationMessages);
     let finish = false;
     let functionExecState = false;
 
@@ -609,11 +613,12 @@ const App = () => {
       if (abortControllerRef.current?.signal.aborted) return;
 
       let textResponse = "";
-      const chatToolCalls: Record<string, ToolCall> = {};
-      const chatStream = AI(chatMessages, "chat", abortControllerRef?.current, safeToAbortRef);
+      const baseToolCalls: Record<string, ToolCall> = {};
+      const baseStream = AI(baseMessages, "base", abortControllerRef?.current, safeToAbortRef);
 
-      for await (const res of chatStream) {
+      for await (const res of baseStream) {
         if (res.type === "text.stream") {
+          if (!textResponse) setToolActivityText(null);
           textResponse += res.text;
           setMessages((prev) => {
             const update = prev.map((msg) => {
@@ -630,7 +635,7 @@ const App = () => {
         }
         if (res.type === "action.call") {
           for (const [key, value] of Object.entries(res.action)) {
-            chatToolCalls[key] = value;
+            baseToolCalls[key] = value;
           }
         }
         if (res.type === "response.completed") {
@@ -653,7 +658,38 @@ const App = () => {
 
       functionExecState = false;
 
-      for (const toolCall of Object.values(chatToolCalls)) {
+      const automateCall = Object.values(baseToolCalls).find(
+        (toolCall) => toolCall.name === "automate"
+      );
+
+      if (automateCall) {
+        let task = prompt_text;
+        try {
+          const args = JSON.parse(automateCall.arguments) as { task?: string };
+          if (args.task?.trim()) task = args.task.trim();
+        } catch {
+          // fall back to original prompt
+        }
+
+        setMessages((prev) => {
+          const update = prev.map((msg) => {
+            if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+            return {
+              ...msg,
+              content: { ...msg.content, mode: "automate" as MessageMode },
+            };
+          });
+          syncMessages(update, true);
+          return update;
+        });
+
+        setToolActivityText(null);
+        setStreaming((prev) => ({ ...prev, response: false }));
+        await automateHandler(task, prompt_files, conversationMessages);
+        return;
+      }
+
+      for (const toolCall of Object.values(baseToolCalls)) {
         const toolName = toolCall.name;
         console.log("toolCall:", toolCall);
 
@@ -665,7 +701,8 @@ const App = () => {
         });
 
         const toolArgs = JSON.parse(toolCall.arguments);
-        const toolCallResult = await chatFunctions[toolName](toolArgs);
+        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
+        const toolCallResult = await baseFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
 
         const screenshotData =
@@ -684,9 +721,116 @@ const App = () => {
         functionExecState = true;
       }
 
-      chatMessages.push(...iterationMessages);
+      baseMessages.push(...iterationMessages);
     }
 
+    setToolActivityText(null);
+    setStreaming((prev) => ({ ...prev, response: false }));
+  };
+
+  const researchHandler = async (
+    prompt_text: string,
+    prompt_files: FileFormat[],
+    conversationMessages: Message[]
+  ) => {
+    if (abortControllerRef.current?.signal.aborted) return;
+    setStatusText("GENERATING");
+    setStreaming((prev) => ({ ...prev, response: true }));
+
+    const researchMessages = buildResearchMessages(prompt_text, prompt_files, conversationMessages);
+    let finish = false;
+    let functionExecState = false;
+
+    while (!finish || functionExecState) {
+      if (abortControllerRef.current?.signal.aborted) return;
+
+      let textResponse = "";
+      const researchToolCalls: Record<string, ToolCall> = {};
+      const researchStream = AI(
+        researchMessages,
+        "research",
+        abortControllerRef?.current,
+        safeToAbortRef
+      );
+
+      for await (const res of researchStream) {
+        if (res.type === "text.stream") {
+          if (!textResponse) setToolActivityText(null);
+          textResponse += res.text;
+          setMessages((prev) => {
+            const update = prev.map((msg) => {
+              if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+              const response = (msg.content.text?.response ?? "") + res.text;
+              return {
+                ...msg,
+                content: { ...msg.content, text: { ...msg.content.text, response } },
+              };
+            });
+            syncMessages(update);
+            return update;
+          });
+        }
+        if (res.type === "action.call") {
+          for (const [key, value] of Object.entries(res.action)) {
+            researchToolCalls[key] = value;
+          }
+        }
+        if (res.type === "response.completed") {
+          if (!functionExecState) finish = true;
+          setMessages((prev) => syncMessages(prev, true));
+        }
+        if (res.type === "response.error") {
+          throw res.error;
+        }
+      }
+
+      console.log("textResponse:", textResponse);
+      const iterationMessages: ExtensionMessage[] = [];
+      if (textResponse) {
+        iterationMessages.push({
+          type: "response",
+          content: [{ type: "text", text: textResponse }],
+        });
+      }
+
+      functionExecState = false;
+
+      for (const toolCall of Object.values(researchToolCalls)) {
+        const toolName = toolCall.name;
+        console.log("toolCall:", toolCall);
+
+        iterationMessages.push({
+          type: "action.init",
+          id: toolCall.id,
+          name: toolName,
+          arguments: toolCall.arguments,
+        });
+
+        const toolArgs = JSON.parse(toolCall.arguments);
+        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
+        const toolCallResult = await researchFunctions[toolName](toolArgs);
+        console.log("toolCallResult:", toolCallResult);
+
+        const screenshotData =
+          toolCallResult.data?.type === "screenshot"
+            ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
+            : {};
+
+        iterationMessages.push({
+          type: "action.result",
+          id: toolCall.id,
+          name: toolName,
+          output: toolCallResult.message,
+          ...screenshotData,
+        });
+
+        functionExecState = true;
+      }
+
+      researchMessages.push(...iterationMessages);
+    }
+
+    setToolActivityText(null);
     setStreaming((prev) => ({ ...prev, response: false }));
   };
 
@@ -714,10 +858,29 @@ const App = () => {
     return false;
   };
 
+  const runModeHandler = async (
+    mode: MessageMode,
+    promptText: string,
+    promptFiles: FileFormat[],
+    conversationMessages: Message[]
+  ) => {
+    switch (mode) {
+      case "base":
+        await baseHandler(promptText, promptFiles, conversationMessages);
+        break;
+      case "research":
+        await researchHandler(promptText, promptFiles, conversationMessages);
+        break;
+      case "automate":
+        await automateHandler(promptText, promptFiles, conversationMessages);
+        break;
+    }
+  };
+
   const sendMessage = async ({
     promptText,
     promptFiles,
-    isAutomate,
+    mode,
     messageId,
     conversationContext,
     prepareMessages,
@@ -725,7 +888,7 @@ const App = () => {
   }: {
     promptText: string;
     promptFiles: FileFormat[];
-    isAutomate: boolean;
+    mode: MessageMode;
     messageId: string;
     conversationContext: Message[];
     prepareMessages: () => void | Promise<void>;
@@ -751,12 +914,7 @@ const App = () => {
 
       try {
         await prepareMessages();
-
-        if (isAutomate) {
-          await automateHandler(promptText, promptFiles, conversationContext);
-        } else {
-          await chatHandler(promptText, promptFiles, conversationContext);
-        }
+        await runModeHandler(mode, promptText, promptFiles, conversationContext);
       } catch (error: unknown) {
         displayError(error);
       } finally {
@@ -764,6 +922,7 @@ const App = () => {
         setStreamingMessageId(null);
         setIsGenerating(false);
         setStatusText("");
+        setToolActivityText(null);
         if (clearInput) {
           setMessage("");
           setMentions([]);
@@ -791,7 +950,7 @@ const App = () => {
     }
 
     const command = parseSlashCommand(mentions, message);
-    const isAutomate = command === "automate";
+    const mode = resolveMode(command);
     const messageId = uuid4();
     const promptText = command ? stripSlashCommands(message) : message.trim();
     const promptFiles = await fileHandler(files);
@@ -807,7 +966,7 @@ const App = () => {
     await sendMessage({
       promptText,
       promptFiles,
-      isAutomate,
+      mode,
       messageId,
       conversationContext,
       clearInput: true,
@@ -833,7 +992,7 @@ const App = () => {
                 taskStatus: "",
                 text: { response: "", execution: [], validation: "", output: "" },
                 files: [],
-                mode: (isAutomate ? "automate" : "chat") as MessageMode,
+                mode,
               },
             },
           ];
@@ -869,12 +1028,12 @@ const App = () => {
       return;
     }
 
-    const isAutomate = assistantMsg.content.mode === "automate";
+    const mode = resolveMode(assistantMsg.content.mode);
 
     await sendMessage({
       promptText,
       promptFiles,
-      isAutomate,
+      mode,
       messageId: assistantMessageId.slice("assistant-".length),
       conversationContext: messages.slice(0, assistantIndex - 1),
       prepareMessages: () => {
@@ -888,7 +1047,7 @@ const App = () => {
                   taskStatus: "",
                   text: { response: "", execution: [], validation: "", output: "" },
                   files: [],
-                  mode: (isAutomate ? "automate" : "chat") as MessageMode,
+                  mode,
                 },
               }
               : msg
@@ -935,6 +1094,7 @@ const App = () => {
     if (safeToAbortRef.current) {
       const currentMessageId = messageIdRef.current;
       abortControllerRef.current?.abort();
+      setToolActivityText(null);
       if (currentMessageId) {
         setMessages((prev) => {
           const update = prev.map((msg) =>
@@ -962,6 +1122,7 @@ const App = () => {
     conversationIdRef.current = null;
     setCurrentTitle("New Chat");
     setStatusText("");
+    setToolActivityText(null);
     setErrorText("");
     setMessage("");
     setMentions([]);
@@ -1061,6 +1222,7 @@ const App = () => {
           streamingMessageId={streamingMessageId}
           isGenerating={isGenerating}
           statusText={statusText}
+          toolActivityText={toolActivityText}
           errorText={errorText}
           setErrorText={setErrorText}
           onRetryMessage={handleRetryMessage}

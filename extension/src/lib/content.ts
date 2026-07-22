@@ -88,22 +88,58 @@ function disableOverlay() {
   }
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getPageSnapshot = () => ({
+  url: window.location.href,
+  title: document.title,
+  html: document.documentElement.outerHTML,
+});
+
+const getVisibleTextLength = () =>
+  (document.body?.innerText ?? "").replace(/\s+/g, " ").trim().length;
+
+// Wait until page text is unchanged for several polls (stream finished).
+const waitAiModeContent = async () => {
+  const POLL_MS = 200;
+  const STABLE_POLLS = 5;
+  const WARMUP_MS = 2500;
+  const TIMEOUT_MS = 30000;
+
+  const started = Date.now();
+  let lastLen = -1;
+  let stableCount = 0;
+
+  while (Date.now() - started < TIMEOUT_MS) {
+    const len = getVisibleTextLength();
+    if (len === lastLen) {
+      stableCount += 1;
+    } else {
+      stableCount = 0;
+      lastLen = len;
+    }
+
+    if (Date.now() - started >= WARMUP_MS && stableCount >= STABLE_POLLS) {
+      return { status: "success" as const, ...getPageSnapshot() };
+    }
+
+    await sleep(POLL_MS);
+  }
+
+  return { status: "success" as const, ...getPageSnapshot() };
+};
+
 Browser.runtime.onMessage.addListener((message: any) => {
   const msg = message as DomMessage;
   switch (msg.type) {
     case "GET_DEVICE_PIXEL_RATIO": {
-      const ratio = window.devicePixelRatio;
-      return Promise.resolve({ status: "success", value: ratio });
+      return Promise.resolve({ status: "success", value: window.devicePixelRatio });
     }
     case "GET_PAGE_CONTENT": {
-      const text = document.body?.innerText ?? "";
-      const maxChars = 16000;
-      return Promise.resolve({
-        status: "success",
-        url: window.location.href,
-        title: document.title,
-        text: text.length > maxChars ? text.slice(0, maxChars) + "\n...[truncated]" : text,
-      });
+      return Promise.resolve({ status: "success", ...getPageSnapshot() });
+    }
+    case "WAIT_AI_MODE_CONTENT": {
+      return waitAiModeContent();
     }
     case "INTERACT_DOM": {
       const name = msg.name;

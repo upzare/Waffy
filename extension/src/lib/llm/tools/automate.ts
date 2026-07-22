@@ -33,7 +33,13 @@ export const T1_TOOLS = {
 
 export const T2_TOOLS = {
   fetchScreen: tool({
-    description: "Get the current page screenshot.",
+    description:
+      "Capture a screenshot of the current automation tab for visual grounding and coordinate targeting. Use for clicks, typing, and verifying UI.",
+    inputSchema: z.object({}),
+  }),
+  getPageContent: tool({
+    description:
+      "Read the full main content of the current automation tab as Markdown in one call. Prefer this over scrolling + repeated screenshots when you need to summarize, extract text, or understand the whole page.",
     inputSchema: z.object({}),
   }),
   click: tool({
@@ -128,6 +134,13 @@ export const T2_TOOLS = {
     description: "Wait for a specified amount of time.",
     inputSchema: z.object({
       ms: z.number().describe("The amount of time to wait in milliseconds."),
+    }),
+  }),
+  webSearch: tool({
+    description:
+      "Search the web via Google AI Mode and return the AI-generated answer as Markdown. Use mid-task when you need a fact, value, URL, or other information that is not available on the current page — without navigating the automation tab away from the task.",
+    inputSchema: z.object({
+      query: z.string().describe("Google search query"),
     }),
   }),
 };

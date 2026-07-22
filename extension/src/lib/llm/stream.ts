@@ -4,17 +4,24 @@ import { toCoreMessages, type ExtensionMessage } from "./messages";
 import { convertToolCoordinates } from "./coords";
 import { generateStepLabel } from "./generate";
 import { getStageConfig, resolveModel } from "./model";
-import { CHAT_TOOLS } from "@/lib/llm/tools/chat";
+import { BASE_TOOLS } from "@/lib/llm/tools/base";
+import { RESEARCH_TOOLS } from "@/lib/llm/tools/research";
 import { T1_TOOLS, T2_TOOLS, T3_TOOLS } from "@/lib/llm/tools/automate";
 import type { AppSettings, ToolCall } from "@/types";
 
-export type StreamMode = "chat" | "t1" | "t2" | "t3" | "t4";
+export type StreamMode = "base" | "research" | "t1" | "t2" | "t3" | "t4";
 
 const TOOLS: Record<
   string,
-  typeof T1_TOOLS | typeof T2_TOOLS | typeof T3_TOOLS | typeof CHAT_TOOLS | Record<string, never>
+  | typeof T1_TOOLS
+  | typeof T2_TOOLS
+  | typeof T3_TOOLS
+  | typeof BASE_TOOLS
+  | typeof RESEARCH_TOOLS
+  | Record<string, never>
 > = {
-  chat: CHAT_TOOLS,
+  base: BASE_TOOLS,
+  research: RESEARCH_TOOLS,
   t1: T1_TOOLS,
   t2: T2_TOOLS,
   t3: T3_TOOLS,

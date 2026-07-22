@@ -1,8 +1,10 @@
-export type SlashCommand = "automate" | "chat";
+import type { MessageMode } from "@/types";
+
+export type SlashCommand = "research" | "automate";
 
 export const SLASH_COMMANDS: { value: SlashCommand; description: string }[] = [
   { value: "automate", description: "Run browser automation" },
-  { value: "chat", description: "Chat about anything on web" },
+  { value: "research", description: "Deep research from the page" },
 ];
 
 const COMMAND_PATTERN = new RegExp(
@@ -26,4 +28,15 @@ export function parseSlashCommand(mentions: string[], text: string): SlashComman
 
 export function stripSlashCommands(text: string): string {
   return text.replace(STRIP_COMMAND_PATTERN, "").replace(/\s+/g, " ").trim();
+}
+
+export function resolveMode(value?: string | null): MessageMode {
+  switch (value) {
+    case "research":
+      return "research";
+    case "automate":
+      return "automate";
+    default:
+      return "base";
+  }
 }

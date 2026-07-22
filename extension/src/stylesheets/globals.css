@@ -1,4 +1,9 @@
 @import "tailwindcss";
+@import "streamdown/styles.css";
+
+/* Streamdown utility classes live in its JS bundles — scan them for Tailwind. */
+@source "../../../node_modules/streamdown/dist/*.js";
+@source "../../../node_modules/@streamdown/code/dist/*.js";
 
 @theme {
   --font-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -29,52 +34,57 @@
   --radius-sm: 6px;
   --radius-md: 8px;
 
-  --animate-fade-in: fadeIn 0.25s ease-out;
-  --animate-fade-in-message: fadeInMessage 0.3s ease-out;
-  --animate-suggestions-gradient: suggestionsGradient 8s ease infinite;
+  --animate-fade-in: fade-in 0.25s ease-out;
+  --animate-fade-in-message: fade-in-message 0.3s ease-out;
+  --animate-suggestions-gradient: suggestions-gradient 8s ease infinite;
   --animate-orbit: orbit 8s linear infinite;
   --animate-orbit-slow: orbit 10s linear infinite;
-  --animate-anim-star: animStar 60s linear infinite;
-  --animate-anim-star-rotate: animStarRotate 90s linear infinite;
+  --animate-anim-star: anim-star 60s linear infinite;
+  --animate-anim-star-rotate: anim-star-rotate 90s linear infinite;
   --animate-l7: l7 1s infinite linear alternate;
   --animate-dots: dots 1s infinite linear;
-  --animate-expand-content: expandContent 0.3s ease-out;
+  --animate-expand-content: expand-content 0.3s ease-out;
   --animate-wobble1: wobble1 0.95s infinite ease-in-out;
   --animate-wobble2: wobble2 0.95s infinite ease-in-out;
   --animate-spin-loader: spin 1.4s infinite linear;
   --animate-iconloader: iconloader 2s linear infinite;
-  --animate-grow-line: growLine 0.5s ease-out forwards;
+  --animate-grow-line: grow-line 0.5s ease-out forwards;
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
 }
 
-@keyframes fadeIn {
+@keyframes fade-in {
   from {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-@keyframes fadeInMessage {
+@keyframes fade-in-message {
   from {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-@keyframes suggestionsGradient {
+@keyframes suggestions-gradient {
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -84,24 +94,27 @@
   from {
     transform: rotate(0deg) translateX(100px) rotate(0deg);
   }
+
   to {
     transform: rotate(360deg) translateX(100px) rotate(-360deg);
   }
 }
 
-@keyframes animStar {
+@keyframes anim-star {
   from {
     transform: translateY(0);
   }
+
   to {
     transform: translateY(-135rem);
   }
 }
 
-@keyframes animStarRotate {
+@keyframes anim-star-rotate {
   from {
     transform: rotate(360deg);
   }
+
   to {
     transform: rotate(0);
   }
@@ -114,30 +127,35 @@
       20% 50%,
       20% 50%;
   }
+
   20% {
     background-size:
       20% 20%,
       20% 50%,
       20% 50%;
   }
+
   40% {
     background-size:
       20% 100%,
       20% 20%,
       20% 50%;
   }
+
   60% {
     background-size:
       20% 50%,
       20% 100%,
       20% 20%;
   }
+
   80% {
     background-size:
       20% 50%,
       20% 50%,
       20% 100%;
   }
+
   100% {
     background-size:
       20% 50%,
@@ -153,18 +171,21 @@
       50% 50%,
       100% 50%;
   }
+
   40% {
     background-position:
       0% 100%,
       50% 0%,
       100% 50%;
   }
+
   60% {
     background-position:
       0% 50%,
       50% 100%,
       100% 0%;
   }
+
   80% {
     background-position:
       0% 50%,
@@ -173,11 +194,12 @@
   }
 }
 
-@keyframes expandContent {
+@keyframes expand-content {
   from {
     max-height: 0;
     opacity: 0;
   }
+
   to {
     max-height: 1000px;
     opacity: 1;
@@ -185,11 +207,13 @@
 }
 
 @keyframes wobble1 {
+
   0%,
   100% {
     transform: translateY(0%) scale(1);
     opacity: 1;
   }
+
   50% {
     transform: translateY(-66%) scale(0.7);
     opacity: 0.8;
@@ -197,11 +221,13 @@
 }
 
 @keyframes wobble2 {
+
   0%,
   100% {
     transform: translateY(0%) scale(1);
     opacity: 1;
   }
+
   50% {
     transform: translateY(66%) scale(0.7);
     opacity: 0.8;
@@ -212,6 +238,7 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -222,18 +249,86 @@
     transform: scale(0);
     opacity: 1;
   }
+
   100% {
     transform: scale(1);
     opacity: 0;
   }
 }
 
-@keyframes growLine {
+@keyframes grow-line {
   from {
     transform: scaleY(0);
   }
+
   to {
     transform: scaleY(1);
+  }
+}
+
+@keyframes shimmer {
+
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.tool-activity-shimmer {
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.35) 0%,
+      rgba(255, 255, 255, 0.75) 50%,
+      rgba(255, 255, 255, 0.35) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-text 2s ease-in-out infinite;
+}
+
+.tool-activity-enter {
+  animation:
+    tool-activity-in 0.28s ease-out forwards,
+    shimmer-text 2s ease-in-out 0.28s infinite;
+}
+
+.tool-activity-exit {
+  animation: tool-activity-out 0.28s ease-in forwards;
+}
+
+@keyframes shimmer-text {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes tool-activity-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes tool-activity-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 
@@ -294,4 +389,26 @@
   ::-webkit-scrollbar-corner {
     background: transparent;
   }
+}
+
+/* Outside @layer so these beat Streamdown's Tailwind `border` utilities. */
+[data-streamdown="code-block-actions"] {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+}
+
+[data-streamdown="code-block-copy-button"],
+[data-streamdown="code-block-download-button"] {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Untagged fences have an empty language — show "text" in the header. */
+[data-streamdown="code-block-header"][data-language=""] span:empty::before {
+  content: "text";
 }

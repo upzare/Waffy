@@ -31,16 +31,28 @@ const STAGE_GROUPS: StageGroup[] = [
   {
     title: "General",
     subtitle:
-      "Local models (Browser AI) work well here — fast, private, and free. Best for chat and title generation.",
+      "Local models (Browser AI) work well here — fast, private, and free. Cloud models are recommended for research.",
     stages: [
       {
-        id: "chat",
-        label: "Chat Model",
-        description: "Conversational assistant for chatting and question-answering.",
+        id: "base",
+        label: "Base Model",
+        description:
+          "Answers questions and switches to automation when the request needs browser actions.",
         recommendation: (
           <>
             Use the built-in browser model, with vision capability (like Gemini Nano) for free. For
             more advanced reasoning and querying, switch to a cloud model.
+          </>
+        ),
+      },
+      {
+        id: "research",
+        label: "Research Model",
+        description: "Deep research and synthesis using the current page as source material.",
+        recommendation: (
+          <>
+            Prefer a capable cloud model for thorough analysis and synthesis. Browser AI works for
+            lighter page summaries.
           </>
         ),
       },
@@ -173,9 +185,8 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             </span>
             <ChevronDown
               size={16}
-              className={`shrink-0 text-text-muted transition-transform duration-200 ${
-                isExpanded ? "rotate-180" : ""
-              }`}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+                }`}
             />
           </div>
         </button>
@@ -185,13 +196,13 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
-                  <div className={alertError}>
-                    <AlertCircle size={15} />
-                    <span>
-                      No API key for {providerMeta.label}. Add one in the API Keys section.
-                    </span>
-                  </div>
-                )}
+                <div className={alertError}>
+                  <AlertCircle size={15} />
+                  <span>
+                    No API key for {providerMeta.label}. Add one in the API Keys section.
+                  </span>
+                </div>
+              )}
 
             {recommendation && (
               <div className={alertInfo}>
