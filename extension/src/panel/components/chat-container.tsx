@@ -56,6 +56,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   streamingMessageId,
   isGenerating,
   statusText,
+  toolActivityText,
   errorText,
   setErrorText,
   onRetryMessage,
@@ -121,11 +122,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         </div>
       )}
       <div
-        className={`flex flex-col gap-4 items-center z-1 ${
-          hidden
-            ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
-            : "flex-1 overflow-y-auto pb-4"
-        }`}
+        className={`flex flex-col gap-4 items-center z-1 ${hidden
+          ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
+          : "flex-1 overflow-y-auto pb-4"
+          }`}
         ref={chatContainerRef}
         onScroll={handleScroll}
         style={{ paddingTop: hidden ? 0 : "1rem" }}
@@ -138,11 +138,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
           return (
             <div
               key={msg.id}
-              className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${
-                isUser
-                  ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
-                  : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
-              }`}
+              className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${isUser
+                ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
+                : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
+                }`}
             >
               <div className="absolute -top-2.5 right-1 z-5 opacity-0 translate-y-1 transition-[opacity,transform] duration-200 ease-in-out pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
                 <div className="flex gap-1 bg-[rgba(15,15,15,0.8)] backdrop-blur-sm p-0.5 rounded-md border border-border">
@@ -201,6 +200,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                       isValidating={isStreamingMessage && streaming.validation}
                       isOutput={isStreamingMessage && streaming.output}
                       taskStatus={msg.content?.taskStatus}
+                      toolActivityText={isStreamingMessage ? toolActivityText : null}
                     />
                     {files.length > 0 && (
                       <MessageFiles files={files} onFileClick={handleFileClick} />

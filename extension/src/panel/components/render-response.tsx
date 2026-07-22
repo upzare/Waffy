@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { DropdownSteps } from "../components/dropdown-steps";
@@ -27,6 +27,7 @@ interface RenderResponseProps {
   isExecuting?: boolean;
   isValidating?: boolean;
   isOutput?: boolean;
+  toolActivityText?: string | null;
 }
 
 type StatusInfo = {
@@ -34,6 +35,8 @@ type StatusInfo = {
   label: string;
   spinning?: boolean;
 };
+
+const ACTIVITY_SCROLL_MS = 250;
 
 const streamdownPlugins = { code };
 const streamdownControls = {
@@ -127,6 +130,63 @@ const StreamingLoader = () => (
   </div>
 );
 
+const ToolActivityLabel = ({
+  text,
+  onPresenceChange,
+}: {
+  text: string | null;
+  onPresenceChange?: (present: boolean) => void;
+}) => {
+  const [displayed, setDisplayed] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"enter" | "idle" | "exit">("idle");
+
+  useEffect(() => {
+    onPresenceChange?.(!!displayed);
+  }, [displayed, onPresenceChange]);
+
+  useEffect(() => {
+    if (text === displayed) return;
+
+    if (displayed) {
+      setPhase("exit");
+      const timer = window.setTimeout(() => {
+        setDisplayed(text);
+        setPhase(text ? "enter" : "idle");
+      }, ACTIVITY_SCROLL_MS);
+      return () => window.clearTimeout(timer);
+    }
+
+    if (text) {
+      setDisplayed(text);
+      setPhase("enter");
+    }
+  }, [text, displayed]);
+
+  useEffect(() => {
+    if (phase !== "enter") return;
+    const timer = window.setTimeout(() => setPhase("idle"), ACTIVITY_SCROLL_MS);
+    return () => window.clearTimeout(timer);
+  }, [phase, displayed]);
+
+  if (!displayed) return null;
+
+  return (
+    <div className="tool-activity-slot relative h-5 min-w-0 flex-1 overflow-hidden">
+      <span
+        key={displayed}
+        className={`tool-activity-shimmer absolute inset-y-0 left-0 flex items-center text-xs whitespace-nowrap ${phase === "enter"
+          ? "tool-activity-enter"
+          : phase === "exit"
+            ? "tool-activity-exit"
+            : ""
+          }`}
+      >
+        {displayed}
+      </span>
+    </div>
+  );
+};
+
 const RenderResponse = ({
   content,
   taskStatus = "",
@@ -134,9 +194,11 @@ const RenderResponse = ({
   isExecuting = false,
   isValidating = false,
   isOutput = false,
+  toolActivityText = null,
 }: RenderResponseProps) => {
   const [isExecutingExpanded, setIsExecutingExpanded] = useState(false);
   const [isValidatingExpanded, setIsValidatingExpanded] = useState(false);
+  const [activityPresent, setActivityPresent] = useState(false);
 
   return (
     <div className="w-full">
@@ -188,7 +250,12 @@ const RenderResponse = ({
         <MarkdownContent isAnimating={isOutput}>{content?.output}</MarkdownContent>
       )}
 
-      {(isInitial || isOutput) && <StreamingLoader />}
+      {(isInitial || isOutput || toolActivityText || activityPresent) && (
+        <div className="flex items-center gap-2 mt-1">
+          <StreamingLoader />
+          <ToolActivityLabel text={toolActivityText} onPresenceChange={setActivityPresent} />
+        </div>
+      )}
     </div>
   );
 };

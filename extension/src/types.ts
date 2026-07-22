@@ -42,6 +42,7 @@ export interface ChatContainerProps {
   streamingMessageId: string | null;
   isGenerating: boolean;
   statusText: string;
+  toolActivityText: string | null;
   errorText: string;
   setErrorText: (error: string) => void;
   onRetryMessage: (assistantMessageId: string) => Promise<void>;

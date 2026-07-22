@@ -49,6 +49,7 @@
   --animate-spin-loader: spin 1.4s infinite linear;
   --animate-iconloader: iconloader 2s linear infinite;
   --animate-grow-line: growLine 0.5s ease-out forwards;
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
 }
 
 @keyframes fadeIn {
@@ -262,6 +263,72 @@
 
   to {
     transform: scaleY(1);
+  }
+}
+
+@keyframes shimmer {
+
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.tool-activity-shimmer {
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.35) 0%,
+      rgba(255, 255, 255, 0.75) 50%,
+      rgba(255, 255, 255, 0.35) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmerText 2s ease-in-out infinite;
+}
+
+.tool-activity-enter {
+  animation:
+    toolActivityIn 0.28s ease-out forwards,
+    shimmerText 2s ease-in-out 0.28s infinite;
+}
+
+.tool-activity-exit {
+  animation: toolActivityOut 0.28s ease-in forwards;
+}
+
+@keyframes shimmerText {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes toolActivityIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toolActivityOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 

@@ -8,6 +8,7 @@ import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
 import { parseSlashCommand, resolveMode, stripSlashCommands } from "./utils/slash-commands";
+import { getToolActivityLabel } from "./utils/tool-activity";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import { availableFunctions as baseFunctions } from "@/lib/llm/tools/handlers/base";
 import { availableFunctions as researchFunctions } from "@/lib/llm/tools/handlers/research";
@@ -49,6 +50,7 @@ const App = () => {
   const [isChat, setIsChat] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusText, setStatusText] = useState("");
+  const [toolActivityText, setToolActivityText] = useState<string | null>(null);
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
   const [mentions, setMentions] = useState<string[]>([]);
@@ -616,6 +618,7 @@ const App = () => {
 
       for await (const res of baseStream) {
         if (res.type === "text.stream") {
+          if (!textResponse) setToolActivityText(null);
           textResponse += res.text;
           setMessages((prev) => {
             const update = prev.map((msg) => {
@@ -680,6 +683,7 @@ const App = () => {
           return update;
         });
 
+        setToolActivityText(null);
         setStreaming((prev) => ({ ...prev, response: false }));
         await automateHandler(task, prompt_files, conversationMessages);
         return;
@@ -697,6 +701,7 @@ const App = () => {
         });
 
         const toolArgs = JSON.parse(toolCall.arguments);
+        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
         const toolCallResult = await baseFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
 
@@ -719,6 +724,7 @@ const App = () => {
       baseMessages.push(...iterationMessages);
     }
 
+    setToolActivityText(null);
     setStreaming((prev) => ({ ...prev, response: false }));
   };
 
@@ -749,6 +755,7 @@ const App = () => {
 
       for await (const res of researchStream) {
         if (res.type === "text.stream") {
+          if (!textResponse) setToolActivityText(null);
           textResponse += res.text;
           setMessages((prev) => {
             const update = prev.map((msg) => {
@@ -800,6 +807,7 @@ const App = () => {
         });
 
         const toolArgs = JSON.parse(toolCall.arguments);
+        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
         const toolCallResult = await researchFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
 
@@ -822,6 +830,7 @@ const App = () => {
       researchMessages.push(...iterationMessages);
     }
 
+    setToolActivityText(null);
     setStreaming((prev) => ({ ...prev, response: false }));
   };
 
@@ -913,6 +922,7 @@ const App = () => {
         setStreamingMessageId(null);
         setIsGenerating(false);
         setStatusText("");
+        setToolActivityText(null);
         if (clearInput) {
           setMessage("");
           setMentions([]);
@@ -1084,6 +1094,7 @@ const App = () => {
     if (safeToAbortRef.current) {
       const currentMessageId = messageIdRef.current;
       abortControllerRef.current?.abort();
+      setToolActivityText(null);
       if (currentMessageId) {
         setMessages((prev) => {
           const update = prev.map((msg) =>
@@ -1111,6 +1122,7 @@ const App = () => {
     conversationIdRef.current = null;
     setCurrentTitle("New Chat");
     setStatusText("");
+    setToolActivityText(null);
     setErrorText("");
     setMessage("");
     setMentions([]);
@@ -1210,6 +1222,7 @@ const App = () => {
           streamingMessageId={streamingMessageId}
           isGenerating={isGenerating}
           statusText={statusText}
+          toolActivityText={toolActivityText}
           errorText={errorText}
           setErrorText={setErrorText}
           onRetryMessage={handleRetryMessage}
