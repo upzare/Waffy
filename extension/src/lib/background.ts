@@ -206,15 +206,24 @@ const fetchGoogleAiMode = async (query: string) => {
     return { status: "error", message: "Search query is required." };
   }
 
-  let searchTabId: number | undefined;
+  let searchWindowId: number | undefined;
 
   try {
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}&udm=50&hl=en`;
-    const searchTab = await Browser.tabs.create({ url: searchUrl, active: false });
-    if (!searchTab.id) {
-      return { status: "error", message: "Failed to open Google AI Mode tab." };
+    const searchWindow = await Browser.windows.create({
+      url: searchUrl,
+      type: "popup",
+      width: 1,
+      height: 1,
+      focused: false
+    });
+    const searchTabId = searchWindow.tabs?.[0]?.id;
+    if (searchWindow.id == null || searchTabId == null) {
+      return { status: "error", message: "Failed to open Google AI Mode window." };
     }
-    searchTabId = searchTab.id;
+    searchWindowId = searchWindow.id;
+
+    const start = performance.now();
 
     await waitForTabComplete(searchTabId);
     const response = await waitAiModeFromTab(searchTabId);
@@ -225,6 +234,9 @@ const fetchGoogleAiMode = async (query: string) => {
       };
     }
 
+    const end = performance.now();
+    console.log("Search Time:", end - start);
+
     return formatPageMarkdown(
       response.html,
       response.url ?? searchUrl,
@@ -234,9 +246,9 @@ const fetchGoogleAiMode = async (query: string) => {
   } catch (e) {
     return { status: "error", message: String(e) };
   } finally {
-    if (searchTabId != null) {
+    if (searchWindowId != null) {
       try {
-        await Browser.tabs.remove(searchTabId);
+        await Browser.windows.remove(searchWindowId);
       } catch (_) { }
     }
   }
@@ -366,7 +378,7 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
           if (previousTabId != null) {
             try {
               await Browser.tabs.update(previousTabId, { active: true });
-            } catch (_) {}
+            } catch (_) { }
           }
         }
       })();
