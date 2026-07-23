@@ -61,6 +61,7 @@ export function isPresetModel(provider: ProviderId, model: string): boolean {
 
 export const DEFAULT_MODELS: Record<StageId, ModelConfig> = {
   base: { provider: "browser-ai", model: "default" },
+  search: { provider: "google", model: "gemini-flash-latest" },
   research: { provider: "google", model: "gemini-flash-latest" },
   title: { provider: "browser-ai", model: "default" },
   t1: { provider: "google", model: "gemini-flash-latest" },
