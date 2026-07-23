@@ -279,6 +279,18 @@ export function buildBaseMessages(
   ];
 }
 
+export function buildSearchMessages(
+  promptText: string,
+  promptFiles: FileFormat[],
+  conversationMessages: Message[]
+): ExtensionMessage[] {
+  const { previousPrompt } = buildPreviousContext(conversationMessages);
+  return [
+    ...previousPrompt,
+    { type: "prompt", content: toExtensionContentParts(promptText, promptFiles) },
+  ];
+}
+
 export function buildResearchMessages(
   promptText: string,
   promptFiles: FileFormat[],

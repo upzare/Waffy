@@ -37,21 +37,31 @@ const STAGE_GROUPS: StageGroup[] = [
         id: "base",
         label: "Base Model",
         description:
-          "Answers questions and switches to automation when the request needs browser actions.",
+          "Answers questions and switches to automation when needed.",
         recommendation: (
           <>
-            Use the built-in browser model, with vision capability (like Gemini Nano) for free. For
+            Use the built-in browser model (like Gemini Nano) for free. For
             more advanced reasoning and querying, switch to a cloud model.
+          </>
+        ),
+      },
+      {
+        id: "search",
+        label: "Search Model",
+        description: "Searches the web and answers the user's query.",
+        recommendation: (
+          <>
+            Browser models is fine here, or use a fast cloud model for better quality.
           </>
         ),
       },
       {
         id: "research",
         label: "Research Model",
-        description: "Deep research and synthesis using the current page as source material.",
+        description: "Deep research and synthesis using the current page as source.",
         recommendation: (
           <>
-            Prefer a capable cloud model for thorough analysis and synthesis. Browser AI works for
+            Prefer a capable cloud model for thorough analysis and synthesis. Browser models works for
             lighter page summaries.
           </>
         ),
@@ -180,7 +190,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             <p className="mt-0.5 text-xs leading-snug text-text-muted">{description}</p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
-            <span className="min-w-0 flex-1 truncate font-mono text-xs text-text-muted sm:max-w-[220px] sm:flex-none">
+            <span className="min-w-0 flex-1 truncate font-mono text-xs text-text-muted sm:max-w-55 sm:flex-none">
               {providerMeta.shortLabel} / {modelPreview}
             </span>
             <ChevronDown

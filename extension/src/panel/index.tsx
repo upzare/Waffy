@@ -11,6 +11,7 @@ import { parseSlashCommand, resolveMode, stripSlashCommands } from "./utils/slas
 import { getToolActivityLabel } from "./utils/tool-activity";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import { availableFunctions as baseFunctions } from "@/lib/llm/tools/handlers/base";
+import { availableFunctions as searchFunctions } from "@/lib/llm/tools/handlers/search";
 import { availableFunctions as researchFunctions } from "@/lib/llm/tools/handlers/research";
 import {
   availableFunctions as automateFunctions,
@@ -21,6 +22,7 @@ import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
 import { findMissingProvider, getStageConfig } from "@/lib/llm/model";
 import {
   buildBaseMessages,
+  buildSearchMessages,
   buildResearchMessages,
   buildT1Messages,
   buildT2Messages,
@@ -728,6 +730,101 @@ const App = () => {
     setStreaming((prev) => ({ ...prev, response: false }));
   };
 
+  const searchHandler = async (
+    prompt_text: string,
+    prompt_files: FileFormat[],
+    conversationMessages: Message[]
+  ) => {
+    if (abortControllerRef.current?.signal.aborted) return;
+    setStatusText("GENERATING");
+    setStreaming((prev) => ({ ...prev, response: true }));
+
+    const searchMessages = buildSearchMessages(prompt_text, prompt_files, conversationMessages);
+    let finish = false;
+    let functionExecState = false;
+
+    while (!finish || functionExecState) {
+      if (abortControllerRef.current?.signal.aborted) return;
+
+      let textResponse = "";
+      const searchToolCalls: Record<string, ToolCall> = {};
+      const searchStream = AI(searchMessages, "search", abortControllerRef?.current, safeToAbortRef);
+
+      for await (const res of searchStream) {
+        if (res.type === "text.stream") {
+          if (!textResponse) setToolActivityText(null);
+          textResponse += res.text;
+          setMessages((prev) => {
+            const update = prev.map((msg) => {
+              if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
+              const response = (msg.content.text?.response ?? "") + res.text;
+              return {
+                ...msg,
+                content: { ...msg.content, text: { ...msg.content.text, response } },
+              };
+            });
+            syncMessages(update);
+            return update;
+          });
+        }
+        if (res.type === "action.call") {
+          for (const [key, value] of Object.entries(res.action)) {
+            searchToolCalls[key] = value;
+          }
+        }
+        if (res.type === "response.completed") {
+          if (!functionExecState) finish = true;
+          setMessages((prev) => syncMessages(prev, true));
+        }
+        if (res.type === "response.error") {
+          throw res.error;
+        }
+      }
+
+      console.log("textResponse:", textResponse);
+      const iterationMessages: ExtensionMessage[] = [];
+      if (textResponse) {
+        iterationMessages.push({
+          type: "response",
+          content: [{ type: "text", text: textResponse }],
+        });
+      }
+
+      functionExecState = false;
+
+      for (const toolCall of Object.values(searchToolCalls)) {
+        const toolName = toolCall.name;
+        console.log("toolCall:", toolCall);
+
+        iterationMessages.push({
+          type: "action.init",
+          id: toolCall.id,
+          name: toolName,
+          arguments: toolCall.arguments,
+        });
+
+        const toolArgs = JSON.parse(toolCall.arguments);
+        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
+        const toolCallResult = await searchFunctions[toolName](toolArgs);
+        console.log("toolCallResult:", toolCallResult);
+
+        iterationMessages.push({
+          type: "action.result",
+          id: toolCall.id,
+          name: toolName,
+          output: toolCallResult.message,
+        });
+
+        functionExecState = true;
+      }
+
+      searchMessages.push(...iterationMessages);
+    }
+
+    setToolActivityText(null);
+    setStreaming((prev) => ({ ...prev, response: false }));
+  };
+
   const researchHandler = async (
     prompt_text: string,
     prompt_files: FileFormat[],
@@ -867,6 +964,9 @@ const App = () => {
     switch (mode) {
       case "base":
         await baseHandler(promptText, promptFiles, conversationMessages);
+        break;
+      case "search":
+        await searchHandler(promptText, promptFiles, conversationMessages);
         break;
       case "research":
         await researchHandler(promptText, promptFiles, conversationMessages);

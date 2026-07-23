@@ -5,22 +5,25 @@ import { convertToolCoordinates } from "./coords";
 import { generateStepLabel } from "./generate";
 import { getStageConfig, resolveModel } from "./model";
 import { BASE_TOOLS } from "@/lib/llm/tools/base";
+import { SEARCH_TOOLS } from "@/lib/llm/tools/search";
 import { RESEARCH_TOOLS } from "@/lib/llm/tools/research";
 import { T1_TOOLS, T2_TOOLS, T3_TOOLS } from "@/lib/llm/tools/automate";
 import type { AppSettings, ToolCall } from "@/types";
 
-export type StreamMode = "base" | "research" | "t1" | "t2" | "t3" | "t4";
+export type StreamMode = "base" | "search" | "research" | "t1" | "t2" | "t3" | "t4";
 
 const TOOLS: Record<
   string,
+  | typeof BASE_TOOLS
+  | typeof SEARCH_TOOLS
+  | typeof RESEARCH_TOOLS
   | typeof T1_TOOLS
   | typeof T2_TOOLS
   | typeof T3_TOOLS
-  | typeof BASE_TOOLS
-  | typeof RESEARCH_TOOLS
   | Record<string, never>
 > = {
   base: BASE_TOOLS,
+  search: SEARCH_TOOLS,
   research: RESEARCH_TOOLS,
   t1: T1_TOOLS,
   t2: T2_TOOLS,

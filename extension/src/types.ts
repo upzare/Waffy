@@ -72,7 +72,7 @@ export interface HistorySidebarProps {
   onRemoveConversation: (id: string) => void;
 }
 
-export type MessageMode = "base" | "research" | "automate";
+export type MessageMode = "base" | "search" | "research" | "automate";
 
 export interface Message {
   id: string;
@@ -137,7 +137,7 @@ export interface Settings {
 export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai";
 
-export type StageId = "base" | "research" | "title" | "t1" | "t2" | "t3" | "t4" | "step";
+export type StageId = "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "t4" | "step";
 
 export interface ModelConfig {
   provider: ProviderId;
