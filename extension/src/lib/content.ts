@@ -101,9 +101,9 @@ const getVisibleTextLength = () =>
 
 // Wait until page text is unchanged for several polls (stream finished).
 const waitAiModeContent = async () => {
-  const POLL_MS = 200;
+  const POLL_MS = 100;
   const STABLE_POLLS = 5;
-  const WARMUP_MS = 2500;
+  const WARMUP_MS = 3000;
   const TIMEOUT_MS = 30000;
 
   const started = Date.now();
