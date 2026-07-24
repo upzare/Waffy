@@ -19,6 +19,14 @@ import {
 } from "@/lib/llm/tools/handlers/automate";
 import { getActiveTab } from "@/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
+import {
+  listConversations,
+  getConversation,
+  createConversation,
+  updateConversationMessages,
+  updateConversationTitle,
+  deleteConversation,
+} from "@/lib/db";
 import { findMissingProvider, getStageConfig } from "@/lib/llm/model";
 import {
   buildBaseMessages,
@@ -80,10 +88,6 @@ const App = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController>(null);
   const generationLockRef = useRef(false);
-  const dbSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const db = useRef<IDBDatabase>(null);
-  const db_request = useRef<IDBOpenDBRequest>(null);
   const conversationIdRef = useRef<string>(null);
   const messageIdRef = useRef<string>(null);
   const t2SessionRef = useRef<StreamSession>({
@@ -100,7 +104,6 @@ const App = () => {
   };
 
   useEffect(() => {
-    initDB();
     fetchConversations();
     checkApiKeys();
 
@@ -128,141 +131,45 @@ const App = () => {
     return () => {
       Browser.runtime.onMessage.removeListener(onMessage);
       document.removeEventListener("mousemove", handleMouseMove);
-      if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
     };
   }, []);
 
-  const initDB = () => {
-    db_request.current = indexedDB.open("WaffyDB", 1);
-    db_request.current.onerror = (event) => {
-      console.log("Error opening database:", event);
-    };
-    db_request.current.onupgradeneeded = (event) => {
-      db.current = (event.target as IDBOpenDBRequest).result as IDBDatabase;
-      db.current.createObjectStore("conversations", { keyPath: "id" });
-    };
-    db_request.current.onsuccess = (event) => {
-      db.current = (event.target as IDBOpenDBRequest).result as IDBDatabase;
-    };
-  };
-
-  // Resolves with the shared connection, waiting for the initial open if needed.
-  const getDB = () =>
-    new Promise<IDBDatabase | null>((resolve) => {
-      if (db.current) {
-        resolve(db.current);
-        return;
-      }
-      const request = db_request.current;
-      if (!request) {
-        resolve(null);
-        return;
-      }
-      if (request.readyState === "done") {
-        resolve(request.result ?? null);
-        return;
-      }
-      request.addEventListener("success", () => resolve(request.result));
-      request.addEventListener("error", () => resolve(null));
-    });
-
   const initConversation = async () => {
-    const database = await getDB();
-    if (!database || !conversationIdRef.current) return;
-
-    await new Promise<void>((resolve) => {
-      const tx = database.transaction("conversations", "readwrite");
-      tx.objectStore("conversations").add({
-        id: conversationIdRef.current,
-        title: "New Chat",
-        timestamp: new Date(),
-        messages: [],
-      });
-      tx.oncomplete = () => {
-        fetchConversations();
-        resolve();
-      };
-      tx.onerror = () => resolve();
-      tx.onabort = () => resolve();
-    });
+    if (!conversationIdRef.current) return;
+    await createConversation(conversationIdRef.current);
+    await fetchConversations();
   };
 
   const generateTitle = async (prompt: string) => {
     const title = await createTitle(prompt);
     setCurrentTitle(title);
-    const conversationDB = db.current
-      ?.transaction("conversations", "readwrite")
-      .objectStore("conversations");
-    if (conversationDB && conversationIdRef.current) {
-      conversationDB.get(conversationIdRef.current).onsuccess = (event) => {
-        const data = (event.target as IDBRequest).result;
-        if (data) {
-          data.title = title;
-          conversationDB.put(data);
-        }
-      };
+    if (conversationIdRef.current) {
+      await updateConversationTitle(conversationIdRef.current, title);
     }
   };
 
   const fetchConversations = async (): Promise<Conversation[]> => {
-    const database = await getDB();
-    if (!database) return [];
-
-    return new Promise((resolve) => {
-      const request = database
-        .transaction("conversations", "readonly")
-        .objectStore("conversations")
-        .getAll();
-      request.onsuccess = () => {
-        const sortedData = (request.result as Conversation[]).sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setConversations(sortedData);
-        resolve(sortedData);
-      };
-      request.onerror = () => resolve([]);
-    });
+    const sorted = await listConversations();
+    setConversations(sorted);
+    return sorted;
   };
 
-  const updateConversationsDB = (updatedMessages: Message[], immediate = false): Promise<void> => {
-    const write = async () => {
-      const database = await getDB();
-      const conversationId = conversationIdRef.current;
-      if (!database || !conversationId) return;
-
-      await new Promise<void>((resolve) => {
-        const tx = database.transaction("conversations", "readwrite");
-        const store = tx.objectStore("conversations");
-        const getRequest = store.get(conversationId);
-
-        getRequest.onsuccess = () => {
-          const data = getRequest.result;
-          if (!data) return;
-          data.messages = updatedMessages;
-          store.put(data);
-        };
-
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-        tx.onabort = () => resolve();
-      });
-    };
-
-    if (immediate) {
-      if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
-      return write();
+  const syncMessages = (updatedMessages: Message[]) => {
+    if (conversationIdRef.current) {
+      void updateConversationMessages(conversationIdRef.current, updatedMessages);
     }
-
-    if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
-    dbSyncTimerRef.current = setTimeout(() => {
-      write();
-    }, 300);
-    return Promise.resolve();
+    return updatedMessages;
   };
 
-  const syncMessages = (updatedMessages: Message[], immediate = false) => {
-    updateConversationsDB(updatedMessages, immediate);
-    return updatedMessages;
+  // Capture id at schedule time — finally clears messageIdRef before batched updaters run.
+  const updateAssistantMessage = (patch: (msg: Message) => Message, persist = false) => {
+    const messageId = messageIdRef.current;
+    if (!messageId) return;
+    const assistantId = `assistant-${messageId}`;
+    setMessages((prev) => {
+      const next = prev.map((msg) => (msg.id === assistantId ? patch(msg) : msg));
+      return persist ? syncMessages(next) : next;
+    });
   };
 
   const isAborted = () => Boolean(abortControllerRef.current?.signal.aborted);
@@ -323,6 +230,7 @@ const App = () => {
     console.log("t1Messages:", t1Messages);
     const responseStream = AI(t1Messages, "t1", abortControllerRef?.current);
     const toolCalls: Record<string, ToolCall> = {};
+    let textResponse = "";
     for await (const res of responseStream) {
       if (res.type === "action.call") {
         for (const [key, value] of Object.entries(res.action)) {
@@ -330,20 +238,17 @@ const App = () => {
         }
       }
       if (res.type === "text.stream") {
-        setMessages((prev) => {
-          const update = prev.map((msg) => {
-            if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-            const response = (msg.content.text?.response ?? "") + res.text;
-            return { ...msg, content: { ...msg.content, text: { ...msg.content.text, response } } };
-          });
-          syncMessages(update);
-          return update;
-        });
+        textResponse += res.text;
+        updateAssistantMessage((msg) => ({
+          ...msg,
+          content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+        }));
       }
       if (res.type === "response.completed") {
-        setMessages((prev) => syncMessages(prev, true));
+        updateAssistantMessage((msg) => msg, true);
       }
       if (res.type === "response.error") {
+        updateAssistantMessage((msg) => msg, true);
         throw res.error;
       }
     }
@@ -352,15 +257,9 @@ const App = () => {
       const toolArgs = JSON.parse(toolCall.arguments);
       console.log("t1 toolArgs:", toolArgs);
       if (toolCall.name === "proceed") {
-        setMessages((prev) =>
-          syncMessages(
-            prev.map((msg) =>
-              msg.id === `assistant-${messageIdRef.current}`
-                ? { ...msg, content: { ...msg.content, task: toolArgs.task } }
-                : msg
-            ),
-            true
-          )
+        updateAssistantMessage(
+          (msg) => ({ ...msg, content: { ...msg.content, task: toolArgs.task } }),
+          true
         );
         return toolArgs.task;
       }
@@ -393,20 +292,15 @@ const App = () => {
     let responded = true;
     let finish = false;
     let functionExecState = false;
-    setMessages((prev) =>
-      syncMessages(
-        prev.map((msg) =>
-          msg.id === `assistant-${messageIdRef.current}`
-            ? {
-              ...msg,
-              content: {
-                ...msg.content,
-                text: { ...msg.content.text, execution: ["Initializing"] },
-              },
-            }
-            : msg
-        )
-      )
+    updateAssistantMessage(
+      (msg) => ({
+        ...msg,
+        content: {
+          ...msg.content,
+          text: { ...msg.content.text, execution: ["Initializing"] },
+        },
+      }),
+      true
     );
 
     const t2Messages = buildT2Messages(task, prompt_files, conversationMessages);
@@ -440,25 +334,21 @@ const App = () => {
           }
           if (res.step) {
             const step = res.step;
-            setMessages((prev) => {
-              const update = prev.map((msg) => {
-                if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-                const execution = [...(msg.content.text?.execution ?? []), step];
-                return {
-                  ...msg,
-                  content: { ...msg.content, text: { ...msg.content.text, execution } },
-                };
-              });
-              syncMessages(update);
-              return update;
+            updateAssistantMessage((msg) => {
+              const execution = [...(msg.content.text?.execution ?? []), step];
+              return {
+                ...msg,
+                content: { ...msg.content, text: { ...msg.content.text, execution } },
+              };
             });
           }
         }
         if (res.type === "response.completed") {
           if (!functionExecState) finish = true;
-          setMessages((prev) => syncMessages(prev, true));
+          updateAssistantMessage((msg) => msg, true);
         }
         if (res.type === "response.error") {
+          updateAssistantMessage((msg) => msg, true);
           throw res.error;
         }
       }
@@ -535,6 +425,7 @@ const App = () => {
     const t3Messages = buildT3Messages(task, t2Reasoning);
     const summaryModelStream = AI(t3Messages, "t3", abortControllerRef?.current);
     const toolCalls: Record<string, ToolCall> = {};
+    let textResponse = "";
     for await (const res of summaryModelStream) {
       if (res.type === "action.call") {
         for (const [key, value] of Object.entries(res.action)) {
@@ -542,23 +433,17 @@ const App = () => {
         }
       }
       if (res.type === "text.stream") {
-        setMessages((prev) => {
-          const update = prev.map((msg) => {
-            if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-            const validation = (msg.content.text?.validation ?? "") + res.text;
-            return {
-              ...msg,
-              content: { ...msg.content, text: { ...msg.content.text, validation } },
-            };
-          });
-          syncMessages(update);
-          return update;
-        });
+        textResponse += res.text;
+        updateAssistantMessage((msg) => ({
+          ...msg,
+          content: { ...msg.content, text: { ...msg.content.text, validation: textResponse } },
+        }));
       }
       if (res.type === "response.completed") {
-        setMessages((prev) => syncMessages(prev, true));
+        updateAssistantMessage((msg) => msg, true);
       }
       if (res.type === "response.error") {
+        updateAssistantMessage((msg) => msg, true);
         throw res.error;
       }
     }
@@ -571,15 +456,9 @@ const App = () => {
       };
       const status = statusMap[toolCall.name];
       if (status) {
-        setMessages((prev) =>
-          syncMessages(
-            prev.map((msg) =>
-              msg.id === `assistant-${messageIdRef.current}`
-                ? { ...msg, content: { ...msg.content, taskStatus: status } }
-                : msg
-            ),
-            true
-          )
+        updateAssistantMessage(
+          (msg) => ({ ...msg, content: { ...msg.content, taskStatus: status } }),
+          true
         );
       }
     }
@@ -591,22 +470,20 @@ const App = () => {
     setStreaming((prev) => ({ ...prev, output: true }));
     const t4Messages = buildT4Messages(task, t2Reasoning);
     const summaryModelStream = AI(t4Messages, "t4", abortControllerRef?.current);
+    let textResponse = "";
     for await (const res of summaryModelStream) {
       if (res.type === "text.stream") {
-        setMessages((prev) => {
-          const update = prev.map((msg) => {
-            if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-            const output = (msg.content.text?.output ?? "") + res.text;
-            return { ...msg, content: { ...msg.content, text: { ...msg.content.text, output } } };
-          });
-          syncMessages(update);
-          return update;
-        });
+        textResponse += res.text;
+        updateAssistantMessage((msg) => ({
+          ...msg,
+          content: { ...msg.content, text: { ...msg.content.text, output: textResponse } },
+        }));
       }
       if (res.type === "response.completed") {
-        setMessages((prev) => syncMessages(prev, true));
+        updateAssistantMessage((msg) => msg, true);
       }
       if (res.type === "response.error") {
+        updateAssistantMessage((msg) => msg, true);
         throw res.error;
       }
     }
@@ -625,29 +502,22 @@ const App = () => {
     const baseMessages = buildBaseMessages(prompt_text, prompt_files, conversationMessages);
     let finish = false;
     let functionExecState = false;
+    let textResponse = "";
 
     while (!finish || functionExecState) {
       assertNotAborted();
-      let textResponse = "";
+      const iterationStart = textResponse.length;
       const baseToolCalls: Record<string, ToolCall> = {};
       const baseStream = AI(baseMessages, "base", abortControllerRef?.current);
 
       for await (const res of baseStream) {
         if (res.type === "text.stream") {
-          if (!textResponse) setToolActivityText(null);
+          if (textResponse.length === iterationStart) setToolActivityText(null);
           textResponse += res.text;
-          setMessages((prev) => {
-            const update = prev.map((msg) => {
-              if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-              const response = (msg.content.text?.response ?? "") + res.text;
-              return {
-                ...msg,
-                content: { ...msg.content, text: { ...msg.content.text, response } },
-              };
-            });
-            syncMessages(update);
-            return update;
-          });
+          updateAssistantMessage((msg) => ({
+            ...msg,
+            content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+          }));
         }
         if (res.type === "action.call") {
           for (const [key, value] of Object.entries(res.action)) {
@@ -656,19 +526,20 @@ const App = () => {
         }
         if (res.type === "response.completed") {
           if (!functionExecState) finish = true;
-          setMessages((prev) => syncMessages(prev, true));
+          updateAssistantMessage((msg) => msg, true);
         }
         if (res.type === "response.error") {
+          updateAssistantMessage((msg) => msg, true);
           throw res.error;
         }
       }
 
-      console.log("textResponse:", textResponse);
+      const iterationText = textResponse.slice(iterationStart);
       const iterationMessages: ExtensionMessage[] = [];
-      if (textResponse) {
+      if (iterationText) {
         iterationMessages.push({
           type: "response",
-          content: [{ type: "text", text: textResponse }],
+          content: [{ type: "text", text: iterationText }],
         });
       }
 
@@ -687,17 +558,13 @@ const App = () => {
           // fall back to original prompt
         }
 
-        setMessages((prev) => {
-          const update = prev.map((msg) => {
-            if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-            return {
-              ...msg,
-              content: { ...msg.content, mode: "automate" as MessageMode },
-            };
-          });
-          syncMessages(update, true);
-          return update;
-        });
+        updateAssistantMessage(
+          (msg) => ({
+            ...msg,
+            content: { ...msg.content, mode: "automate" as MessageMode },
+          }),
+          true
+        );
 
         setToolActivityText(null);
         setStreaming((prev) => ({ ...prev, response: false }));
@@ -741,6 +608,7 @@ const App = () => {
       baseMessages.push(...iterationMessages);
     }
 
+    console.log("textResponse:", textResponse);
     setToolActivityText(null);
     setStreaming((prev) => ({ ...prev, response: false }));
   };
@@ -757,29 +625,22 @@ const App = () => {
     const searchMessages = buildSearchMessages(prompt_text, prompt_files, conversationMessages);
     let finish = false;
     let functionExecState = false;
+    let textResponse = "";
 
     while (!finish || functionExecState) {
       assertNotAborted();
-      let textResponse = "";
+      const iterationStart = textResponse.length;
       const searchToolCalls: Record<string, ToolCall> = {};
       const searchStream = AI(searchMessages, "search", abortControllerRef?.current);
 
       for await (const res of searchStream) {
         if (res.type === "text.stream") {
-          if (!textResponse) setToolActivityText(null);
+          if (textResponse.length === iterationStart) setToolActivityText(null);
           textResponse += res.text;
-          setMessages((prev) => {
-            const update = prev.map((msg) => {
-              if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-              const response = (msg.content.text?.response ?? "") + res.text;
-              return {
-                ...msg,
-                content: { ...msg.content, text: { ...msg.content.text, response } },
-              };
-            });
-            syncMessages(update);
-            return update;
-          });
+          updateAssistantMessage((msg) => ({
+            ...msg,
+            content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+          }));
         }
         if (res.type === "action.call") {
           for (const [key, value] of Object.entries(res.action)) {
@@ -788,19 +649,20 @@ const App = () => {
         }
         if (res.type === "response.completed") {
           if (!functionExecState) finish = true;
-          setMessages((prev) => syncMessages(prev, true));
+          updateAssistantMessage((msg) => msg, true);
         }
         if (res.type === "response.error") {
+          updateAssistantMessage((msg) => msg, true);
           throw res.error;
         }
       }
 
-      console.log("textResponse:", textResponse);
+      const iterationText = textResponse.slice(iterationStart);
       const iterationMessages: ExtensionMessage[] = [];
-      if (textResponse) {
+      if (iterationText) {
         iterationMessages.push({
           type: "response",
-          content: [{ type: "text", text: textResponse }],
+          content: [{ type: "text", text: iterationText }],
         });
       }
 
@@ -836,6 +698,7 @@ const App = () => {
       searchMessages.push(...iterationMessages);
     }
 
+    console.log("textResponse:", textResponse);
     setToolActivityText(null);
     setStreaming((prev) => ({ ...prev, response: false }));
   };
@@ -852,29 +715,22 @@ const App = () => {
     const researchMessages = buildResearchMessages(prompt_text, prompt_files, conversationMessages);
     let finish = false;
     let functionExecState = false;
+    let textResponse = "";
 
     while (!finish || functionExecState) {
       assertNotAborted();
-      let textResponse = "";
+      const iterationStart = textResponse.length;
       const researchToolCalls: Record<string, ToolCall> = {};
       const researchStream = AI(researchMessages, "research", abortControllerRef?.current);
 
       for await (const res of researchStream) {
         if (res.type === "text.stream") {
-          if (!textResponse) setToolActivityText(null);
+          if (textResponse.length === iterationStart) setToolActivityText(null);
           textResponse += res.text;
-          setMessages((prev) => {
-            const update = prev.map((msg) => {
-              if (msg.id !== `assistant-${messageIdRef.current}`) return msg;
-              const response = (msg.content.text?.response ?? "") + res.text;
-              return {
-                ...msg,
-                content: { ...msg.content, text: { ...msg.content.text, response } },
-              };
-            });
-            syncMessages(update);
-            return update;
-          });
+          updateAssistantMessage((msg) => ({
+            ...msg,
+            content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+          }));
         }
         if (res.type === "action.call") {
           for (const [key, value] of Object.entries(res.action)) {
@@ -883,19 +739,20 @@ const App = () => {
         }
         if (res.type === "response.completed") {
           if (!functionExecState) finish = true;
-          setMessages((prev) => syncMessages(prev, true));
+          updateAssistantMessage((msg) => msg, true);
         }
         if (res.type === "response.error") {
+          updateAssistantMessage((msg) => msg, true);
           throw res.error;
         }
       }
 
-      console.log("textResponse:", textResponse);
+      const iterationText = textResponse.slice(iterationStart);
       const iterationMessages: ExtensionMessage[] = [];
-      if (textResponse) {
+      if (iterationText) {
         iterationMessages.push({
           type: "response",
-          content: [{ type: "text", text: textResponse }],
+          content: [{ type: "text", text: iterationText }],
         });
       }
 
@@ -937,6 +794,7 @@ const App = () => {
       researchMessages.push(...iterationMessages);
     }
 
+    console.log("textResponse:", textResponse);
     setToolActivityText(null);
     setStreaming((prev) => ({ ...prev, response: false }));
   };
@@ -1094,8 +952,7 @@ const App = () => {
               },
             },
           ];
-          syncMessages(update, true);
-          return update;
+          return syncMessages(update);
         });
 
         if (wasFirstMessage) {
@@ -1152,24 +1009,19 @@ const App = () => {
       messageId: assistantMessageId.slice("assistant-".length),
       conversationContext: messages.slice(0, assistantIndex - 1),
       prepareMessages: () => {
-        setMessages((prev) => {
-          const update = prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                ...msg,
-                content: {
-                  task: "",
-                  taskStatus: "",
-                  text: { response: "", execution: [], validation: "", output: "" },
-                  files: [],
-                  mode,
-                },
-              }
-              : msg
-          );
-          syncMessages(update, true);
-          return update;
-        });
+        updateAssistantMessage(
+          (msg) => ({
+            ...msg,
+            content: {
+              task: "",
+              taskStatus: "",
+              text: { response: "", execution: [], validation: "", output: "" },
+              files: [],
+              mode,
+            },
+          }),
+          true
+        );
       },
     });
   };
@@ -1187,8 +1039,8 @@ const App = () => {
     const conversationId = conversationIdRef.current;
 
     setMessages(remainingMessages);
-    await updateConversationsDB(remainingMessages, true);
     if (conversationId) {
+      await updateConversationMessages(conversationId, remainingMessages);
       setConversations((prev) =>
         prev.map((conversation) =>
           conversation.id === conversationId
@@ -1213,17 +1065,10 @@ const App = () => {
     setToolActivityText(null);
     showError(USER_INTERRUPTED_MESSAGE);
 
-    const messageId = messageIdRef.current;
-    if (!messageId) return;
-    setMessages((prev) => {
-      const update = prev.map((msg) =>
-        msg.id === `assistant-${messageId}`
-          ? { ...msg, content: { ...msg.content, aborted: true } }
-          : msg
-      );
-      syncMessages(update, true);
-      return update;
-    });
+    updateAssistantMessage(
+      (msg) => ({ ...msg, content: { ...msg.content, aborted: true } }),
+      true
+    );
   };
 
   const handleNewChat = async () => {
@@ -1253,8 +1098,7 @@ const App = () => {
       setShowWorkingDialog(true);
       return;
     }
-    const latestConversations = await fetchConversations();
-    const conversation = latestConversations.find((c) => c.id === id);
+    const conversation = await getConversation(id);
     if (conversation) {
       await handleStopGeneration();
       setMessages([]);
@@ -1279,10 +1123,7 @@ const App = () => {
     }
     const conversation = conversations.find((c) => c.id === id);
     if (conversation) {
-      const conversationDB = db.current
-        ?.transaction("conversations", "readwrite")
-        .objectStore("conversations");
-      conversationDB?.delete(id);
+      await deleteConversation(id);
       await fetchConversations();
       if (conversationIdRef.current === id) {
         handleNewChat();

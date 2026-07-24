@@ -24,6 +24,7 @@
     "@streamdown/code": "^1.1.1",
     "@tanstack/react-virtual": "^3.14.8",
     "ai": "^6.0.208",
+    "dexie": "^4.4.4",
     "linkedom": "^0.18.13",
     "lucide-react": "^1.21.0",
     "react": "^19.2.7",
