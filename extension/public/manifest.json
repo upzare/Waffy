@@ -44,8 +44,6 @@
     "debugger"
   ],
   "host_permissions": [
-    "http://*/*",
-    "https://*/*",
     "<all_urls>"
   ],
   "web_accessible_resources": [
@@ -58,5 +56,5 @@
       ]
     }
   ],
-  "author": "Waffy AI"
+  "author": "Waffy.io"
 }
