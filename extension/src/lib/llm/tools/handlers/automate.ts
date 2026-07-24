@@ -153,7 +153,7 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
     const tabsBefore = await Browser.tabs.query({});
     const tabIdsBefore = new Set(tabsBefore.map((t) => t.id));
 
-    void Browser.tabs.sendMessage(tab.id, {
+    Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
       name: "DISPLAY_POINTER",
       args: { x, y },
@@ -221,7 +221,7 @@ const typeText = async ({
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    void Browser.tabs.sendMessage(tab.id, {
+    Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
       name: "DISPLAY_POINTER",
       args: { x, y, timeout: text.length * 150 + 500 },
@@ -257,7 +257,7 @@ const clearValue = async ({ x, y }: { x: number; y: number }): Promise<AutomateT
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    void Browser.tabs.sendMessage(tab.id, {
+    Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
       name: "DISPLAY_POINTER",
       args: { x, y },
@@ -295,7 +295,7 @@ const getOption = async ({ x, y }: { x: number; y: number }): Promise<AutomateTo
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    void Browser.tabs.sendMessage(tab.id, {
+    Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
       name: "DISPLAY_POINTER",
       args: { x, y },
@@ -330,7 +330,7 @@ const setOption = async ({
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    void Browser.tabs.sendMessage(tab.id, {
+    Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
       name: "DISPLAY_POINTER",
       args: { x, y },
@@ -366,7 +366,7 @@ const scroll = async ({
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    void Browser.tabs.sendMessage(tab.id, {
+    Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
       name: "DISPLAY_POINTER",
       args: { x, y },

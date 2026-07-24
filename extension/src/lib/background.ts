@@ -20,7 +20,7 @@ const syncOpenedTabs = async (): Promise<void> => {
 };
 
 const setOverlay = (tabId: number, enabled: boolean) => {
-  void Browser.tabs
+  Browser.tabs
     .sendMessage(tabId, {
       type: "INTERACT_DOM",
       name: enabled ? "SHOW_OVERLAY" : "HIDE_OVERLAY",
@@ -195,7 +195,7 @@ const waitForTabComplete = (tabId: number, timeoutMs = 15000): Promise<void> =>
     Browser.tabs.onUpdated.addListener(onUpdated);
     Browser.tabs.onRemoved.addListener(onRemoved);
 
-    void Browser.tabs.get(tabId).then(
+    Browser.tabs.get(tabId).then(
       (tab) => {
         if (tab.status === "complete") settle(() => resolve());
       },
@@ -489,7 +489,7 @@ Browser.runtime.onInstalled.addListener(async () => {
 
 Browser.commands.onCommand.addListener((command) => {
   if (command === "open_side_panel") {
-    void Browser.windows.getCurrent().then((w) => {
+    Browser.windows.getCurrent().then((w) => {
       if (w.id) chrome.sidePanel.open({ windowId: w.id });
     });
   }

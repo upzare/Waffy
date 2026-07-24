@@ -116,7 +116,9 @@ function InputContainer({
           <MentionInput asChild onKeyDown={handleKeyDown}>
             <textarea
               ref={setTextareaRef}
-              className="box-border max-h-50 min-h-12 w-full resize-none border-none bg-transparent py-3.5 pr-18 pl-2.5 text-white caret-current outline-none text-sm placeholder:text-white/40 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar]:bg-[#22222299] [&::-webkit-scrollbar-thumb]:bg-white/30"
+              className={`box-border max-h-50 min-h-12 w-full resize-none border-none bg-transparent py-3.5 pr-18 pl-2.5 caret-current outline-none text-sm placeholder:text-white/40 disabled:opacity-100 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar]:bg-[#22222299] [&::-webkit-scrollbar-thumb]:bg-white/30 ${
+                isGenerating ? "text-[#909090]" : "text-white"
+              }`}
               placeholder="Ask or type / for commands"
               value={message}
               rows={1}

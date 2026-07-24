@@ -1,9 +1,9 @@
-import SuggestedPromptButton from "./suggested-prompt-button";
+import PinnedPromptButton from "./pinned-prompt-button";
 import { BookOpen, Bot, Globe, MessageSquare } from "lucide-react";
 import type { HeroProps } from "../../types";
 
 const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => {
-  const suggestedPrompts = pinnedPrompts.filter((prompt) => prompt.trim().length > 0);
+  const prompts = pinnedPrompts.filter((prompt) => prompt.trim().length > 0);
 
   if (hidden) {
     return null;
@@ -45,12 +45,12 @@ const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => 
         </div>
       </div>
 
-      {suggestedPrompts.length > 0 && (
+      {prompts.length > 0 && (
         <div className="mt-8 w-full max-w-full px-4">
           <h2 className="mb-6 text-center text-xl font-medium text-white/80">Try asking</h2>
           <div className="flex flex-col items-center justify-center gap-4">
-            {suggestedPrompts.map((prompt, index) => (
-              <SuggestedPromptButton
+            {prompts.map((prompt, index) => (
+              <PinnedPromptButton
                 key={index}
                 text={prompt}
                 onClick={() => onPromptClick(prompt)}

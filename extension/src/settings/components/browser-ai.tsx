@@ -44,7 +44,7 @@ const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) =
   }, [onStatusChange]);
 
   useEffect(() => {
-    void refreshStatus();
+    refreshStatus();
   }, [refreshStatus]);
 
   const handleDownload = async () => {
