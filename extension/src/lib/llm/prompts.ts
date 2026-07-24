@@ -394,7 +394,8 @@ You will be given three inputs: \`PREVIOUS REASONING\`, \`CURRENT REASONING\`, a
 
 ### **Strict Output Rules**
 
-* It must be a single, short phrase.
+* It must be **3 to 4 words maximum**. Never exceed 4 words.
+* It must be a single short phrase (e.g. "Click search button", "Type search query", "Open settings page").
 * It must **not** contain any special characters, including periods, commas, quotes, or backticks.
 * It must accurately describe the operation in plain language.
 * It must be clean, direct, and ready for immediate display in a UI.`;
