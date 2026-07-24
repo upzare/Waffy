@@ -4,7 +4,7 @@ import type { HeaderProps } from "../../types";
 
 const Header: React.FC<HeaderProps> = ({ currentConversationId, currentTitle, onNewChat }) => {
   const openSettings = () => {
-    void Browser.runtime.openOptionsPage();
+    Browser.runtime.openOptionsPage();
   };
 
   return (

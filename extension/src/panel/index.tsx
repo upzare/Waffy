@@ -179,7 +179,7 @@ const App = () => {
         messages: [],
       });
       tx.oncomplete = () => {
-        void fetchConversations();
+        fetchConversations();
         resolve();
       };
       tx.onerror = () => resolve();
@@ -255,13 +255,13 @@ const App = () => {
 
     if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
     dbSyncTimerRef.current = setTimeout(() => {
-      void write();
+      write();
     }, 300);
     return Promise.resolve();
   };
 
   const syncMessages = (updatedMessages: Message[], immediate = false) => {
-    void updateConversationsDB(updatedMessages, immediate);
+    updateConversationsDB(updatedMessages, immediate);
     return updatedMessages;
   };
 
@@ -952,7 +952,7 @@ const App = () => {
     } else {
       toast.error("Configure API keys in extension settings.");
     }
-    void Browser.runtime.openOptionsPage();
+    Browser.runtime.openOptionsPage();
     return false;
   };
 
@@ -1008,11 +1008,6 @@ const App = () => {
       setErrorText("");
       abortControllerRef.current = new AbortController();
 
-      const inputEl = textareaRef.current;
-      if (clearInput && inputEl) {
-        inputEl.style.color = "#909090";
-      }
-
       try {
         await prepareMessages();
         await runModeHandler(mode, promptText, promptFiles, conversationContext);
@@ -1029,10 +1024,6 @@ const App = () => {
           setMentions([]);
           setFiles([]);
           setInputResetKey((key) => key + 1);
-          if (inputEl) {
-            inputEl.style.height = "auto";
-            inputEl.style.color = "#ffffff";
-          }
         } else {
           textareaRef.current?.focus();
         }
@@ -1044,16 +1035,23 @@ const App = () => {
     }
   };
 
-  const handleSendMessage = async () => {
-    if ((!message.trim() && files.length === 0) || isGenerating || generationLockRef.current) {
+  const sendUserPrompt = async ({
+    text,
+    promptMentions,
+    promptFilesInput,
+  }: {
+    text: string;
+    promptMentions: string[];
+    promptFilesInput: File[];
+  }) => {
+    if ((!text.trim() && promptFilesInput.length === 0) || isGenerating || generationLockRef.current) {
       return;
     }
-
-    const command = parseSlashCommand(mentions, message);
+    const command = parseSlashCommand(promptMentions, text);
     const mode = resolveMode(command);
     const messageId = uuid4();
-    const promptText = command ? stripSlashCommands(message) : message.trim();
-    const promptFiles = await fileHandler(files);
+    const promptText = command ? stripSlashCommands(text) : text.trim();
+    const promptFiles = await fileHandler(promptFilesInput);
 
     if (!promptText && promptFiles.length === 0) {
       toast.error(command ? `Add a message after /${command}` : "Message cannot be empty");
@@ -1106,6 +1104,23 @@ const App = () => {
             .catch(() => { });
         }
       },
+    });
+  };
+
+  const handleSendMessage = async () => {
+    await sendUserPrompt({
+      text: message,
+      promptMentions: mentions,
+      promptFilesInput: files,
+    });
+  };
+
+  const handlePromptClick = (prompt: string) => {
+    setMessage(prompt);
+    sendUserPrompt({
+      text: prompt,
+      promptMentions: [],
+      promptFilesInput: [],
     });
   };
 
@@ -1209,11 +1224,6 @@ const App = () => {
       syncMessages(update, true);
       return update;
     });
-  };
-
-  const handlePromptClick = (prompt: string) => {
-    setMessage(prompt);
-    textareaRef.current?.focus();
   };
 
   const handleNewChat = async () => {
@@ -1326,7 +1336,7 @@ const App = () => {
                 border: "none",
                 cursor: "pointer",
               }}
-              onClick={() => void Browser.runtime.openOptionsPage()}
+              onClick={() => Browser.runtime.openOptionsPage()}
             >
               Open Settings
             </button>

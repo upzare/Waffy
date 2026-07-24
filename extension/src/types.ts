@@ -23,7 +23,7 @@ export interface HeroProps {
   onPromptClick: (prompt: string) => void;
 }
 
-export interface SuggestedPromptProps {
+export interface PinnedPromptProps {
   text: string;
   onClick?: () => void;
 }

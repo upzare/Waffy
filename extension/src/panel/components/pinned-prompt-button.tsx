@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import type { SuggestedPromptProps } from "../../types";
+import type { PinnedPromptProps } from "../../types";
 
-const SuggestedPromptButton: React.FC<SuggestedPromptProps> = ({ text, onClick }) => {
+const PinnedPromptButton: React.FC<PinnedPromptProps> = ({ text, onClick }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -25,11 +25,11 @@ const SuggestedPromptButton: React.FC<SuggestedPromptProps> = ({ text, onClick }
     <button
       ref={buttonRef}
       type="button"
-      className="group relative flex justify-center items-center overflow-hidden h-10 cursor-pointer bg-size-[300%_300%] backdrop-blur-[1rem] rounded-[5rem] [transition:0.5s] animate-suggestions-gradient border-2 border-double border-transparent px-4 font-['Orbitron',sans-serif] hover:scale-105 [background-image:linear-gradient(#161a25,#161a25),linear-gradient(137.48deg,var(--color-1)_15%,var(--color-2)_25%,var(--color-3)_40%,var(--color-4)_60%,var(--color-5)_75%,var(--color-6)_90%)] bg-origin-border [background-clip:content-box,border-box]"
+      className="group relative flex justify-center items-center overflow-hidden h-10 cursor-pointer bg-size-[300%_300%] backdrop-blur-lg rounded-[5rem] [transition:0.5s] animate-suggestions-gradient border-2 border-double border-transparent px-4 font-['Orbitron',sans-serif] hover:scale-105 [background-image:linear-gradient(#161a25,#161a25),linear-gradient(137.48deg,var(--color-1)_15%,var(--color-2)_25%,var(--color-3)_40%,var(--color-4)_60%,var(--color-5)_75%,var(--color-6)_90%)] bg-origin-border [background-clip:content-box,border-box]"
       onClick={onClick}
     >
       <strong className="z-2 tracking-wide text-white [text-shadow:0_0_1px_white]">{text}</strong>
-      <div className="absolute z-[-1] w-full h-full overflow-hidden [transition:0.5s] backdrop-blur-[1rem] rounded-[5rem] group-hover:z-1 group-hover:bg-[#161a25]">
+      <div className="absolute z-[-1] w-full h-full overflow-hidden [transition:0.5s] backdrop-blur-lg rounded-[5rem] group-hover:z-1 group-hover:bg-[#161a25]">
         <div className="relative bg-transparent w-[200rem] h-[200rem] before:content-[''] before:absolute before:top-0 before:left-[-50%] before:w-[170%] before:h-[500%] before:animate-anim-star before:bg-[radial-gradient(#ffffff_1px,transparent_1%)] before:bg-size-[50px_50px] before:opacity-50 after:content-[''] after:absolute after:top-[-10rem] after:left-[-100rem] after:w-full after:h-full after:animate-anim-star-rotate after:bg-[radial-gradient(#ffffff_1px,transparent_1%)] after:bg-size-[50px_50px]"></div>
       </div>
       <div className="absolute flex w-48">
@@ -40,4 +40,4 @@ const SuggestedPromptButton: React.FC<SuggestedPromptProps> = ({ text, onClick }
   );
 };
 
-export default SuggestedPromptButton;
+export default PinnedPromptButton;
