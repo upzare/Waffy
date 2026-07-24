@@ -67,6 +67,7 @@ const MarkdownContent = ({
   <Streamdown
     className="wrap-break-word w-full leading-[1.75] text-text-primary"
     plugins={streamdownPlugins}
+    mode={isAnimating ? "streaming" : "static"}
     isAnimating={isAnimating}
     animated={{ animation: "blurIn", stagger: 0, sep: "char" }}
     shikiTheme={["github-dark", "github-dark"]}
