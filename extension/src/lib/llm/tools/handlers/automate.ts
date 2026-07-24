@@ -3,6 +3,8 @@ import type { Tabs } from "webextension-polyfill";
 import { isInaccessiblePage } from "@/helper";
 import { AutomateToolResult } from "../automate";
 import { webSearch } from "./web-search";
+import { toolError } from "@/lib/errors";
+import { sleep } from "@/lib/utils";
 
 const KEY_CODES = {
   Enter: 13,
@@ -20,10 +22,6 @@ const KEY_CODES = {
 };
 
 type KEY_TYPES = keyof typeof KEY_CODES;
-
-const sleep = async (ms: number) => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
 
 const getSessionTab = async () => (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as Tabs.Tab | undefined;
 
@@ -58,14 +56,14 @@ const fetchScreen = async (): Promise<AutomateToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     if (isInaccessiblePage(tab.url)) {
       return {
         status: "error",
-        message:
-          "Error: " +
-          `Cannot capture screen on "${tab.url}". Browser internal pages cannot be accessed or automated.`,
+        message: toolError(
+          `Cannot capture screen on "${tab.url}". Browser internal pages cannot be accessed or automated.`
+        ),
       };
     }
     const devicePixelRatio = await Browser.tabs
@@ -102,7 +100,7 @@ const fetchScreen = async (): Promise<AutomateToolResult> => {
       data: { type: "screenshot", metadata: meta, image: base64Image },
     };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -110,14 +108,14 @@ const getPageContent = async (): Promise<AutomateToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab?.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     if (isInaccessiblePage(tab.url)) {
       return {
         status: "error",
-        message:
-          "Error: " +
-          `Cannot read "${tab.url}". Browser internal pages cannot be accessed or automated.`,
+        message: toolError(
+          `Cannot read "${tab.url}". Browser internal pages cannot be accessed or automated.`
+        ),
       };
     }
     const response = (await Browser.runtime.sendMessage({
@@ -127,12 +125,12 @@ const getPageContent = async (): Promise<AutomateToolResult> => {
     if (!response || response.status === "error") {
       return {
         status: "error",
-        message: "Error: " + (response?.message ?? "Failed to get page content."),
+        message: toolError(response?.message, "Failed to get page content."),
       };
     }
     return { status: "success", message: response.message as string };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -148,7 +146,7 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     const sourceTabId = tab.id;
     const tabsBefore = await Browser.tabs.query({});
@@ -175,7 +173,7 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
     }
     return { status: "success", message: "Success: Click initiated" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -184,7 +182,7 @@ const keyPress = async ({ key }: { key: KEY_TYPES }): Promise<AutomateToolResult
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
       type: "keyDown",
@@ -203,7 +201,7 @@ const keyPress = async ({ key }: { key: KEY_TYPES }): Promise<AutomateToolResult
     });
     return { status: "success", message: "Success: Key pressed" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -220,7 +218,7 @@ const typeText = async ({
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     void Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
@@ -247,7 +245,7 @@ const typeText = async ({
     }
     return { status: "success", message: "Success: Text typed successfully" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -256,7 +254,7 @@ const clearValue = async ({ x, y }: { x: number; y: number }): Promise<AutomateT
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     void Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
@@ -285,7 +283,7 @@ const clearValue = async ({ x, y }: { x: number; y: number }): Promise<AutomateT
     });
     return { status: "success", message: "Success: Value cleared successfully" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -294,7 +292,7 @@ const getOption = async ({ x, y }: { x: number; y: number }): Promise<AutomateTo
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     void Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
@@ -310,9 +308,9 @@ const getOption = async ({ x, y }: { x: number; y: number }): Promise<AutomateTo
     if (res.status === "success") {
       return { status: "success", message: "Success: " + res.value };
     }
-    return { status: "error", message: "Error: " + res.value };
+    return { status: "error", message: toolError(res.value) };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -329,7 +327,7 @@ const setOption = async ({
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     void Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
@@ -345,9 +343,9 @@ const setOption = async ({
     if (res.status === "success") {
       return { status: "success", message: "Success: " + res.value };
     }
-    return { status: "error", message: "Error: " + res.value };
+    return { status: "error", message: toolError(res.value) };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -365,7 +363,7 @@ const scroll = async ({
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     void Browser.tabs.sendMessage(tab.id, {
       type: "INTERACT_DOM",
@@ -380,7 +378,7 @@ const scroll = async ({
     });
     return { status: "success", message: "Success: Scroll initiated" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -388,7 +386,7 @@ const loadingState = async (): Promise<AutomateToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     const readyState = await new Promise<string>((resolve, reject) => {
       chrome.debugger.sendCommand(
@@ -409,7 +407,7 @@ const loadingState = async (): Promise<AutomateToolResult> => {
     }
     return { status: "success", message: "Success: Page is under loading" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -417,12 +415,12 @@ const goto = async ({ url }: { url: string }): Promise<AutomateToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     await Browser.tabs.update(tab.id, { url });
     return { status: "success", message: "Success: Navigated to URL successfully" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -438,7 +436,7 @@ const getOpenedTabs = async (): Promise<AutomateToolResult> => {
     }));
     return { status: "success", message: JSON.stringify(result) };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -449,7 +447,7 @@ const openTab = async ({ url }: { url: string }): Promise<AutomateToolResult> =>
     await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
     return { status: "success", message: "Success: URL opened in new tab successfully" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -460,7 +458,7 @@ const switchTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResu
     await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
     return { status: "success", message: "Success: Tab switched successfully" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -469,7 +467,7 @@ const closeTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResul
     await Browser.tabs.remove(tabId);
     return { status: "success", message: "Success: Tab closed successfully" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -477,12 +475,12 @@ const reload = async (): Promise<AutomateToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
-      return { status: "error", message: "Error: Tab not found" };
+      return { status: "error", message: toolError("Tab not found") };
     }
     await Browser.tabs.reload(tab.id);
     return { status: "success", message: "Success: Reloaded the page successfully" };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 
@@ -491,7 +489,7 @@ const wait = async ({ ms }: { ms: number }): Promise<AutomateToolResult> => {
     await sleep(ms);
     return { status: "success", message: `Success: Waited for ${ms} milliseconds` };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };
 

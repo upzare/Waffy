@@ -1,5 +1,6 @@
 import Browser from "webextension-polyfill";
 import type { DomMessage } from "../types";
+import { sleep } from "./utils";
 
 async function initOverlay() {
   if (document.querySelector(".waffy-overlay")) {
@@ -87,8 +88,6 @@ function disableOverlay() {
     overlay.style.display = "none";
   }
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getPageSnapshot = () => ({
   url: window.location.href,

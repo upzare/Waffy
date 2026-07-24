@@ -8,6 +8,7 @@ import { BASE_TOOLS } from "@/lib/llm/tools/base";
 import { SEARCH_TOOLS } from "@/lib/llm/tools/search";
 import { RESEARCH_TOOLS } from "@/lib/llm/tools/research";
 import { T1_TOOLS, T2_TOOLS, T3_TOOLS } from "@/lib/llm/tools/automate";
+import { DEFAULT_ERROR_MESSAGE, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import type { AppSettings, ToolCall } from "@/types";
 
 export type StreamMode = "base" | "search" | "research" | "t1" | "t2" | "t3" | "t4";
@@ -92,10 +93,8 @@ export type StreamEvent =
   | ReasoningDeltaEvent
   | ActionCallEvent;
 
-const DEFAULT_ERROR_MESSAGE = "Something went wrong. Please try again.";
-
 export function normalizeStreamError(error: unknown, abortSignal?: AbortSignal): string {
-  if (abortSignal?.aborted) return "User interrupted while processing.";
+  if (abortSignal?.aborted) return USER_INTERRUPTED_MESSAGE;
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return DEFAULT_ERROR_MESSAGE;

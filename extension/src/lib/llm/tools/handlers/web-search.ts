@@ -1,4 +1,5 @@
 import Browser from "webextension-polyfill";
+import { toolError } from "@/lib/errors";
 
 export type WebSearchToolResult = {
   status: string;
@@ -18,9 +19,9 @@ export const webSearch = async ({ query }: { query: string }): Promise<WebSearch
 
     return {
       status: "error",
-      message: "Error: " + (response?.message ?? "Failed to fetch Google AI Mode results."),
+      message: toolError(response?.message, "Failed to fetch Google AI Mode results."),
     };
   } catch (error) {
-    return { status: "error", message: "Error: " + error };
+    return { status: "error", message: toolError(error) };
   }
 };

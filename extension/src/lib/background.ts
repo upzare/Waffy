@@ -3,6 +3,7 @@ import type { Runtime, Tabs } from "webextension-polyfill";
 import { initClient, initSettings } from "./client";
 import { isInaccessiblePage } from "@/helper";
 import { htmlToMarkdown } from "./html-to-markdown";
+import { sleep } from "./utils";
 
 const overlayInfo: Record<number, boolean> = {};
 
@@ -11,6 +12,8 @@ let openedTabs: Tabs.Tab[] = [];
 let activeTabId: number | null = null;
 
 let active = false;
+
+let searchWindowId: number | null = null;
 
 const syncOpenedTabs = async (): Promise<void> => {
   openedTabs = await Browser.tabs.query({});
@@ -76,6 +79,12 @@ const attachDebugger = (tabId: number): Promise<void> => {
 };
 
 const detachDebugger = async (tabId: number): Promise<void> => {
+  const isAttached = await new Promise<boolean>((resolve) => {
+    chrome.debugger.getTargets((targets) => {
+      resolve(targets.some((target) => target.tabId === tabId && target.attached));
+    });
+  });
+  if (!isAttached) return;
   disableOverlay(tabId);
   try {
     await chrome.debugger.sendCommand({ tabId }, "Page.disable");
@@ -122,7 +131,9 @@ const stopSession = async () => {
   }
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const cleanupGeneration = async () => {
+  await Promise.all([stopGoogleAiMode(), stopSession()]);
+};
 
 const formatPageMarkdown = (
   html: string,
@@ -150,36 +161,39 @@ const waitForTabComplete = (tabId: number, timeoutMs = 15000): Promise<void> =>
   new Promise((resolve, reject) => {
     let settled = false;
 
-    const finish = (fn: () => void) => {
+    const settle = (fn: () => void) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      Browser.tabs.onUpdated.removeListener(listener);
+      Browser.tabs.onUpdated.removeListener(onUpdated);
+      Browser.tabs.onRemoved.removeListener(onRemoved);
       fn();
     };
 
     const timer = setTimeout(() => {
-      finish(() => reject(new Error("Timed out waiting for Google AI Mode page to load.")));
+      settle(() => reject(new Error("Timed out waiting for Google AI Mode page to load.")));
     }, timeoutMs);
 
-    const listener = (updatedTabId: number, changeInfo: Tabs.OnUpdatedChangeInfoType) => {
-      if (updatedTabId === tabId && changeInfo.status === "complete") {
-        finish(() => resolve());
-      }
+    const onUpdated = (id: number, info: Tabs.OnUpdatedChangeInfoType) => {
+      if (id === tabId && info.status === "complete") settle(() => resolve());
+    };
+    const onRemoved = (id: number) => {
+      if (id === tabId) settle(() => reject(new Error("Search cancelled.")));
     };
 
-    Browser.tabs.onUpdated.addListener(listener);
+    Browser.tabs.onUpdated.addListener(onUpdated);
+    Browser.tabs.onRemoved.addListener(onRemoved);
 
-    void Browser.tabs.get(tabId).then((tab) => {
-      if (tab.status === "complete") {
-        finish(() => resolve());
-      }
-    });
+    void Browser.tabs.get(tabId).then(
+      (tab) => {
+        if (tab.status === "complete") settle(() => resolve());
+      },
+      () => settle(() => reject(new Error("Search cancelled.")))
+    );
   });
 
-const waitAiModeFromTab = async (tabId: number) => {
-  let lastError: unknown;
-  for (let i = 0; i < 8; i++) {
+const waitGoogleAiMode = async (tabId: number) => {
+  for (let i = 0; i < 3; i++) {
     try {
       return (await Browser.tabs.sendMessage(tabId, {
         type: "WAIT_AI_MODE_CONTENT",
@@ -190,14 +204,20 @@ const waitAiModeFromTab = async (tabId: number) => {
         url?: string;
         title?: string;
       };
-    } catch (e) {
-      lastError = e;
-      await sleep(250);
+    } catch (_) {
+      await sleep(200);
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Content script not ready on Google AI Mode tab.");
+  throw new Error("Search cancelled.");
+};
+
+const stopGoogleAiMode = async () => {
+  const id = searchWindowId;
+  searchWindowId = null;
+  if (id == null) return;
+  try {
+    await Browser.windows.remove(id);
+  } catch (_) { }
 };
 
 const fetchGoogleAiMode = async (query: string) => {
@@ -206,51 +226,45 @@ const fetchGoogleAiMode = async (query: string) => {
     return { status: "error", message: "Search query is required." };
   }
 
-  let searchWindowId: number | undefined;
+  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}&udm=50&hl=en`;
 
   try {
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}&udm=50&hl=en`;
     const searchWindow = await Browser.windows.create({
       url: searchUrl,
       type: "popup",
       width: 1,
       height: 1,
-      focused: false
+      focused: false,
     });
-    const searchTabId = searchWindow.tabs?.[0]?.id;
-    if (searchWindow.id == null || searchTabId == null) {
+    const tabId = searchWindow.tabs?.[0]?.id;
+    if (searchWindow.id == null || tabId == null) {
       return { status: "error", message: "Failed to open Google AI Mode window." };
     }
+
     searchWindowId = searchWindow.id;
 
-    const start = performance.now();
-
-    await waitForTabComplete(searchTabId);
-    const response = await waitAiModeFromTab(searchTabId);
-    if (!response || response.status === "error" || !response.html) {
+    await waitForTabComplete(tabId);
+    const response = await waitGoogleAiMode(tabId);
+    if (!response?.html || response.status === "error") {
       return {
         status: "error",
         message: response?.value ?? "Failed to read Google AI Mode response.",
       };
     }
 
-    const end = performance.now();
-    console.log("Search Time:", end - start);
-
     return formatPageMarkdown(
       response.html,
-      response.url ?? searchUrl,
+      searchUrl,
       response.title ?? "",
       `Query: ${trimmed}`
     );
   } catch (e) {
-    return { status: "error", message: String(e) };
+    return {
+      status: "error",
+      message: e instanceof Error ? e.message : String(e),
+    };
   } finally {
-    if (searchWindowId != null) {
-      try {
-        await Browser.windows.remove(searchWindowId);
-      } catch (_) { }
-    }
+    await stopGoogleAiMode();
   }
 };
 
@@ -296,12 +310,18 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     case "START_SESSION": {
       return startSession(request.tabId)
         .then(() => ({ status: "success" }))
-        .catch((e) => ({ status: "error", value: String(e) }));
+        .catch((e) => ({
+          status: "error",
+          value: e instanceof Error ? e.message : String(e),
+        }));
     }
     case "STOP_SESSION": {
       return stopSession()
         .then(() => ({ status: "success" }))
-        .catch((e) => ({ status: "error", value: String(e) }));
+        .catch((e) => ({
+          status: "error",
+          value: e instanceof Error ? e.message : String(e),
+        }));
     }
     case "GET_PAGE_INFO": {
       return (async () => {
@@ -324,7 +344,10 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
             message: `URL: ${tab.url ?? ""}\nTitle: ${tab.title ?? ""}\nLoading: ${tab.status ?? ""}`,
           };
         } catch (e) {
-          return { status: "error", message: String(e) };
+          return {
+            status: "error",
+            message: e instanceof Error ? e.message : String(e),
+          };
         }
       })();
     }
@@ -373,7 +396,10 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
             },
           };
         } catch (e) {
-          return { status: "error", message: String(e) };
+          return {
+            status: "error",
+            message: e instanceof Error ? e.message : String(e),
+          };
         } finally {
           if (previousTabId != null) {
             try {
@@ -385,6 +411,9 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     }
     case "FETCH_GOOGLE_AI_MODE": {
       return fetchGoogleAiMode(request.query);
+    }
+    case "STOP_GENERATION": {
+      return cleanupGeneration().then(() => ({ status: "success" }));
     }
     case "GET_PAGE_CONTENT": {
       return (async () => {
@@ -419,7 +448,10 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
           }
           return formatPageMarkdown(response.html, response.url ?? "", response.title ?? "");
         } catch (e) {
-          return { status: "error", message: String(e) };
+          return {
+            status: "error",
+            message: e instanceof Error ? e.message : String(e),
+          };
         }
       })();
     }
