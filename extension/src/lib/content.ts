@@ -128,75 +128,91 @@ const waitAiModeContent = async () => {
   return { status: "success" as const, ...getPageSnapshot() };
 };
 
+const getDevicePixelRatio = () =>
+  Promise.resolve({ status: "success", value: window.devicePixelRatio });
+
+const getPageContent = () =>
+  Promise.resolve({ status: "success", ...getPageSnapshot() });
+
+const getOption = () => {
+  const element = document.activeElement as HTMLSelectElement;
+  if (element && element.tagName.toLowerCase() === "select") {
+    const options = Array.from(element.options).map((option) => option.value);
+    const optionsMessage = "Available options -> " + options.join(", ");
+    return Promise.resolve({ status: "success", value: optionsMessage });
+  }
+  return Promise.resolve({ status: "error", value: "Element is not a select element" });
+};
+
+const setOption = (value: string) => {
+  const element = document.activeElement as HTMLSelectElement;
+  if (element && element.tagName.toLowerCase() === "select") {
+    const options = Array.from(element.options).map((option) => option.value);
+    if (options.includes(value)) {
+      element.value = value;
+      return Promise.resolve({ status: "success", value: "Value set successfully" });
+    }
+    return Promise.resolve({ status: "error", value: "Value not found" });
+  }
+  return Promise.resolve({ status: "error", value: "Element is not a select element" });
+};
+
+const displayPointer = async (args: { x?: number; y?: number; timeout?: number }) => {
+  const { x, y, timeout } = args;
+  const pointer = document.createElement("img");
+  pointer.id = "waffy-pointer";
+  pointer.src = Browser.runtime.getURL("shared/cursor.png");
+  pointer.style.position = "fixed";
+  pointer.style.left = `${x}px`;
+  pointer.style.top = `${y}px`;
+  pointer.style.width = "32px";
+  pointer.style.height = "32px";
+  pointer.style.zIndex = "999999";
+  pointer.style.pointerEvents = "none";
+  document.body.appendChild(pointer);
+  await new Promise((resolve) => setTimeout(resolve, timeout || 1500));
+  pointer.remove();
+  return { status: "success", value: "Pointer displayed" };
+};
+
+const showOverlay = () => {
+  enableOverlay();
+  return Promise.resolve({ status: "success", value: "Overlay Enabled" });
+};
+
+const hideOverlay = () => {
+  disableOverlay();
+  return Promise.resolve({ status: "success", value: "Overlay Disabled" });
+};
+
+const interactDom = (name: string, args: Record<string, any> = {}) => {
+  switch (name) {
+    case "GET_OPTION":
+      return getOption();
+    case "SET_OPTION":
+      return setOption(args.value);
+    case "DISPLAY_POINTER":
+      return displayPointer(args);
+    case "SHOW_OVERLAY":
+      return showOverlay();
+    case "HIDE_OVERLAY":
+      return hideOverlay();
+    default:
+      return Promise.resolve({ status: "error", value: "Invalid function name" });
+  }
+};
+
 Browser.runtime.onMessage.addListener((message: any) => {
   const msg = message as DomMessage;
   switch (msg.type) {
-    case "GET_DEVICE_PIXEL_RATIO": {
-      return Promise.resolve({ status: "success", value: window.devicePixelRatio });
-    }
-    case "GET_PAGE_CONTENT": {
-      return Promise.resolve({ status: "success", ...getPageSnapshot() });
-    }
-    case "WAIT_AI_MODE_CONTENT": {
+    case "GET_DEVICE_PIXEL_RATIO":
+      return getDevicePixelRatio();
+    case "GET_PAGE_CONTENT":
+      return getPageContent();
+    case "WAIT_AI_MODE_CONTENT":
       return waitAiModeContent();
-    }
-    case "INTERACT_DOM": {
-      const name = msg.name;
-      const args = msg.args ?? {};
-      switch (name) {
-        case "GET_OPTION": {
-          const element = document.activeElement as HTMLSelectElement;
-          if (element && element.tagName.toLowerCase() === "select") {
-            const options = Array.from(element.options).map((option) => option.value);
-            const optionsMessage = "Available options -> " + options.join(", ");
-            return Promise.resolve({ status: "success", value: optionsMessage });
-          }
-          return Promise.resolve({ status: "error", value: "Element is not a select element" });
-        }
-        case "SET_OPTION": {
-          const element = document.activeElement as HTMLSelectElement;
-          if (element && element.tagName.toLowerCase() === "select") {
-            const value = args.value;
-            const options = Array.from(element.options).map((option) => option.value);
-            if (options.includes(value)) {
-              element.value = value;
-              return Promise.resolve({ status: "success", value: "Value set successfully" });
-            }
-            return Promise.resolve({ status: "error", value: "Value not found" });
-          }
-          return Promise.resolve({ status: "error", value: "Element is not a select element" });
-        }
-        case "DISPLAY_POINTER": {
-          return (async () => {
-            const { x, y, timeout } = args;
-            const pointer = document.createElement("img");
-            pointer.id = "waffy-pointer";
-            pointer.src = Browser.runtime.getURL("shared/cursor.png");
-            pointer.style.position = "fixed";
-            pointer.style.left = `${x}px`;
-            pointer.style.top = `${y}px`;
-            pointer.style.width = "32px";
-            pointer.style.height = "32px";
-            pointer.style.zIndex = "999999";
-            pointer.style.pointerEvents = "none";
-            document.body.appendChild(pointer);
-            await new Promise((resolve) => setTimeout(resolve, timeout || 1500));
-            pointer.remove();
-            return { status: "success", value: "Pointer displayed" };
-          })();
-        }
-        case "SHOW_OVERLAY": {
-          enableOverlay();
-          return Promise.resolve({ status: "success", value: "Overlay Enabled" });
-        }
-        case "HIDE_OVERLAY": {
-          disableOverlay();
-          return Promise.resolve({ status: "success", value: "Overlay Disabled" });
-        }
-        default:
-          return Promise.resolve({ status: "error", value: "Invalid function name" });
-      }
-    }
+    case "INTERACT_DOM":
+      return interactDom(msg.name ?? "", msg.args ?? {});
   }
   return undefined;
 });
