@@ -7,18 +7,18 @@ type ContentPart =
 export type ToolResultData = {
   image?: string;
   metadata?: Record<string, unknown>;
-}
+};
 
 export type ExtensionMessage =
   | { type: "prompt"; content?: ContentPart[] }
   | { type: "response"; content?: ContentPart[] }
   | { type: "action.init"; id: string; name: string; arguments?: string }
-  | { type: "action.result"; id: string; name: string; output?: string; data?: ToolResultData; };
+  | { type: "action.result"; id: string; name: string; output?: string; data?: ToolResultData };
 
 export type ScreenshotState = {
   image: string | null;
   metadata: Record<string, unknown> | null;
-}
+};
 
 type ToolCallContent = {
   type: "tool-call";

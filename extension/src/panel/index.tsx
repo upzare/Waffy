@@ -31,6 +31,7 @@ import {
   keepLatestScreenshotOnly,
 } from "@/lib/llm/messages";
 import type { StreamSession } from "@/lib/llm/stream";
+import { errorMessage, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import type { ExtensionMessage } from "@/lib/llm/messages";
 import HistorySidebar from "./components/history-sidebar";
 import Hero from "./components/hero";
@@ -76,7 +77,6 @@ const App = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController>(null);
-  const safeToAbortRef = useRef<boolean>(false);
   const generationLockRef = useRef(false);
   const dbSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -263,6 +263,14 @@ const App = () => {
     return updatedMessages;
   };
 
+  const isAborted = () => Boolean(abortControllerRef.current?.signal.aborted);
+
+  const assertNotAborted = () => {
+    if (isAborted()) throw USER_INTERRUPTED_MESSAGE;
+  };
+
+  const showError = (error?: unknown) => setErrorText(errorMessage(error));
+
   const attachController = async () => {
     const tab = await getActiveTab();
     if (!tab?.id) return;
@@ -271,6 +279,10 @@ const App = () => {
 
   const detachController = async () => {
     await Browser.runtime.sendMessage({ action: "STOP_SESSION" });
+  };
+
+  const cleanupBackground = () => {
+    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => {});
   };
 
   const automateHandler = async (
@@ -302,12 +314,12 @@ const App = () => {
     prompt_files: FileFormat[],
     conversationMessages: Message[]
   ) => {
-    if (abortControllerRef.current?.signal.aborted) return;
+    assertNotAborted();
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
     const t1Messages = buildT1Messages(prompt_text, prompt_files, conversationMessages);
     console.log("t1Messages:", t1Messages);
-    const responseStream = AI(t1Messages, "t1", abortControllerRef?.current, safeToAbortRef);
+    const responseStream = AI(t1Messages, "t1", abortControllerRef?.current);
     const toolCalls: Record<string, ToolCall> = {};
     for await (const res of responseStream) {
       if (res.type === "action.call") {
@@ -359,7 +371,7 @@ const App = () => {
     prompt_files: FileFormat[],
     conversationMessages: Message[]
   ) => {
-    if (abortControllerRef.current?.signal.aborted) return;
+    assertNotAborted();
     setStatusText("EXECUTING");
     setStreaming((prev) => ({ ...prev, execution: true }));
 
@@ -384,12 +396,12 @@ const App = () => {
         prev.map((msg) =>
           msg.id === `assistant-${messageIdRef.current}`
             ? {
-              ...msg,
-              content: {
-                ...msg.content,
-                text: { ...msg.content.text, execution: ["Initializing"] },
-              },
-            }
+                ...msg,
+                content: {
+                  ...msg.content,
+                  text: { ...msg.content.text, execution: ["Initializing"] },
+                },
+              }
             : msg
         )
       )
@@ -400,6 +412,7 @@ const App = () => {
     let t2Reasoning = "";
 
     while (!finish || functionExecState) {
+      assertNotAborted();
       if (!responded) return false;
       responded = false;
 
@@ -410,7 +423,6 @@ const App = () => {
         t2Messages,
         "t2",
         abortControllerRef?.current,
-        safeToAbortRef,
         t2SessionRef.current
       );
 
@@ -474,6 +486,7 @@ const App = () => {
         console.log("toolArgs:", toolArgs);
         const toolCallResult = await automateFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
+        assertNotAborted();
 
         const screenshotData =
           toolCallResult.data?.type === "screenshot"
@@ -514,11 +527,11 @@ const App = () => {
   };
 
   const t3Handler = async (task: string, t2Reasoning: string) => {
-    if (abortControllerRef.current?.signal.aborted) return;
+    assertNotAborted();
     setStatusText("VALIDATING");
     setStreaming((prev) => ({ ...prev, validation: true }));
     const t3Messages = buildT3Messages(task, t2Reasoning);
-    const summaryModelStream = AI(t3Messages, "t3", abortControllerRef?.current, safeToAbortRef);
+    const summaryModelStream = AI(t3Messages, "t3", abortControllerRef?.current);
     const toolCalls: Record<string, ToolCall> = {};
     for await (const res of summaryModelStream) {
       if (res.type === "action.call") {
@@ -571,11 +584,11 @@ const App = () => {
   };
 
   const t4Handler = async (task: string, t2Reasoning: string) => {
-    if (abortControllerRef.current?.signal.aborted) return;
+    assertNotAborted();
     setStatusText("FINALIZING");
     setStreaming((prev) => ({ ...prev, output: true }));
     const t4Messages = buildT4Messages(task, t2Reasoning);
-    const summaryModelStream = AI(t4Messages, "t4", abortControllerRef?.current, safeToAbortRef);
+    const summaryModelStream = AI(t4Messages, "t4", abortControllerRef?.current);
     for await (const res of summaryModelStream) {
       if (res.type === "text.stream") {
         setMessages((prev) => {
@@ -603,7 +616,7 @@ const App = () => {
     prompt_files: FileFormat[],
     conversationMessages: Message[]
   ) => {
-    if (abortControllerRef.current?.signal.aborted) return;
+    assertNotAborted();
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
@@ -612,11 +625,10 @@ const App = () => {
     let functionExecState = false;
 
     while (!finish || functionExecState) {
-      if (abortControllerRef.current?.signal.aborted) return;
-
+      assertNotAborted();
       let textResponse = "";
       const baseToolCalls: Record<string, ToolCall> = {};
-      const baseStream = AI(baseMessages, "base", abortControllerRef?.current, safeToAbortRef);
+      const baseStream = AI(baseMessages, "base", abortControllerRef?.current);
 
       for await (const res of baseStream) {
         if (res.type === "text.stream") {
@@ -706,6 +718,7 @@ const App = () => {
         setToolActivityText(getToolActivityLabel(toolName, toolArgs));
         const toolCallResult = await baseFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
+        assertNotAborted();
 
         const screenshotData =
           toolCallResult.data?.type === "screenshot"
@@ -735,7 +748,7 @@ const App = () => {
     prompt_files: FileFormat[],
     conversationMessages: Message[]
   ) => {
-    if (abortControllerRef.current?.signal.aborted) return;
+    assertNotAborted();
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
@@ -744,11 +757,10 @@ const App = () => {
     let functionExecState = false;
 
     while (!finish || functionExecState) {
-      if (abortControllerRef.current?.signal.aborted) return;
-
+      assertNotAborted();
       let textResponse = "";
       const searchToolCalls: Record<string, ToolCall> = {};
-      const searchStream = AI(searchMessages, "search", abortControllerRef?.current, safeToAbortRef);
+      const searchStream = AI(searchMessages, "search", abortControllerRef?.current);
 
       for await (const res of searchStream) {
         if (res.type === "text.stream") {
@@ -807,6 +819,7 @@ const App = () => {
         setToolActivityText(getToolActivityLabel(toolName, toolArgs));
         const toolCallResult = await searchFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
+        assertNotAborted();
 
         iterationMessages.push({
           type: "action.result",
@@ -830,7 +843,7 @@ const App = () => {
     prompt_files: FileFormat[],
     conversationMessages: Message[]
   ) => {
-    if (abortControllerRef.current?.signal.aborted) return;
+    assertNotAborted();
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
@@ -839,16 +852,10 @@ const App = () => {
     let functionExecState = false;
 
     while (!finish || functionExecState) {
-      if (abortControllerRef.current?.signal.aborted) return;
-
+      assertNotAborted();
       let textResponse = "";
       const researchToolCalls: Record<string, ToolCall> = {};
-      const researchStream = AI(
-        researchMessages,
-        "research",
-        abortControllerRef?.current,
-        safeToAbortRef
-      );
+      const researchStream = AI(researchMessages, "research", abortControllerRef?.current);
 
       for await (const res of researchStream) {
         if (res.type === "text.stream") {
@@ -907,6 +914,7 @@ const App = () => {
         setToolActivityText(getToolActivityLabel(toolName, toolArgs));
         const toolCallResult = await researchFunctions[toolName](toolArgs);
         console.log("toolCallResult:", toolCallResult);
+        assertNotAborted();
 
         const screenshotData =
           toolCallResult.data?.type === "screenshot"
@@ -929,15 +937,6 @@ const App = () => {
 
     setToolActivityText(null);
     setStreaming((prev) => ({ ...prev, response: false }));
-  };
-
-  const displayError = (error?: unknown) => {
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-    setIsGenerating(false);
-    let errorMessage = "Something went wrong. Please try again.";
-    if (typeof error === "string") errorMessage = error;
-    else if (error instanceof Error) errorMessage = error.message;
-    setErrorText(errorMessage);
   };
 
   const ensureProvidersConfigured = async () => {
@@ -1016,7 +1015,7 @@ const App = () => {
         await prepareMessages();
         await runModeHandler(mode, promptText, promptFiles, conversationContext);
       } catch (error: unknown) {
-        displayError(error);
+        showError(error);
       } finally {
         setStreaming({ response: false, execution: false, validation: false, output: false });
         setStreamingMessageId(null);
@@ -1037,7 +1036,6 @@ const App = () => {
         }
         messageIdRef.current = null;
         abortControllerRef.current = null;
-        safeToAbortRef.current = false;
       }
     } finally {
       generationLockRef.current = false;
@@ -1103,7 +1101,7 @@ const App = () => {
         if (wasFirstMessage) {
           generateTitle(promptText)
             .then(() => fetchConversations())
-            .catch(() => { });
+            .catch(() => {});
         }
       },
     });
@@ -1141,15 +1139,15 @@ const App = () => {
           const update = prev.map((msg) =>
             msg.id === assistantMessageId
               ? {
-                ...msg,
-                content: {
-                  task: "",
-                  taskStatus: "",
-                  text: { response: "", execution: [], validation: "", output: "" },
-                  files: [],
-                  mode,
-                },
-              }
+                  ...msg,
+                  content: {
+                    task: "",
+                    taskStatus: "",
+                    text: { response: "", execution: [], validation: "", output: "" },
+                    files: [],
+                    mode,
+                  },
+                }
               : msg
           );
           syncMessages(update, true);
@@ -1191,22 +1189,24 @@ const App = () => {
   };
 
   const handleStopGeneration = async () => {
-    if (safeToAbortRef.current) {
-      const currentMessageId = messageIdRef.current;
-      abortControllerRef.current?.abort();
-      setToolActivityText(null);
-      if (currentMessageId) {
-        setMessages((prev) => {
-          const update = prev.map((msg) =>
-            msg.id === `assistant-${currentMessageId}`
-              ? { ...msg, content: { ...msg.content, aborted: true } }
-              : msg
-          );
-          syncMessages(update, true);
-          return update;
-        });
-      }
-    }
+    if (!abortControllerRef.current) return;
+    abortControllerRef.current.abort();
+
+    cleanupBackground();
+    setToolActivityText(null);
+    showError(USER_INTERRUPTED_MESSAGE);
+
+    const messageId = messageIdRef.current;
+    if (!messageId) return;
+    setMessages((prev) => {
+      const update = prev.map((msg) =>
+        msg.id === `assistant-${messageId}`
+          ? { ...msg, content: { ...msg.content, aborted: true } }
+          : msg
+      );
+      syncMessages(update, true);
+      return update;
+    });
   };
 
   const handlePromptClick = (prompt: string) => {

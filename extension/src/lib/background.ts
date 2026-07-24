@@ -3,6 +3,7 @@ import type { Runtime, Tabs } from "webextension-polyfill";
 import { initClient, initSettings } from "./client";
 import { isInaccessiblePage } from "@/helper";
 import { htmlToMarkdown } from "./html-to-markdown";
+import { sleep } from "./utils";
 
 const overlayInfo: Record<number, boolean> = {};
 
@@ -12,29 +13,27 @@ let activeTabId: number | null = null;
 
 let active = false;
 
+let searchWindowId: number | null = null;
+
 const syncOpenedTabs = async (): Promise<void> => {
   openedTabs = await Browser.tabs.query({});
 };
 
-const disableOverlay = (tabId: number) => {
+const setOverlay = (tabId: number, enabled: boolean) => {
   void Browser.tabs
-    .sendMessage(tabId, { type: "INTERACT_DOM", name: "HIDE_OVERLAY" })
+    .sendMessage(tabId, {
+      type: "INTERACT_DOM",
+      name: enabled ? "SHOW_OVERLAY" : "HIDE_OVERLAY",
+    })
     .catch(() => { });
-  overlayInfo[tabId] = false;
-};
-
-const enableOverlay = (tabId: number) => {
-  void Browser.tabs
-    .sendMessage(tabId, { type: "INTERACT_DOM", name: "SHOW_OVERLAY" })
-    .catch(() => { });
-  overlayInfo[tabId] = true;
+  overlayInfo[tabId] = enabled;
 };
 
 const disableNonActiveOverlays = (activeId: number) => {
   for (const tabId of Object.keys(overlayInfo)) {
     const id = Number(tabId);
     if (id !== activeId && overlayInfo[id]) {
-      disableOverlay(id);
+      setOverlay(id, false);
     }
   }
 };
@@ -45,7 +44,7 @@ const setActiveTab = async (tabId: number) => {
   if (!tab) return;
   disableNonActiveOverlays(tabId);
   activeTabId = tabId;
-  enableOverlay(tabId);
+  setOverlay(tabId, true);
 };
 
 // chrome-only
@@ -76,7 +75,13 @@ const attachDebugger = (tabId: number): Promise<void> => {
 };
 
 const detachDebugger = async (tabId: number): Promise<void> => {
-  disableOverlay(tabId);
+  const isAttached = await new Promise<boolean>((resolve) => {
+    chrome.debugger.getTargets((targets) => {
+      resolve(targets.some((target) => target.tabId === tabId && target.attached));
+    });
+  });
+  if (!isAttached) return;
+  setOverlay(tabId, false);
   try {
     await chrome.debugger.sendCommand({ tabId }, "Page.disable");
     await chrome.debugger.sendCommand({ tabId }, "DOM.disable");
@@ -103,39 +108,56 @@ Browser.tabs.onUpdated.addListener((tabId, _changeInfo, tab) => {
 });
 
 const startSession = async (tabId: number) => {
-  active = true;
-  await syncOpenedTabs();
-  for (const tab of openedTabs) {
-    if (isInaccessiblePage(tab.url) || !tab.id) continue;
-    await attachDebugger(tab.id);
+  try {
+    active = true;
+    await syncOpenedTabs();
+    for (const tab of openedTabs) {
+      if (isInaccessiblePage(tab.url) || !tab.id) continue;
+      await attachDebugger(tab.id);
+    }
+    if (tabId) await setActiveTab(tabId);
+    return { status: "success" };
+  } catch (e) {
+    return {
+      status: "error",
+      value: e instanceof Error ? e.message : String(e),
+    };
   }
-  if (tabId) await setActiveTab(tabId);
 };
 
 const stopSession = async () => {
-  active = false;
-  activeTabId = null;
-  const tabs = await Browser.tabs.query({});
-  for (const tab of tabs) {
-    if (isInaccessiblePage(tab.url) || !tab.id) continue;
-    await detachDebugger(tab.id);
+  try {
+    active = false;
+    activeTabId = null;
+    const tabs = await Browser.tabs.query({});
+    for (const tab of tabs) {
+      if (isInaccessiblePage(tab.url) || !tab.id) continue;
+      await detachDebugger(tab.id);
+    }
+    return { status: "success" };
+  } catch (e) {
+    return {
+      status: "error",
+      value: e instanceof Error ? e.message : String(e),
+    };
   }
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const stopGeneration = async () => {
+  await Promise.all([stopGoogleAiMode(), stopSession()]);
+  return { status: "success" };
+};
 
 const formatPageMarkdown = (
   html: string,
   pageUrl: string,
   fallbackTitle: string,
   header?: string,
-  maxChars = 8000,
+  maxChars = 8000
 ) => {
   const { title, markdown } = htmlToMarkdown(html, pageUrl, fallbackTitle);
   const content =
-    markdown.length > maxChars
-      ? markdown.slice(0, maxChars) + "\n...[truncated]"
-      : markdown;
+    markdown.length > maxChars ? markdown.slice(0, maxChars) + "\n...[truncated]" : markdown;
   if (!content.trim()) {
     return { status: "error" as const, message: "Page had no extractable content." };
   }
@@ -150,36 +172,39 @@ const waitForTabComplete = (tabId: number, timeoutMs = 15000): Promise<void> =>
   new Promise((resolve, reject) => {
     let settled = false;
 
-    const finish = (fn: () => void) => {
+    const settle = (fn: () => void) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      Browser.tabs.onUpdated.removeListener(listener);
+      Browser.tabs.onUpdated.removeListener(onUpdated);
+      Browser.tabs.onRemoved.removeListener(onRemoved);
       fn();
     };
 
     const timer = setTimeout(() => {
-      finish(() => reject(new Error("Timed out waiting for Google AI Mode page to load.")));
+      settle(() => reject(new Error("Timed out waiting for Google AI Mode page to load.")));
     }, timeoutMs);
 
-    const listener = (updatedTabId: number, changeInfo: Tabs.OnUpdatedChangeInfoType) => {
-      if (updatedTabId === tabId && changeInfo.status === "complete") {
-        finish(() => resolve());
-      }
+    const onUpdated = (id: number, info: Tabs.OnUpdatedChangeInfoType) => {
+      if (id === tabId && info.status === "complete") settle(() => resolve());
+    };
+    const onRemoved = (id: number) => {
+      if (id === tabId) settle(() => reject(new Error("Search cancelled.")));
     };
 
-    Browser.tabs.onUpdated.addListener(listener);
+    Browser.tabs.onUpdated.addListener(onUpdated);
+    Browser.tabs.onRemoved.addListener(onRemoved);
 
-    void Browser.tabs.get(tabId).then((tab) => {
-      if (tab.status === "complete") {
-        finish(() => resolve());
-      }
-    });
+    void Browser.tabs.get(tabId).then(
+      (tab) => {
+        if (tab.status === "complete") settle(() => resolve());
+      },
+      () => settle(() => reject(new Error("Search cancelled.")))
+    );
   });
 
-const waitAiModeFromTab = async (tabId: number) => {
-  let lastError: unknown;
-  for (let i = 0; i < 8; i++) {
+const waitGoogleAiMode = async (tabId: number) => {
+  for (let i = 0; i < 3; i++) {
     try {
       return (await Browser.tabs.sendMessage(tabId, {
         type: "WAIT_AI_MODE_CONTENT",
@@ -190,14 +215,20 @@ const waitAiModeFromTab = async (tabId: number) => {
         url?: string;
         title?: string;
       };
-    } catch (e) {
-      lastError = e;
-      await sleep(250);
+    } catch (_) {
+      await sleep(200);
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Content script not ready on Google AI Mode tab.");
+  throw new Error("Search cancelled.");
+};
+
+const stopGoogleAiMode = async () => {
+  const id = searchWindowId;
+  searchWindowId = null;
+  if (id == null) return;
+  try {
+    await Browser.windows.remove(id);
+  } catch (_) { }
 };
 
 const fetchGoogleAiMode = async (query: string) => {
@@ -206,223 +237,240 @@ const fetchGoogleAiMode = async (query: string) => {
     return { status: "error", message: "Search query is required." };
   }
 
-  let searchWindowId: number | undefined;
+  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}&udm=50&hl=en`;
 
   try {
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmed)}&udm=50&hl=en`;
     const searchWindow = await Browser.windows.create({
       url: searchUrl,
       type: "popup",
       width: 1,
       height: 1,
-      focused: false
+      focused: false,
     });
-    const searchTabId = searchWindow.tabs?.[0]?.id;
-    if (searchWindow.id == null || searchTabId == null) {
+    const tabId = searchWindow.tabs?.[0]?.id;
+    if (searchWindow.id == null || tabId == null) {
       return { status: "error", message: "Failed to open Google AI Mode window." };
     }
+
     searchWindowId = searchWindow.id;
 
-    const start = performance.now();
-
-    await waitForTabComplete(searchTabId);
-    const response = await waitAiModeFromTab(searchTabId);
-    if (!response || response.status === "error" || !response.html) {
+    await waitForTabComplete(tabId);
+    const response = await waitGoogleAiMode(tabId);
+    if (!response?.html || response.status === "error") {
       return {
         status: "error",
         message: response?.value ?? "Failed to read Google AI Mode response.",
       };
     }
 
-    const end = performance.now();
-    console.log("Search Time:", end - start);
-
-    return formatPageMarkdown(
-      response.html,
-      response.url ?? searchUrl,
-      response.title ?? "",
-      `Query: ${trimmed}`
-    );
+    return formatPageMarkdown(response.html, searchUrl, response.title ?? "", `Query: ${trimmed}`);
   } catch (e) {
-    return { status: "error", message: String(e) };
+    return {
+      status: "error",
+      message: e instanceof Error ? e.message : String(e),
+    };
   } finally {
-    if (searchWindowId != null) {
+    await stopGoogleAiMode();
+  }
+};
+
+const setTab = (tabId: number) => {
+  const tab = openedTabs.find((t) => t.id === tabId);
+  if (tab?.id != null) {
+    disableNonActiveOverlays(tab.id);
+    activeTabId = tab.id;
+    setOverlay(tab.id, true);
+    return Promise.resolve({ status: "success", value: "Tab set successfully" });
+  }
+  return Promise.resolve({ status: "error", value: "Tab not found" });
+};
+
+const getTab = () => {
+  const tab = openedTabs.find((t) => t.id === activeTabId);
+  return Promise.resolve(tab);
+};
+
+const setOpenedTabs = (tabs: Tabs.Tab[]) => {
+  openedTabs = tabs;
+  return Promise.resolve({ status: "success", value: "Tabs updated successfully" });
+};
+
+const setActive = (isActive: boolean) => {
+  active = isActive;
+  return Promise.resolve({ status: "success", value: "State updated successfully" });
+};
+
+const enableOverlay = (tabId: number) => {
+  disableNonActiveOverlays(tabId);
+  activeTabId = tabId;
+  setOverlay(tabId, true);
+  return Promise.resolve({ status: "success", value: "Waffy overlay enabled" });
+};
+
+const disableOverlay = (tabId: number) => {
+  setOverlay(tabId, false);
+  return Promise.resolve({ status: "success", value: "Waffy overlay disabled" });
+};
+
+const getOverlayStatus = (sender: Runtime.MessageSender) => {
+  if (sender?.tab?.id)
+    return Promise.resolve({ status: overlayInfo[sender.tab.id] ? "enabled" : "disabled" });
+  return Promise.resolve({ status: "disabled" });
+};
+
+const getPageInfo = async (tabId: unknown) => {
+  try {
+    if (typeof tabId !== "number") {
+      return { status: "error", message: "tabId is required." };
+    }
+    const tab = await Browser.tabs.get(tabId);
+    if (!tab?.id) {
+      return { status: "error", message: "No tab found." };
+    }
+    if (isInaccessiblePage(tab.url)) {
+      return {
+        status: "error",
+        message: `Cannot read "${tab.url}". Browser internal pages are not accessible.`,
+      };
+    }
+    return {
+      status: "success",
+      message: `URL: ${tab.url ?? ""}\nTitle: ${tab.title ?? ""}\nLoading: ${tab.status ?? ""}`,
+    };
+  } catch (e) {
+    return {
+      status: "error",
+      message: e instanceof Error ? e.message : String(e),
+    };
+  }
+};
+
+const captureVisibleTab = async (tabId: unknown) => {
+  let previousTabId: number | undefined;
+  try {
+    if (typeof tabId !== "number") {
+      return { status: "error", message: "tabId is required." };
+    }
+    const tab = await Browser.tabs.get(tabId);
+    if (!tab?.id || tab.windowId == null) {
+      return { status: "error", message: "No tab found." };
+    }
+    if (isInaccessiblePage(tab.url)) {
+      return {
+        status: "error",
+        message: `Cannot capture "${tab.url}". Browser internal pages are not accessible.`,
+      };
+    }
+
+    // captureVisibleTab only captures the focused tab in a window.
+    if (!tab.active) {
+      const [focused] = await Browser.tabs.query({
+        active: true,
+        windowId: tab.windowId,
+      });
+      previousTabId = focused?.id;
+      await Browser.tabs.update(tab.id, { active: true });
+      await sleep(100);
+    }
+
+    const dataUrl = await Browser.tabs.captureVisibleTab(tab.windowId, {
+      format: "jpeg",
+      quality: 25,
+    });
+    const base64Image = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+    const captured = await Browser.tabs.get(tab.id);
+    return {
+      status: "success",
+      image: base64Image,
+      metadata: {
+        url: captured.url ?? tab.url ?? "",
+        title: captured.title ?? tab.title ?? "",
+        loading_status: captured.status ?? tab.status ?? "",
+      },
+    };
+  } catch (e) {
+    return {
+      status: "error",
+      message: e instanceof Error ? e.message : String(e),
+    };
+  } finally {
+    if (previousTabId != null) {
       try {
-        await Browser.windows.remove(searchWindowId);
+        await Browser.tabs.update(previousTabId, { active: true });
       } catch (_) { }
     }
   }
 };
 
+const getPageContent = async (tabId: unknown) => {
+  try {
+    if (typeof tabId !== "number") {
+      return { status: "error", message: "tabId is required." };
+    }
+    const tab = await Browser.tabs.get(tabId);
+    if (!tab?.id) {
+      return { status: "error", message: "No tab found." };
+    }
+    if (isInaccessiblePage(tab.url)) {
+      return {
+        status: "error",
+        message: `Cannot read "${tab.url}". Browser internal pages are not accessible.`,
+      };
+    }
+    const response = (await Browser.tabs.sendMessage(tab.id, {
+      type: "GET_PAGE_CONTENT",
+    })) as {
+      status?: string;
+      value?: string;
+      html?: string;
+      url?: string;
+      title?: string;
+    };
+    if (!response || response.status === "error" || !response.html) {
+      return {
+        status: "error",
+        message: response?.value ?? "Failed to read page content.",
+      };
+    }
+    return formatPageMarkdown(response.html, response.url ?? "", response.title ?? "");
+  } catch (e) {
+    return {
+      status: "error",
+      message: e instanceof Error ? e.message : String(e),
+    };
+  }
+};
+
 Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSender) => {
   switch (request.action) {
-    case "SET_TAB": {
-      const tab = openedTabs.find((tab) => tab.id === request.tabId);
-      if (tab?.id != null) {
-        disableNonActiveOverlays(tab.id);
-        activeTabId = tab.id;
-        enableOverlay(tab.id);
-        return Promise.resolve({ status: "success", value: "Tab set successfully" });
-      }
-      return Promise.resolve({ status: "error", value: "Tab not found" });
-    }
-    case "GET_TAB": {
-      const tab = openedTabs.find((tab) => tab.id === activeTabId);
-      return Promise.resolve(tab);
-    }
-    case "SET_OPENED_TABS": {
-      openedTabs = request.tabs;
-      return Promise.resolve({ status: "success", value: "Tabs updated successfully" });
-    }
-    case "SET_ACTIVE": {
-      active = request.active;
-      return Promise.resolve({ status: "success", value: "State updated successfully" });
-    }
-    case "ENABLE_OVERLAY": {
-      disableNonActiveOverlays(request.tabId);
-      activeTabId = request.tabId;
-      enableOverlay(request.tabId);
-      return Promise.resolve({ status: "success", value: "Waffy overlay enabled" });
-    }
-    case "DISABLE_OVERLAY": {
-      disableOverlay(request.tabId);
-      return Promise.resolve({ status: "success", value: "Waffy overlay disabled" });
-    }
-    case "GET_OVERLAY_STATUS": {
-      if (sender?.tab?.id)
-        return Promise.resolve({ status: overlayInfo[sender.tab.id] ? "enabled" : "disabled" });
-      return Promise.resolve({ status: "disabled" });
-    }
-    case "START_SESSION": {
-      return startSession(request.tabId)
-        .then(() => ({ status: "success" }))
-        .catch((e) => ({ status: "error", value: String(e) }));
-    }
-    case "STOP_SESSION": {
-      return stopSession()
-        .then(() => ({ status: "success" }))
-        .catch((e) => ({ status: "error", value: String(e) }));
-    }
-    case "GET_PAGE_INFO": {
-      return (async () => {
-        try {
-          if (typeof request.tabId !== "number") {
-            return { status: "error", message: "tabId is required." };
-          }
-          const tab = await Browser.tabs.get(request.tabId);
-          if (!tab?.id) {
-            return { status: "error", message: "No tab found." };
-          }
-          if (isInaccessiblePage(tab.url)) {
-            return {
-              status: "error",
-              message: `Cannot read "${tab.url}". Browser internal pages are not accessible.`,
-            };
-          }
-          return {
-            status: "success",
-            message: `URL: ${tab.url ?? ""}\nTitle: ${tab.title ?? ""}\nLoading: ${tab.status ?? ""}`,
-          };
-        } catch (e) {
-          return { status: "error", message: String(e) };
-        }
-      })();
-    }
-    case "CAPTURE_VISIBLE_TAB": {
-      return (async () => {
-        let previousTabId: number | undefined;
-        try {
-          if (typeof request.tabId !== "number") {
-            return { status: "error", message: "tabId is required." };
-          }
-          const tab = await Browser.tabs.get(request.tabId);
-          if (!tab?.id || tab.windowId == null) {
-            return { status: "error", message: "No tab found." };
-          }
-          if (isInaccessiblePage(tab.url)) {
-            return {
-              status: "error",
-              message: `Cannot capture "${tab.url}". Browser internal pages are not accessible.`,
-            };
-          }
-
-          // captureVisibleTab only captures the focused tab in a window.
-          if (!tab.active) {
-            const [focused] = await Browser.tabs.query({
-              active: true,
-              windowId: tab.windowId,
-            });
-            previousTabId = focused?.id;
-            await Browser.tabs.update(tab.id, { active: true });
-            await sleep(100);
-          }
-
-          const dataUrl = await Browser.tabs.captureVisibleTab(tab.windowId, {
-            format: "jpeg",
-            quality: 50,
-          });
-          const base64Image = dataUrl.replace(/^data:image\/\w+;base64,/, "");
-          const captured = await Browser.tabs.get(tab.id);
-          return {
-            status: "success",
-            image: base64Image,
-            metadata: {
-              url: captured.url ?? tab.url ?? "",
-              title: captured.title ?? tab.title ?? "",
-              loading_status: captured.status ?? tab.status ?? "",
-            },
-          };
-        } catch (e) {
-          return { status: "error", message: String(e) };
-        } finally {
-          if (previousTabId != null) {
-            try {
-              await Browser.tabs.update(previousTabId, { active: true });
-            } catch (_) { }
-          }
-        }
-      })();
-    }
-    case "FETCH_GOOGLE_AI_MODE": {
+    case "SET_TAB":
+      return setTab(request.tabId);
+    case "GET_TAB":
+      return getTab();
+    case "SET_OPENED_TABS":
+      return setOpenedTabs(request.tabs);
+    case "SET_ACTIVE":
+      return setActive(request.active);
+    case "ENABLE_OVERLAY":
+      return enableOverlay(request.tabId);
+    case "DISABLE_OVERLAY":
+      return disableOverlay(request.tabId);
+    case "GET_OVERLAY_STATUS":
+      return getOverlayStatus(sender);
+    case "START_SESSION":
+      return startSession(request.tabId);
+    case "STOP_SESSION":
+      return stopSession();
+    case "GET_PAGE_INFO":
+      return getPageInfo(request.tabId);
+    case "CAPTURE_VISIBLE_TAB":
+      return captureVisibleTab(request.tabId);
+    case "FETCH_GOOGLE_AI_MODE":
       return fetchGoogleAiMode(request.query);
-    }
-    case "GET_PAGE_CONTENT": {
-      return (async () => {
-        try {
-          if (typeof request.tabId !== "number") {
-            return { status: "error", message: "tabId is required." };
-          }
-          const tab = await Browser.tabs.get(request.tabId);
-          if (!tab?.id) {
-            return { status: "error", message: "No tab found." };
-          }
-          if (isInaccessiblePage(tab.url)) {
-            return {
-              status: "error",
-              message: `Cannot read "${tab.url}". Browser internal pages are not accessible.`,
-            };
-          }
-          const response = (await Browser.tabs.sendMessage(tab.id, {
-            type: "GET_PAGE_CONTENT",
-          })) as {
-            status?: string;
-            value?: string;
-            html?: string;
-            url?: string;
-            title?: string;
-          };
-          if (!response || response.status === "error" || !response.html) {
-            return {
-              status: "error",
-              message: response?.value ?? "Failed to read page content.",
-            };
-          }
-          return formatPageMarkdown(response.html, response.url ?? "", response.title ?? "");
-        } catch (e) {
-          return { status: "error", message: String(e) };
-        }
-      })();
-    }
+    case "STOP_GENERATION":
+      return stopGeneration();
+    case "GET_PAGE_CONTENT":
+      return getPageContent(request.tabId);
     default:
       return undefined;
   }

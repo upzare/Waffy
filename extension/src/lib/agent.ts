@@ -16,21 +16,15 @@ export async function* AI(
   messages: ExtensionMessage[],
   mode: StreamMode,
   abortController: AbortController | null,
-  safeToAbortRef: React.RefObject<boolean>,
   session?: StreamSession
 ): AsyncGenerator<StreamEvent> {
   const { settings, apiKeys } = await getAppSettings();
-  safeToAbortRef.current = true;
 
-  try {
-    yield* runStream({
-      mode,
-      messages,
-      settings: { settings, apiKeys },
-      abortSignal: abortController?.signal,
-      session,
-    });
-  } finally {
-    safeToAbortRef.current = false;
-  }
+  yield* runStream({
+    mode,
+    messages,
+    settings: { settings, apiKeys },
+    abortSignal: abortController?.signal,
+    session,
+  });
 }

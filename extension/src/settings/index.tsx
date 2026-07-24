@@ -33,7 +33,12 @@ const sections = [
     description: "Configure cloud and local browser models for each stages.",
     icon: Cpu,
   },
-  { id: "about", label: "About", description: "Information about Waffy.", icon: Info },
+  {
+    id: "about",
+    label: "About",
+    description: "Version and product information.",
+    icon: Info,
+  },
 ];
 
 const defaultSettings: SettingsType = {
@@ -59,10 +64,6 @@ const Settings = () => {
 
   const [settings, setSettings] = useState<SettingsType>(defaultSettings);
   const [apiKeys, setApiKeys] = useState<ApiKeys>({});
-
-  const [theme, setTheme] = useState("system");
-  const [enableHistory, setEnableHistory] = useState(true);
-  const [enableNotifications, setEnableNotifications] = useState(true);
   const [pinnedPrompts, setPinnedPrompts] = useState<string[]>([...DEFAULT_PINNED_PROMPTS]);
 
   useEffect(() => {
@@ -71,9 +72,6 @@ const Settings = () => {
         const data = await getAppSettings();
         setSettings(data.settings);
         setApiKeys(data.apiKeys);
-        setTheme(data.settings.theme ?? "system");
-        setEnableHistory(data.settings.enableHistory ?? true);
-        setEnableNotifications(data.settings.enableNotifications ?? true);
         setPinnedPrompts(
           data.settings.pinnedPrompts !== undefined
             ? data.settings.pinnedPrompts.length > 0
@@ -92,9 +90,6 @@ const Settings = () => {
     try {
       const merged: SettingsType = {
         ...settings,
-        theme,
-        enableHistory,
-        enableNotifications,
         pinnedPrompts: pinnedPrompts.map((prompt) => prompt.trim()).filter(Boolean),
       };
       await saveAppSettings(merged, apiKeys);
@@ -110,9 +105,6 @@ const Settings = () => {
   const handleReset = () => {
     setSettings(defaultSettings);
     setApiKeys({});
-    setTheme("system");
-    setEnableHistory(true);
-    setEnableNotifications(true);
     setPinnedPrompts([...DEFAULT_PINNED_PROMPTS]);
     toast.success("Changes reset to default values");
   };
@@ -120,18 +112,7 @@ const Settings = () => {
   const renderSection = () => {
     switch (activeSection) {
       case "general":
-        return (
-          <GeneralSection
-            theme={theme}
-            setTheme={setTheme}
-            enableHistory={enableHistory}
-            setEnableHistory={setEnableHistory}
-            enableNotifications={enableNotifications}
-            setEnableNotifications={setEnableNotifications}
-            pinnedPrompts={pinnedPrompts}
-            setPinnedPrompts={setPinnedPrompts}
-          />
-        );
+        return <GeneralSection pinnedPrompts={pinnedPrompts} setPinnedPrompts={setPinnedPrompts} />;
       case "api-keys":
         return <ApiKeysSection apiKeys={apiKeys} setApiKeys={setApiKeys} />;
       case "models":

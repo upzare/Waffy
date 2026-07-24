@@ -36,12 +36,11 @@ const STAGE_GROUPS: StageGroup[] = [
       {
         id: "base",
         label: "Base Model",
-        description:
-          "Answers questions and switches to automation when needed.",
+        description: "Answers questions and switches to automation when needed.",
         recommendation: (
           <>
-            Use the built-in browser model (like Gemini Nano) for free. For
-            more advanced reasoning and querying, switch to a cloud model.
+            Use the built-in browser model (like Gemini Nano) for free. For more advanced reasoning
+            and querying, switch to a cloud model.
           </>
         ),
       },
@@ -50,9 +49,7 @@ const STAGE_GROUPS: StageGroup[] = [
         label: "Search Model",
         description: "Searches the web and answers the user's query.",
         recommendation: (
-          <>
-            Browser models is fine here, or use a fast cloud model for better quality.
-          </>
+          <>Browser models is fine here, or use a fast cloud model for better quality.</>
         ),
       },
       {
@@ -61,8 +58,8 @@ const STAGE_GROUPS: StageGroup[] = [
         description: "Deep research and synthesis using the current page as source.",
         recommendation: (
           <>
-            Prefer a capable cloud model for thorough analysis and synthesis. Browser models works for
-            lighter page summaries.
+            Prefer a capable cloud model for thorough analysis and synthesis. Browser models works
+            for lighter page summaries.
           </>
         ),
       },
