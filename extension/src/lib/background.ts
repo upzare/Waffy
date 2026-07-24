@@ -382,7 +382,7 @@ const captureVisibleTab = async (tabId: unknown) => {
 
     const dataUrl = await Browser.tabs.captureVisibleTab(tab.windowId, {
       format: "jpeg",
-      quality: 50,
+      quality: 25,
     });
     const base64Image = dataUrl.replace(/^data:image\/\w+;base64,/, "");
     const captured = await Browser.tabs.get(tab.id);

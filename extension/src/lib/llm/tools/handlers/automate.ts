@@ -2,7 +2,7 @@ import Browser from "webextension-polyfill";
 import type { Tabs } from "webextension-polyfill";
 import { isInaccessiblePage } from "@/helper";
 import { AutomateToolResult } from "../automate";
-import { webSearch } from "./web-search";
+import { webSearch } from "./common";
 import { toolError } from "@/lib/errors";
 import { sleep } from "@/lib/utils";
 
