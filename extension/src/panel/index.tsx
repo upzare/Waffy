@@ -34,6 +34,7 @@ import type { StreamSession } from "@/lib/llm/stream";
 import { errorMessage, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import type { ExtensionMessage } from "@/lib/llm/messages";
 import HistorySidebar from "./components/history-sidebar";
+import WorkingDialog from "./components/working-dialog";
 import Hero from "./components/hero";
 import Particles from "./components/particles";
 import Loader from "./components/loader";
@@ -52,6 +53,7 @@ const App = () => {
   const [isFirstMessage, setIsFirstMessage] = useState(true);
   const [isChat, setIsChat] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showWorkingDialog, setShowWorkingDialog] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [toolActivityText, setToolActivityText] = useState<string | null>(null);
   const [errorText, setErrorText] = useState("");
@@ -282,7 +284,7 @@ const App = () => {
   };
 
   const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => {});
+    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => { });
   };
 
   const automateHandler = async (
@@ -396,12 +398,12 @@ const App = () => {
         prev.map((msg) =>
           msg.id === `assistant-${messageIdRef.current}`
             ? {
-                ...msg,
-                content: {
-                  ...msg.content,
-                  text: { ...msg.content.text, execution: ["Initializing"] },
-                },
-              }
+              ...msg,
+              content: {
+                ...msg.content,
+                text: { ...msg.content.text, execution: ["Initializing"] },
+              },
+            }
             : msg
         )
       )
@@ -1101,7 +1103,7 @@ const App = () => {
         if (wasFirstMessage) {
           generateTitle(promptText)
             .then(() => fetchConversations())
-            .catch(() => {});
+            .catch(() => { });
         }
       },
     });
@@ -1139,15 +1141,15 @@ const App = () => {
           const update = prev.map((msg) =>
             msg.id === assistantMessageId
               ? {
-                  ...msg,
-                  content: {
-                    task: "",
-                    taskStatus: "",
-                    text: { response: "", execution: [], validation: "", output: "" },
-                    files: [],
-                    mode,
-                  },
-                }
+                ...msg,
+                content: {
+                  task: "",
+                  taskStatus: "",
+                  text: { response: "", execution: [], validation: "", output: "" },
+                  files: [],
+                  mode,
+                },
+              }
               : msg
           );
           syncMessages(update, true);
@@ -1215,6 +1217,10 @@ const App = () => {
   };
 
   const handleNewChat = async () => {
+    if (isGenerating) {
+      setShowWorkingDialog(true);
+      return;
+    }
     await handleStopGeneration();
     fetchConversations();
     setIsFirstMessage(true);
@@ -1233,6 +1239,10 @@ const App = () => {
 
   const handleSelectConversation = async (id: string) => {
     if (id === conversationIdRef.current) return;
+    if (isGenerating) {
+      setShowWorkingDialog(true);
+      return;
+    }
     const latestConversations = await fetchConversations();
     const conversation = latestConversations.find((c) => c.id === id);
     if (conversation) {
@@ -1253,6 +1263,10 @@ const App = () => {
   };
 
   const handleItemRemove = async (id: string) => {
+    if (conversationIdRef.current === id && isGenerating) {
+      setShowWorkingDialog(true);
+      return;
+    }
     const conversation = conversations.find((c) => c.id === id);
     if (conversation) {
       const conversationDB = db.current
@@ -1276,6 +1290,10 @@ const App = () => {
     <>
       <Toaster position="top-center" reverseOrder={false} />
       <Particles quantity={100} />
+      <WorkingDialog
+        open={showWorkingDialog}
+        onClose={() => setShowWorkingDialog(false)}
+      />
       <HistorySidebar
         currentConversationId={conversationIdRef.current}
         conversations={conversations}
