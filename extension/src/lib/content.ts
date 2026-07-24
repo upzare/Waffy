@@ -131,8 +131,7 @@ const waitAiModeContent = async () => {
 const getDevicePixelRatio = () =>
   Promise.resolve({ status: "success", value: window.devicePixelRatio });
 
-const getPageContent = () =>
-  Promise.resolve({ status: "success", ...getPageSnapshot() });
+const getPageContent = () => Promise.resolve({ status: "success", ...getPageSnapshot() });
 
 const getOption = () => {
   const element = document.activeElement as HTMLSelectElement;

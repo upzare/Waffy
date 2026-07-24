@@ -153,13 +153,11 @@ const formatPageMarkdown = (
   pageUrl: string,
   fallbackTitle: string,
   header?: string,
-  maxChars = 8000,
+  maxChars = 8000
 ) => {
   const { title, markdown } = htmlToMarkdown(html, pageUrl, fallbackTitle);
   const content =
-    markdown.length > maxChars
-      ? markdown.slice(0, maxChars) + "\n...[truncated]"
-      : markdown;
+    markdown.length > maxChars ? markdown.slice(0, maxChars) + "\n...[truncated]" : markdown;
   if (!content.trim()) {
     return { status: "error" as const, message: "Page had no extractable content." };
   }
@@ -265,12 +263,7 @@ const fetchGoogleAiMode = async (query: string) => {
       };
     }
 
-    return formatPageMarkdown(
-      response.html,
-      searchUrl,
-      response.title ?? "",
-      `Query: ${trimmed}`
-    );
+    return formatPageMarkdown(response.html, searchUrl, response.title ?? "", `Query: ${trimmed}`);
   } catch (e) {
     return {
       status: "error",

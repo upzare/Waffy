@@ -108,9 +108,7 @@ const StatusPanel = ({
           <Icon
             size={16}
             className={
-              status.spinning
-                ? "animate-[spin_1.5s_linear_infinite] text-white"
-                : "text-white"
+              status.spinning ? "animate-[spin_1.5s_linear_infinite] text-white" : "text-white"
             }
           />
           <span className="font-normal text-xs">{status.label}</span>
@@ -176,12 +174,9 @@ const ToolActivityLabel = ({
     <div className="tool-activity-slot relative h-5 min-w-0 flex-1 overflow-hidden">
       <span
         key={displayed}
-        className={`tool-activity-shimmer absolute inset-y-0 left-0 flex items-center text-xs whitespace-nowrap ${phase === "enter"
-          ? "tool-activity-enter"
-          : phase === "exit"
-            ? "tool-activity-exit"
-            : ""
-          }`}
+        className={`tool-activity-shimmer absolute inset-y-0 left-0 flex items-center text-xs whitespace-nowrap ${
+          phase === "enter" ? "tool-activity-enter" : phase === "exit" ? "tool-activity-exit" : ""
+        }`}
       >
         {displayed}
       </span>
@@ -236,8 +231,7 @@ const RenderResponse = ({
                     {
                       "--dots":
                         "no-repeat radial-gradient(circle closest-side, rgb(0, 200, 83) 90%, transparent)",
-                      background:
-                        "var(--dots) 0% 50%, var(--dots) 50% 50%, var(--dots) 100% 50%",
+                      background: "var(--dots) 0% 50%, var(--dots) 50% 50%, var(--dots) 100% 50%",
                       backgroundSize: "calc(100% / 3) 50%",
                     } as CSSProperties
                   }

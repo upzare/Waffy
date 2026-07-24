@@ -12,11 +12,7 @@ const VIRTUAL_OVERSCAN = 4;
 const SCROLL_PADDING_PX = 16;
 
 const VirtualPadding = () => (
-  <div
-    className="w-full shrink-0"
-    style={{ height: SCROLL_PADDING_PX }}
-    aria-hidden
-  />
+  <div className="w-full shrink-0" style={{ height: SCROLL_PADDING_PX }} aria-hidden />
 );
 
 const actionButtonClass =
@@ -87,12 +83,7 @@ const MessageActions = ({
         </button>
       ) : (
         <>
-          <button
-            className={actionButtonClass}
-            title="Retry"
-            disabled={disabled}
-            onClick={onRetry}
-          >
+          <button className={actionButtonClass} title="Retry" disabled={disabled} onClick={onRetry}>
             <Repeat size={16} />
           </button>
           <button
@@ -183,8 +174,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       <div
         ref={sticky.containerRef}
         className={`z-1 ${hidden
-          ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
-          : "min-h-0 flex-1 overflow-y-auto"
+            ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
+            : "min-h-0 flex-1 overflow-y-auto"
           }`}
         onWheel={sticky.onWheel}
         onTouchStart={sticky.onTouchStart}
@@ -218,8 +209,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                 >
                   <div
                     className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${isUser
-                      ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
-                      : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
+                        ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
+                        : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
                       }`}
                   >
                     <MessageActions

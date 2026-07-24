@@ -207,7 +207,6 @@
 }
 
 @keyframes wobble1 {
-
   0%,
   100% {
     transform: translateY(0%) scale(1);
@@ -221,7 +220,6 @@
 }
 
 @keyframes wobble2 {
-
   0%,
   100% {
     transform: translateY(0%) scale(1);
@@ -267,7 +265,6 @@
 }
 
 @keyframes shimmer {
-
   0%,
   100% {
     opacity: 0.45;
@@ -279,10 +276,12 @@
 }
 
 .tool-activity-shimmer {
-  background: linear-gradient(90deg,
-      rgba(255, 255, 255, 0.35) 0%,
-      rgba(255, 255, 255, 0.75) 50%,
-      rgba(255, 255, 255, 0.35) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;

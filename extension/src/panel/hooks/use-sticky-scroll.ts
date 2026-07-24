@@ -106,8 +106,7 @@ export function useStickyScroll({
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     const el = containerRef.current;
     if (!el) return;
-    scrollbarDragRef.current =
-      el.getBoundingClientRect().right - e.clientX <= SCROLLBAR_EDGE_PX;
+    scrollbarDragRef.current = el.getBoundingClientRect().right - e.clientX <= SCROLLBAR_EDGE_PX;
   };
 
   const onPointerUp = () => {

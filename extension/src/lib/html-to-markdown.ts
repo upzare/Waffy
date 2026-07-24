@@ -18,7 +18,6 @@ turndown.addRule("stripMedia", {
   replacement: () => "",
 });
 
-
 // Extract main page content with Readability and convert to Markdown.
 export function htmlToMarkdown(
   html: string,
@@ -41,12 +40,9 @@ export function htmlToMarkdown(
   }).parse();
 
   const contentNode =
-    (article?.content as HTMLElement | null | undefined) ??
-    (document.body as HTMLElement | null);
+    (article?.content as HTMLElement | null | undefined) ?? (document.body as HTMLElement | null);
   const title = (article?.title || fallbackTitle || "").trim();
-  const markdown = contentNode
-    ? turndown.turndown(contentNode).trim()
-    : "";
+  const markdown = contentNode ? turndown.turndown(contentNode).trim() : "";
 
   console.log("markdown:", markdown);
 

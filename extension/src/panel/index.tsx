@@ -265,7 +265,9 @@ const App = () => {
 
   const isAborted = () => Boolean(abortControllerRef.current?.signal.aborted);
 
-  const assertNotAborted = () => { if (isAborted()) throw USER_INTERRUPTED_MESSAGE; };
+  const assertNotAborted = () => {
+    if (isAborted()) throw USER_INTERRUPTED_MESSAGE;
+  };
 
   const showError = (error?: unknown) => setErrorText(errorMessage(error));
 
@@ -280,8 +282,8 @@ const App = () => {
   };
 
   const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => { });
-  }
+    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => {});
+  };
 
   const automateHandler = async (
     prompt_text: string,
@@ -394,12 +396,12 @@ const App = () => {
         prev.map((msg) =>
           msg.id === `assistant-${messageIdRef.current}`
             ? {
-              ...msg,
-              content: {
-                ...msg.content,
-                text: { ...msg.content.text, execution: ["Initializing"] },
-              },
-            }
+                ...msg,
+                content: {
+                  ...msg.content,
+                  text: { ...msg.content.text, execution: ["Initializing"] },
+                },
+              }
             : msg
         )
       )
@@ -1099,7 +1101,7 @@ const App = () => {
         if (wasFirstMessage) {
           generateTitle(promptText)
             .then(() => fetchConversations())
-            .catch(() => { });
+            .catch(() => {});
         }
       },
     });
@@ -1137,15 +1139,15 @@ const App = () => {
           const update = prev.map((msg) =>
             msg.id === assistantMessageId
               ? {
-                ...msg,
-                content: {
-                  task: "",
-                  taskStatus: "",
-                  text: { response: "", execution: [], validation: "", output: "" },
-                  files: [],
-                  mode,
-                },
-              }
+                  ...msg,
+                  content: {
+                    task: "",
+                    taskStatus: "",
+                    text: { response: "", execution: [], validation: "", output: "" },
+                    files: [],
+                    mode,
+                  },
+                }
               : msg
           );
           syncMessages(update, true);

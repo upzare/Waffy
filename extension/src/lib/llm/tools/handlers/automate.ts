@@ -23,7 +23,8 @@ const KEY_CODES = {
 
 type KEY_TYPES = keyof typeof KEY_CODES;
 
-const getSessionTab = async () => (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as Tabs.Tab | undefined;
+const getSessionTab = async () =>
+  (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as Tabs.Tab | undefined;
 
 const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) => {
   chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
