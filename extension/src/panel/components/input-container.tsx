@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { CircleStop, File, Paperclip, Send, X } from "lucide-react";
 import { MentionRoot, MentionInput, MentionContent, MentionItem } from "@diceui/mention";
 import type { InputContainerProps } from "../../types";
-import { hasSlashCommand, SLASH_COMMANDS } from "../utils/slash-commands";
+import { getSlashCommands, hasSlashCommand } from "../utils/slash-commands";
 
 const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
@@ -16,6 +16,7 @@ function InputContainer({
   mentions,
   files,
   inputResetKey,
+  features,
   setMessage,
   setMentions,
   setFiles,
@@ -25,6 +26,7 @@ function InputContainer({
   const canSend = message.trim().length > 0 || files.length > 0;
   const [mentionOpen, setMentionOpen] = useState(false);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const slashCommands = getSlashCommands(features);
 
   const setTextareaRef = (el: HTMLTextAreaElement | null) => {
     (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
@@ -125,33 +127,35 @@ function InputContainer({
               disabled={isGenerating}
             />
           </MentionInput>
-          <div className="pointer-events-none absolute inset-x-0 top-auto bottom-[calc(100%+0.5rem)] z-50 [&>*]:pointer-events-auto">
-            <MentionContent
-              className="!static !inset-auto !w-full !transform-none box-border max-h-56 overflow-y-auto rounded-md border border-white/8 bg-[#101010]/96 p-1.5 shadow-lg backdrop-blur-md data-[state=closed]:hidden"
-              avoidCollisions={false}
-            >
-              <p className="p-1.5 text-xs font-medium tracking-wider text-white/35 uppercase">
-                Commands
-              </p>
-              {SLASH_COMMANDS.map(({ value, description }) => (
-                <MentionItem
-                  key={value}
-                  className="group cursor-pointer rounded p-0.5 transition-colors duration-150 data-[highlighted]:bg-white/[0.06]"
-                  value={value}
-                  label={value}
-                >
-                  <div className="grid grid-cols-[5.25rem_1fr] items-baseline gap-x-3 px-2 py-1.5">
-                    <span className="text-sm font-medium tracking-tight whitespace-nowrap text-white/90 group-data-[highlighted]:text-green-300">
-                      /{value}
-                    </span>
-                    <span className="text-xs leading-snug text-white/40 group-data-[highlighted]:text-white/55">
-                      {description}
-                    </span>
-                  </div>
-                </MentionItem>
-              ))}
-            </MentionContent>
-          </div>
+          {slashCommands.length > 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-auto bottom-[calc(100%+0.5rem)] z-50 [&>*]:pointer-events-auto">
+              <MentionContent
+                className="!static !inset-auto !w-full !transform-none box-border max-h-56 overflow-y-auto rounded-md border border-white/8 bg-[#101010]/96 p-1.5 shadow-lg backdrop-blur-md data-[state=closed]:hidden"
+                avoidCollisions={false}
+              >
+                <p className="p-1.5 text-xs font-medium tracking-wider text-white/35 uppercase">
+                  Commands
+                </p>
+                {slashCommands.map(({ value, description }) => (
+                  <MentionItem
+                    key={value}
+                    className="group cursor-pointer rounded p-0.5 transition-colors duration-150 data-[highlighted]:bg-white/[0.06]"
+                    value={value}
+                    label={value}
+                  >
+                    <div className="grid grid-cols-[5.25rem_1fr] items-baseline gap-x-3 px-2 py-1.5">
+                      <span className="text-sm font-medium tracking-tight whitespace-nowrap text-white/90 group-data-[highlighted]:text-green-300">
+                        /{value}
+                      </span>
+                      <span className="text-xs leading-snug text-white/40 group-data-[highlighted]:text-white/55">
+                        {description}
+                      </span>
+                    </div>
+                  </MentionItem>
+                ))}
+              </MentionContent>
+            </div>
+          )}
         </MentionRoot>
         <div className="absolute right-2 bottom-2 z-10 flex gap-2">
           {isGenerating ? (

@@ -5,7 +5,8 @@ import { createXai } from "@ai-sdk/xai";
 import { createGroq } from "@ai-sdk/groq";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
-import type { ApiKeys, ModelConfig, ProviderId, StageId } from "@/types";
+import type { ApiKeys, FeatureFlags, ModelConfig, ProviderId, StageId } from "@/types";
+import { isStageEnabled } from "@/lib/features";
 import { ensureBrowserAIModelReady, getBrowserAIStatus } from "./browser-ai";
 
 export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
@@ -61,8 +62,8 @@ export function isPresetModel(provider: ProviderId, model: string): boolean {
 
 export const DEFAULT_MODELS: Record<StageId, ModelConfig> = {
   base: { provider: "browser-ai", model: "default" },
-  search: { provider: "google", model: "gemini-flash-latest" },
-  research: { provider: "google", model: "gemini-flash-latest" },
+  search: { provider: "browser-ai", model: "default" },
+  research: { provider: "browser-ai", model: "default" },
   title: { provider: "browser-ai", model: "default" },
   t1: { provider: "google", model: "gemini-flash-latest" },
   t2: { provider: "google", model: "gemini-3-flash-preview" },
@@ -80,11 +81,14 @@ export function getStageConfig(
 
 export async function findMissingProvider(
   models: Partial<Record<StageId, ModelConfig>> | undefined,
-  apiKeys: ApiKeys
+  apiKeys: ApiKeys,
+  flags: FeatureFlags
 ): Promise<StageId | null> {
   let browserAIReady: boolean | null = null;
 
   for (const stage of Object.keys(DEFAULT_MODELS) as StageId[]) {
+    if (!isStageEnabled(stage, flags)) continue;
+
     const { provider } = getStageConfig(models, stage);
     if (provider === "browser-ai") {
       browserAIReady ??= (await getBrowserAIStatus()) === "available";

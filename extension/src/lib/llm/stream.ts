@@ -1,36 +1,14 @@
 import { streamText } from "ai";
-import { PROMPTS } from "./prompts";
 import { toCoreMessages, type ExtensionMessage } from "./messages";
 import { convertToolCoordinates } from "./coords";
 import { generateStepLabel } from "./generate";
 import { getStageConfig, resolveModel } from "./model";
-import { BASE_TOOLS } from "@/lib/llm/tools/base";
-import { SEARCH_TOOLS } from "@/lib/llm/tools/search";
-import { RESEARCH_TOOLS } from "@/lib/llm/tools/research";
-import { T1_TOOLS, T2_TOOLS, T3_TOOLS } from "@/lib/llm/tools/automate";
+import { MODES, resolvePrompt, resolveTools, type StreamMode } from "./modes";
 import { DEFAULT_ERROR_MESSAGE, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
+import { getFeatureFlags } from "@/lib/features";
 import type { AppSettings, ToolCall } from "@/types";
 
-export type StreamMode = "base" | "search" | "research" | "t1" | "t2" | "t3" | "t4";
-
-const TOOLS: Record<
-  string,
-  | typeof BASE_TOOLS
-  | typeof SEARCH_TOOLS
-  | typeof RESEARCH_TOOLS
-  | typeof T1_TOOLS
-  | typeof T2_TOOLS
-  | typeof T3_TOOLS
-  | Record<string, never>
-> = {
-  base: BASE_TOOLS,
-  search: SEARCH_TOOLS,
-  research: RESEARCH_TOOLS,
-  t1: T1_TOOLS,
-  t2: T2_TOOLS,
-  t3: T3_TOOLS,
-  t4: {},
-};
+export type { StreamMode } from "./modes";
 
 export interface StreamSession {
   screenshot: string | null;
@@ -116,6 +94,7 @@ function toolCallToRecord(
 
 export async function* runStream(options: StreamOptions): AsyncGenerator<StreamEvent> {
   const { mode, messages, settings, abortSignal, session } = options;
+  const config = MODES[mode];
   const responseId = crypto.randomUUID();
 
   yield {
@@ -127,8 +106,9 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
 
   const stageConfig = getStageConfig(settings.settings.models, mode);
   const model = await resolveModel(stageConfig, settings.apiKeys);
-  const system = PROMPTS[mode] ?? "";
-  const tools = TOOLS[mode] ?? {};
+  const flags = getFeatureFlags(settings.settings);
+  const system = resolvePrompt(mode, flags);
+  const tools = resolveTools(mode, flags);
 
   const screenshotState = {
     image: session?.screenshot ?? null,
@@ -142,17 +122,14 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
       model,
       system,
       messages: toCoreMessages(messages, screenshotState),
-      tools:
-        Object.keys(tools).length > 0
-          ? (tools as Parameters<typeof streamText>[0]["tools"])
-          : undefined,
+      tools: Object.keys(tools).length > 0 ? tools : undefined,
       abortSignal,
     });
 
     for await (const part of result.fullStream) {
       if (part.type === "text-delta") {
         textResponse += part.text;
-        if (mode === "t2") {
+        if (config.extra?.streamAsReasoning) {
           yield { type: "reasoning.delta", id: responseId, text: part.text };
         } else {
           yield { type: "text.stream", id: responseId, text: part.text };
@@ -171,7 +148,7 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
       for (const tc of completedToolCalls) {
         let input = tc.input as Record<string, unknown>;
         if (
-          mode === "t2" &&
+          config.extra?.convertCoordinates &&
           screenshotState.image &&
           input.x !== undefined &&
           input.y !== undefined
@@ -189,7 +166,7 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
       const action = toolCallToRecord(convertedCalls);
       let step: string | undefined;
 
-      if (mode === "t2" && session && textResponse) {
+      if (config.extra?.generateSteps && session && textResponse) {
         try {
           step = await generateStepLabel(session.previousReasoning, textResponse, action, settings);
           session.previousReasoning = textResponse;

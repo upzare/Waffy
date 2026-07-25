@@ -1,5 +1,6 @@
 import Browser from "webextension-polyfill";
 import { DEFAULT_MODELS } from "./llm/model";
+import { DEFAULT_FEATURES } from "./features";
 import type { ApiKeys, AppSettings, Settings } from "@/types";
 
 export const initClient = async () => {
@@ -25,10 +26,8 @@ export const DEFAULT_PINNED_PROMPTS = [
   "Summarize this page contents",
 ];
 
-const defaultSettings: Settings = {
-  theme: "system",
-  enableHistory: true,
-  enableNotifications: true,
+export const DEFAULT_SETTINGS: Settings = {
+  ...DEFAULT_FEATURES,
   pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
   models: { ...DEFAULT_MODELS },
 };
@@ -39,7 +38,7 @@ export const initSettings = async () => {
   const localStorage = await Browser.storage.local.get();
   const updates: Record<string, string> = {};
   if (!localStorage.settings || localStorage.settings === "undefined") {
-    updates.settings = JSON.stringify(defaultSettings);
+    updates.settings = JSON.stringify(DEFAULT_SETTINGS);
   }
   if (!localStorage.apiKeys || localStorage.apiKeys === "undefined") {
     updates.apiKeys = JSON.stringify(defaultApiKeys);
@@ -72,11 +71,11 @@ export const getAppSettings = async (): Promise<AppSettings> => {
   const localStorage = await getLocalStorage();
   const storedSettings = (localStorage.settings ?? {}) as Partial<Settings>;
   const settings: Settings = {
-    ...defaultSettings,
+    ...DEFAULT_SETTINGS,
     ...storedSettings,
     pinnedPrompts: storedSettings.pinnedPrompts?.length
       ? storedSettings.pinnedPrompts
-      : defaultSettings.pinnedPrompts,
+      : DEFAULT_SETTINGS.pinnedPrompts,
     models: {
       ...DEFAULT_MODELS,
       ...(storedSettings.models ?? {}),
