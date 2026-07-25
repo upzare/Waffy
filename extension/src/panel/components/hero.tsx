@@ -50,11 +50,7 @@ const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => 
           <h2 className="mb-6 text-center text-xl font-medium text-white/80">Try asking</h2>
           <div className="flex flex-col items-center justify-center gap-4">
             {prompts.map((prompt, index) => (
-              <PinnedPromptButton
-                key={index}
-                text={prompt}
-                onClick={() => onPromptClick(prompt)}
-              />
+              <PinnedPromptButton key={index} text={prompt} onClick={() => onPromptClick(prompt)} />
             ))}
           </div>
         </div>

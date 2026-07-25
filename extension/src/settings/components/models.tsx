@@ -197,8 +197,9 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             </span>
             <ChevronDown
               size={16}
-              className={`shrink-0 text-text-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
-                }`}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${
+                isExpanded ? "rotate-180" : ""
+              }`}
             />
           </div>
         </button>
@@ -208,13 +209,13 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
-                <div className={alertError}>
-                  <AlertCircle size={15} />
-                  <span>
-                    No API key for {providerMeta.label}. Add one in the API Keys section.
-                  </span>
-                </div>
-              )}
+                  <div className={alertError}>
+                    <AlertCircle size={15} />
+                    <span>
+                      No API key for {providerMeta.label}. Add one in the API Keys section.
+                    </span>
+                  </div>
+                )}
 
             {recommendation && (
               <div className={alertInfo}>

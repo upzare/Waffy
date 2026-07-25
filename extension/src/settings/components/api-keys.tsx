@@ -38,10 +38,11 @@ const ApiKeysSection: React.FC<ApiKeysSectionProps> = ({ apiKeys, setApiKeys }) 
                 </div>
               </div>
               <span
-                className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium ${isConfigured
-                  ? "border-green-border bg-green-dim text-green"
-                  : "border-border bg-white/4 text-text-muted"
-                  }`}
+                className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium ${
+                  isConfigured
+                    ? "border-green-border bg-green-dim text-green"
+                    : "border-border bg-white/4 text-text-muted"
+                }`}
               >
                 {isConfigured ? "Available" : "N / A"}
               </span>
