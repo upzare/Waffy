@@ -25,10 +25,11 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
           conversations.map((conv) => (
             <div
               key={conv.id}
-              className={`flex items-center justify-between p-3 rounded-md mb-2 transition-all duration-200 cursor-pointer ${conv.id === currentConversationId
-                ? "bg-[rgba(0,200,83,0.1)] border-l-[3px] border-l-[rgba(0,200,83,0.7)]"
-                : "bg-[rgba(255,255,255,0.05)] hover:bg-border"
-                }`}
+              className={`flex items-center justify-between p-3 rounded-md mb-2 transition-all duration-200 cursor-pointer ${
+                conv.id === currentConversationId
+                  ? "bg-[rgba(0,200,83,0.1)] border-l-[3px] border-l-[rgba(0,200,83,0.7)]"
+                  : "bg-[rgba(255,255,255,0.05)] hover:bg-border"
+              }`}
               role="button"
               tabIndex={0}
               onClick={() => onSelectConversation(conv.id)}

@@ -135,7 +135,10 @@ export interface Settings {
   models: Partial<Record<StageId, ModelConfig>>;
 }
 
-export type FeatureFlags = Pick<Settings, "featureSearch" | "featureResearch" | "featureAutomation">;
+export type FeatureFlags = Pick<
+  Settings,
+  "featureSearch" | "featureResearch" | "featureAutomation"
+>;
 
 export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai";

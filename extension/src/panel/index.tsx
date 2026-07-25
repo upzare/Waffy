@@ -7,11 +7,7 @@ import { AI, createTitle } from "@/lib/agent";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
-import {
-  parseSlashCommand,
-  resolveMode,
-  stripSlashCommands,
-} from "./utils/slash-commands";
+import { parseSlashCommand, resolveMode, stripSlashCommands } from "./utils/slash-commands";
 import { getToolActivityLabel } from "./utils/tool-activity";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import { availableFunctions as baseFunctions } from "@/lib/llm/tools/handlers/base";
@@ -205,7 +201,7 @@ const App = () => {
   };
 
   const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => { });
+    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => {});
   };
 
   const automateHandler = async (
@@ -820,7 +816,11 @@ const App = () => {
 
   const ensureProvidersConfigured = async () => {
     if (!appSettings) return false;
-    const missingStage = await findMissingProvider(appSettings.settings.models, appSettings.apiKeys, features);
+    const missingStage = await findMissingProvider(
+      appSettings.settings.models,
+      appSettings.apiKeys,
+      features
+    );
     if (!missingStage) return true;
 
     const provider = getStageConfig(appSettings.settings.models, missingStage).provider;
@@ -926,7 +926,11 @@ const App = () => {
     promptMentions: string[];
     promptFilesInput: File[];
   }) => {
-    if ((!text.trim() && promptFilesInput.length === 0) || isGenerating || generationLockRef.current) {
+    if (
+      (!text.trim() && promptFilesInput.length === 0) ||
+      isGenerating ||
+      generationLockRef.current
+    ) {
       return;
     }
 
@@ -983,7 +987,7 @@ const App = () => {
         if (wasFirstMessage) {
           generateTitle(promptText)
             .then(() => fetchConversations())
-            .catch(() => { });
+            .catch(() => {});
         }
       },
     });
@@ -1090,10 +1094,7 @@ const App = () => {
     setToolActivityText(null);
     showError(USER_INTERRUPTED_MESSAGE);
 
-    updateAssistantMessage(
-      (msg) => ({ ...msg, content: { ...msg.content, aborted: true } }),
-      true
-    );
+    updateAssistantMessage((msg) => ({ ...msg, content: { ...msg.content, aborted: true } }), true);
   };
 
   const handleNewChat = async () => {
@@ -1166,10 +1167,7 @@ const App = () => {
     <>
       <Toaster position="top-center" reverseOrder={false} />
       <Particles quantity={100} />
-      <WorkingDialog
-        open={showWorkingDialog}
-        onClose={() => setShowWorkingDialog(false)}
-      />
+      <WorkingDialog open={showWorkingDialog} onClose={() => setShowWorkingDialog(false)} />
       <HistorySidebar
         currentConversationId={conversationIdRef.current}
         conversations={conversations}
