@@ -114,8 +114,16 @@ const App = () => {
   };
 
   useEffect(() => {
-    checkAppSettings();
-    fetchConversations();
+    const init = async () => {
+      const minDelay = new Promise((resolve) => setTimeout(resolve, 600));
+      try {
+        await Promise.all([checkAppSettings(), fetchConversations(), minDelay]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    init();
 
     const onMessage = (request: unknown) => {
       if ((request as { action?: string })?.action === "RELOAD_PANEL") {
@@ -132,10 +140,6 @@ const App = () => {
         setSidebarHovered(false);
       }
     };
-
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
 
     document.addEventListener("mousemove", handleMouseMove);
     return () => {
