@@ -7,7 +7,11 @@ import { AI, createTitle } from "@/lib/agent";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
-import { parseSlashCommand, resolveMode, stripSlashCommands } from "./utils/slash-commands";
+import {
+  parseSlashCommand,
+  resolveMode,
+  stripSlashCommands,
+} from "./utils/slash-commands";
 import { getToolActivityLabel } from "./utils/tool-activity";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import { availableFunctions as baseFunctions } from "@/lib/llm/tools/handlers/base";
@@ -19,6 +23,7 @@ import {
 } from "@/lib/llm/tools/handlers/automate";
 import { getActiveTab } from "@/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
+import { DEFAULT_FEATURES, getFeatureFlags, isModeEnabled, MODE_LABELS } from "@/lib/features";
 import {
   listConversations,
   getConversation,
@@ -50,6 +55,7 @@ import type {
   Message,
   MessageMode,
   Conversation,
+  AppSettings,
   StreamingState,
   ToolCall,
   FileFormat,
@@ -78,7 +84,10 @@ const App = () => {
   });
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [missingApiKeys, setMissingApiKeys] = useState(false);
-  const [pinnedPrompts, setPinnedPrompts] = useState<string[]>([...DEFAULT_PINNED_PROMPTS]);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+
+  const features = appSettings ? getFeatureFlags(appSettings.settings) : DEFAULT_FEATURES;
+  const pinnedPrompts = appSettings?.settings.pinnedPrompts ?? DEFAULT_PINNED_PROMPTS;
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentTitle, setCurrentTitle] = useState("New Chat");
@@ -96,16 +105,17 @@ const App = () => {
     previousReasoning: "",
   });
 
-  const checkApiKeys = async () => {
-    const { settings, apiKeys } = await getAppSettings();
-    const missing = (await findMissingProvider(settings.models, apiKeys)) !== null;
-    setMissingApiKeys(missing);
-    setPinnedPrompts(settings.pinnedPrompts);
+  const checkAppSettings = async () => {
+    const data = await getAppSettings();
+    setAppSettings(data);
+    const flags = getFeatureFlags(data.settings);
+    const missingStage = await findMissingProvider(data.settings.models, data.apiKeys, flags);
+    setMissingApiKeys(missingStage !== null);
   };
 
   useEffect(() => {
+    checkAppSettings();
     fetchConversations();
-    checkApiKeys();
 
     const onMessage = (request: unknown) => {
       if ((request as { action?: string })?.action === "RELOAD_PANEL") {
@@ -550,6 +560,11 @@ const App = () => {
       );
 
       if (automateCall) {
+        if (!features.featureAutomation) {
+          toast.error("Enable Automation in extension settings.");
+          return;
+        }
+
         let task = prompt_text;
         try {
           const args = JSON.parse(automateCall.arguments) as { task?: string };
@@ -800,11 +815,11 @@ const App = () => {
   };
 
   const ensureProvidersConfigured = async () => {
-    const { settings, apiKeys } = await getAppSettings();
-    const missingStage = await findMissingProvider(settings.models, apiKeys);
+    if (!appSettings) return false;
+    const missingStage = await findMissingProvider(appSettings.settings.models, appSettings.apiKeys, features);
     if (!missingStage) return true;
 
-    const provider = getStageConfig(settings.models, missingStage).provider;
+    const provider = getStageConfig(appSettings.settings.models, missingStage).provider;
     if (provider === "browser-ai") {
       toast.error("Download Browser AI in extension settings.");
     } else {
@@ -857,6 +872,11 @@ const App = () => {
     generationLockRef.current = true;
 
     try {
+      if (!isModeEnabled(mode, features)) {
+        toast.error(`Enable ${MODE_LABELS[mode] ?? mode} in extension settings.`);
+        return;
+      }
+
       if (!(await ensureProvidersConfigured())) return;
 
       messageIdRef.current = messageId;
@@ -905,6 +925,7 @@ const App = () => {
     if ((!text.trim() && promptFilesInput.length === 0) || isGenerating || generationLockRef.current) {
       return;
     }
+
     const command = parseSlashCommand(promptMentions, text);
     const mode = resolveMode(command);
     const messageId = uuid4();
@@ -1205,6 +1226,7 @@ const App = () => {
           mentions={mentions}
           files={files}
           inputResetKey={inputResetKey}
+          features={features}
           setMessage={setMessage}
           setMentions={setMentions}
           setFiles={setFiles}

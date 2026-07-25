@@ -57,6 +57,7 @@ export interface InputContainerProps {
   mentions: string[];
   files: File[];
   inputResetKey: number;
+  features: FeatureFlags;
   setMessage: React.Dispatch<React.SetStateAction<string>>;
   setMentions: React.Dispatch<React.SetStateAction<string[]>>;
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;
@@ -127,12 +128,14 @@ export interface ParticlesProps {
 }
 
 export interface Settings {
-  theme: string;
-  enableHistory: boolean;
-  enableNotifications: boolean;
+  featureSearch: boolean;
+  featureResearch: boolean;
+  featureAutomation: boolean;
   pinnedPrompts: string[];
   models: Partial<Record<StageId, ModelConfig>>;
 }
+
+export type FeatureFlags = Pick<Settings, "featureSearch" | "featureResearch" | "featureAutomation">;
 
 export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai";

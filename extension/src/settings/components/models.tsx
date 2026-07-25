@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AlertCircle, ChevronDown, Info } from "lucide-react";
 import { CUSTOM_MODEL_OPTION, isPresetModel, PROVIDER_MODELS } from "@/lib/llm/model";
+import { getFeatureFlags, isStageEnabled } from "@/lib/features";
 import { getBrowserAIModelLabel, type BrowserAIStatus } from "@/lib/llm/browser-ai";
 import { BROWSER_AI_PROVIDER, getProviderMeta, hasApiKey, PROVIDERS } from "../providers";
 import type { CloudProviderId } from "../providers";
@@ -30,8 +31,7 @@ interface StageGroup {
 const STAGE_GROUPS: StageGroup[] = [
   {
     title: "General",
-    subtitle:
-      "Local models (Browser AI) work well here — fast, private, and free. Cloud models are recommended for research.",
+    subtitle: "Use browser models for free and cloud models for more advanced reasoning.",
     stages: [
       {
         id: "base",
@@ -63,17 +63,11 @@ const STAGE_GROUPS: StageGroup[] = [
           </>
         ),
       },
-      {
-        id: "title",
-        label: "Title Generation Model",
-        description: "Creates a title for the conversation",
-      },
     ],
   },
   {
     title: "Automation",
-    subtitle:
-      "Cloud models are recommended for automation — stronger vision, reasoning, and reliability for multi-step browser tasks.",
+    subtitle: "Cloud models recommended for multi-step browser tasks.",
     stages: [
       {
         id: "t1",
@@ -102,10 +96,21 @@ const STAGE_GROUPS: StageGroup[] = [
         label: "Output Model",
         description: "Generates a summary of the task completion",
       },
+    ],
+  },
+  {
+    title: "Miscellaneous",
+    subtitle: "Supporting models used across conversations.",
+    stages: [
+      {
+        id: "title",
+        label: "Title Model",
+        description: "Creates a title for the conversation",
+      },
       {
         id: "step",
-        label: "Step Generation Model",
-        description: "Short execution step descriptions shown in the UI",
+        label: "Step Model",
+        description: "Creates short labels for each execution step",
       },
     ],
   },
@@ -318,10 +323,16 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     );
   };
 
+  const flags = getFeatureFlags(settings);
+  const visibleGroups = STAGE_GROUPS.map((group) => ({
+    ...group,
+    stages: group.stages.filter((stage) => isStageEnabled(stage.id, flags)),
+  })).filter((group) => group.stages.length > 0);
+
   return (
     <>
       <BrowserAISection onStatusChange={setBrowserAIStatus} />
-      {STAGE_GROUPS.map((group) => (
+      {visibleGroups.map((group) => (
         <div className="mb-7" key={group.title}>
           <div className="mb-3">
             <h3 className="mb-0.5 text-sm font-semibold">{group.title}</h3>

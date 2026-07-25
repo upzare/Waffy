@@ -3,8 +3,12 @@ import ReactDOM from "react-dom/client";
 import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
 import { Settings as SettingsIcon, Key, Cpu, Info } from "lucide-react";
-import { getAppSettings, saveAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
-import { DEFAULT_MODELS } from "@/lib/llm/model";
+import {
+  getAppSettings,
+  saveAppSettings,
+  DEFAULT_PINNED_PROMPTS,
+  DEFAULT_SETTINGS,
+} from "@/lib/client";
 import type { ApiKeys, Settings as SettingsType } from "../types";
 import "@/stylesheets/globals.css";
 
@@ -41,14 +45,6 @@ const sections = [
   },
 ];
 
-const defaultSettings: SettingsType = {
-  theme: "system",
-  enableHistory: true,
-  enableNotifications: true,
-  pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
-  models: { ...DEFAULT_MODELS },
-};
-
 const getHashSection = () => {
   const hash = window.location.hash.replace("#", "");
   if (hash === "" || !sections.some((section) => section.id === hash)) {
@@ -62,7 +58,7 @@ const Settings = () => {
   const activeSectionMeta = sections.find((section) => section.id === activeSection) ?? sections[0];
   const logoUrl = Browser.runtime.getURL("assets/logo.svg");
 
-  const [settings, setSettings] = useState<SettingsType>(defaultSettings);
+  const [settings, setSettings] = useState<SettingsType>({ ...DEFAULT_SETTINGS });
   const [apiKeys, setApiKeys] = useState<ApiKeys>({});
   const [pinnedPrompts, setPinnedPrompts] = useState<string[]>([...DEFAULT_PINNED_PROMPTS]);
 
@@ -103,7 +99,7 @@ const Settings = () => {
   };
 
   const handleReset = () => {
-    setSettings(defaultSettings);
+    setSettings({ ...DEFAULT_SETTINGS });
     setApiKeys({});
     setPinnedPrompts([...DEFAULT_PINNED_PROMPTS]);
     toast.success("Changes reset to default values");
@@ -112,7 +108,14 @@ const Settings = () => {
   const renderSection = () => {
     switch (activeSection) {
       case "general":
-        return <GeneralSection pinnedPrompts={pinnedPrompts} setPinnedPrompts={setPinnedPrompts} />;
+        return (
+          <GeneralSection
+            settings={settings}
+            setSettings={setSettings}
+            pinnedPrompts={pinnedPrompts}
+            setPinnedPrompts={setPinnedPrompts}
+          />
+        );
       case "api-keys":
         return <ApiKeysSection apiKeys={apiKeys} setApiKeys={setApiKeys} />;
       case "models":

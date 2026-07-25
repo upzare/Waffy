@@ -1,8 +1,9 @@
-import type { MessageMode } from "@/types";
+import type { FeatureFlags, MessageMode } from "@/types";
+import { isModeEnabled } from "@/lib/features";
 
 export type SlashCommand = "search" | "research" | "automate";
 
-export const SLASH_COMMANDS: { value: SlashCommand; description: string }[] = [
+const SLASH_COMMANDS: { value: SlashCommand; description: string }[] = [
   { value: "search", description: "Search the web and answer" },
   { value: "research", description: "Deep research from the page" },
   { value: "automate", description: "Run browser automation" },
@@ -14,6 +15,9 @@ const COMMAND_PATTERN = new RegExp(
 );
 
 const STRIP_COMMAND_PATTERN = new RegExp(COMMAND_PATTERN.source, "gi");
+
+export const getSlashCommands = (flags: FeatureFlags) =>
+  SLASH_COMMANDS.filter(({ value }) => isModeEnabled(value, flags));
 
 export function hasSlashCommand(text: string): boolean {
   return COMMAND_PATTERN.test(text);
