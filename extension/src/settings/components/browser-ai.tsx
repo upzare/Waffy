@@ -20,7 +20,7 @@ const STATUS_LABELS: Record<BrowserAIStatus, string> = {
 };
 
 function getStatusBadgeClass(status: BrowserAIStatus): string {
-  const base = "shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium";
+  const base = "w-fit shrink-0 self-start rounded border px-1.5 py-0.5 text-xs font-medium";
   if (status === "available") {
     return `${base} border-green-border bg-green-dim text-green`;
   }

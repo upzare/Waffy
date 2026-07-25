@@ -11,8 +11,8 @@ const Hero: React.FC<HeroProps> = ({ hidden, pinnedPrompts, onPromptClick }) => 
 
   return (
     <div className="relative z-10 flex flex-col items-center justify-start overflow-auto bg-transparent transition-all duration-500 ease-out py-[4vh]">
-      <div className="max-w-full px-4 text-center">
-        <h1 className="text-3xl font-extrabold">What can I do for you?</h1>
+      <div className="w-full text-center">
+        <h1 className="text-[1.75rem] font-extrabold">What can I do for you?</h1>
 
         <div className="mt-4 flex flex-wrap justify-center gap-6">
           <div className="group flex flex-col items-center gap-2">

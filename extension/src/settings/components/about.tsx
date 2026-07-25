@@ -46,7 +46,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({ logoUrl }) => {
             <img src={logoUrl} alt="Waffy" className="h-9 w-9" />
           </div>
 
-          <h2 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Waffy</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Waffy Extension</h2>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-text-secondary">
             {manifest.description}
           </p>
