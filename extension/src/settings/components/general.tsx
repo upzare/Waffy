@@ -1,5 +1,6 @@
 import React from "react";
 import { Pin, Plus, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { iconBox, iconButton, panel, panelSubtitle, panelTitle } from "../styles";
 import type { FeatureFlags, Settings } from "@/types";
 
@@ -100,11 +101,10 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
               className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-1 py-2.5 transition-colors duration-150 hover:bg-black/20"
             >
               <span className="text-sm font-medium text-text-primary">{label}</span>
-              <input
-                type="checkbox"
-                className="h-4 w-4 shrink-0 cursor-pointer accent-green"
+              <Switch
+                size="sm"
                 checked={settings[key]}
-                onChange={(e) => setSettings((prev) => ({ ...prev, [key]: e.target.checked }))}
+                onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, [key]: checked }))}
               />
             </label>
           ))}

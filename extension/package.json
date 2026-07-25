@@ -17,6 +17,7 @@
     "@ai-sdk/groq": "^3.0.42",
     "@ai-sdk/openai": "^3.0.74",
     "@ai-sdk/xai": "^3.0.96",
+    "@base-ui/react": "^1.6.0",
     "@browser-ai/core": "^2.1.13",
     "@diceui/mention": "^0.8.0",
     "@mozilla/readability": "^0.6.0",
@@ -24,6 +25,7 @@
     "@streamdown/code": "^1.1.1",
     "@tanstack/react-virtual": "^3.14.8",
     "ai": "^6.0.208",
+    "clsx": "^2.1.1",
     "dexie": "^4.4.4",
     "linkedom": "^0.18.13",
     "lucide-react": "^1.21.0",
@@ -31,6 +33,7 @@
     "react-dom": "^19.2.7",
     "react-hot-toast": "^2.6.0",
     "streamdown": "^2.5.0",
+    "tailwind-merge": "^3.6.0",
     "turndown": "^7.2.4",
     "uuid": "^14.0.1",
     "webextension-polyfill": "^0.12.0"

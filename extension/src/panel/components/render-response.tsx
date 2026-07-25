@@ -4,7 +4,6 @@ import { code } from "@streamdown/code";
 import { DropdownSteps } from "../components/dropdown-steps";
 import {
   ChevronDown,
-  ChevronUp,
   Loader2,
   CheckCircle2,
   CircleX,
@@ -113,11 +112,28 @@ const StatusPanel = ({
           />
           <span className="font-normal text-xs">{status.label}</span>
         </div>
-        <div className="text-white transition-transform duration-200 ease-in-out">
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </div>
+        <ChevronDown
+          size={16}
+          className={`text-white transition-transform duration-300 ease-in-out ${
+            expanded ? "rotate-180" : "rotate-0"
+          }`}
+        />
       </button>
-      {expanded ? children : null}
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden" aria-hidden={!expanded}>
+          <div
+            className={`transition-opacity duration-300 ease-in-out ${
+              expanded ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -219,7 +235,7 @@ const RenderResponse = ({
           onToggle={() => setIsValidatingExpanded((open) => !open)}
           status={getValidationStatus(isValidating, taskStatus)}
         >
-          <div className="p-4 border-t border-[rgba(255,255,255,0.05)] animate-expand-content">
+          <div className="p-4 border-t border-[rgba(255,255,255,0.05)]">
             <MarkdownContent isAnimating={isValidating}>
               {content?.validation || ""}
             </MarkdownContent>
