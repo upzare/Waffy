@@ -131,14 +131,16 @@ const Settings = () => {
     <div className="flex h-screen w-full flex-col overflow-hidden bg-surface-0 font-sans text-text-primary md:flex-row">
       <Toaster position="top-center" reverseOrder={false} />
 
-      <aside className="flex shrink-0 flex-col gap-2 border-b border-border bg-surface-1 p-3 md:w-70 md:border-r md:border-b-0 md:px-3 md:py-4">
-        <div className="flex items-center justify-center gap-3 px-2 pb-3 pt-1 md:px-3 md:pb-5 md:pt-2">
-          <img src={logoUrl} alt="Waffy Logo" className="h-9 w-9" />
-          <h1 className="text-xl font-bold tracking-tight">Extension Settings</h1>
+      <aside className="flex shrink-0 flex-col border-b border-border bg-surface-1 md:w-70 md:border-r md:border-b-0">
+        <div className="flex items-center gap-2.5 px-4 py-3 md:gap-3 md:px-5 md:pb-5 md:pt-6">
+          <img src={logoUrl} alt="Waffy Logo" className="h-8 w-8 shrink-0 md:h-9 md:w-9" />
+          <h1 className="truncate text-lg font-bold tracking-tight md:text-xl">
+            Extension Settings
+          </h1>
         </div>
 
         <nav
-          className={`flex flex-1 gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-y-auto md:pb-0 ${thinScroll}`}
+          className={`flex w-full gap-1 px-2 pb-2 md:flex-1 md:flex-col md:gap-1 md:overflow-y-auto md:px-3 md:pb-4 ${thinScroll}`}
         >
           {sections.map((section) => {
             const Icon = section.icon;
@@ -147,7 +149,7 @@ const Settings = () => {
               <button
                 key={section.id}
                 type="button"
-                className={`flex min-w-18 flex-col items-center gap-2 rounded-md border px-2 py-2.5 text-left transition-colors duration-150 md:w-full md:min-w-0 md:flex-row md:gap-2.5 md:px-3 ${
+                className={`flex flex-1 flex-col items-center justify-center gap-1.5 rounded-md border px-1 py-2 text-center transition-colors duration-150 md:w-full md:flex-none md:flex-row md:justify-start md:gap-2.5 md:px-3 md:py-2.5 md:text-left ${
                   isActive
                     ? "border-green-border bg-green-dim text-green"
                     : "border-transparent text-text-secondary hover:bg-white/4 hover:text-text-primary"
@@ -165,7 +167,9 @@ const Settings = () => {
                 >
                   <Icon size={17} />
                 </span>
-                <span className="text-xs font-medium leading-none md:text-sm">{section.label}</span>
+                <span className="text-[11px] font-medium leading-none md:text-sm">
+                  {section.label}
+                </span>
               </button>
             );
           })}
