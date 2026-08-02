@@ -21,8 +21,7 @@ import { getActiveTab } from "@/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
 import { DEFAULT_FEATURES, getFeatureFlags, isModeEnabled, MODE_LABELS } from "@/lib/features";
 import {
-  listConversations,
-  getConversation,
+  observeConversations,
   createConversation,
   updateConversationMessages,
   updateConversationTitle,
@@ -110,10 +109,14 @@ const App = () => {
   };
 
   useEffect(() => {
+    const sub = observeConversations().subscribe({
+      next: (result) => setConversations(result),
+    });
+
     const init = async () => {
       const minDelay = new Promise((resolve) => setTimeout(resolve, 600));
       try {
-        await Promise.all([checkAppSettings(), fetchConversations(), minDelay]);
+        await Promise.all([checkAppSettings(), minDelay]);
       } finally {
         setIsLoading(false);
       }
@@ -139,6 +142,7 @@ const App = () => {
 
     document.addEventListener("mousemove", handleMouseMove);
     return () => {
+      sub.unsubscribe();
       Browser.runtime.onMessage.removeListener(onMessage);
       document.removeEventListener("mousemove", handleMouseMove);
     };
@@ -147,7 +151,6 @@ const App = () => {
   const initConversation = async () => {
     if (!conversationIdRef.current) return;
     await createConversation(conversationIdRef.current);
-    await fetchConversations();
   };
 
   const generateTitle = async (prompt: string) => {
@@ -156,12 +159,6 @@ const App = () => {
     if (conversationIdRef.current) {
       await updateConversationTitle(conversationIdRef.current, title);
     }
-  };
-
-  const fetchConversations = async (): Promise<Conversation[]> => {
-    const sorted = await listConversations();
-    setConversations(sorted);
-    return sorted;
   };
 
   const syncMessages = (updatedMessages: Message[]) => {
@@ -985,9 +982,7 @@ const App = () => {
         });
 
         if (wasFirstMessage) {
-          generateTitle(promptText)
-            .then(() => fetchConversations())
-            .catch(() => { });
+          generateTitle(promptText).catch(() => {});
         }
       },
     });
@@ -1070,13 +1065,6 @@ const App = () => {
     setMessages(remainingMessages);
     if (conversationId) {
       await updateConversationMessages(conversationId, remainingMessages);
-      setConversations((prev) =>
-        prev.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, messages: remainingMessages }
-            : conversation
-        )
-      );
     }
 
     setMentions([]);
@@ -1103,7 +1091,6 @@ const App = () => {
       return;
     }
     await handleStopGeneration();
-    fetchConversations();
     setIsFirstMessage(true);
     setMessages([]);
     conversationIdRef.current = null;
@@ -1124,7 +1111,7 @@ const App = () => {
       setShowWorkingDialog(true);
       return;
     }
-    const conversation = await getConversation(id);
+    const conversation = conversations.find((c) => c.id === id);
     if (conversation) {
       await handleStopGeneration();
       setMessages([]);
@@ -1150,7 +1137,6 @@ const App = () => {
     const conversation = conversations.find((c) => c.id === id);
     if (conversation) {
       await deleteConversation(id);
-      await fetchConversations();
       if (conversationIdRef.current === id) {
         handleNewChat();
       }

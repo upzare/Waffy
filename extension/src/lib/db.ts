@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from "dexie";
+import Dexie, { liveQuery, type EntityTable } from "dexie";
 import type { Conversation, Message } from "@/types";
 
 class WaffyDB extends Dexie {
@@ -18,10 +18,6 @@ export function listConversations(): Promise<Conversation[]> {
   return db.conversations.orderBy("timestamp").reverse().toArray();
 }
 
-export function getConversation(id: string): Promise<Conversation | undefined> {
-  return db.conversations.get(id);
-}
-
 export function createConversation(id: string): Promise<string> {
   return db.conversations.add({
     id,
@@ -32,7 +28,10 @@ export function createConversation(id: string): Promise<string> {
 }
 
 export function updateConversationMessages(id: string, messages: Message[]): Promise<number> {
-  return db.conversations.update(id, { messages });
+  return db.conversations.update(id, {
+    messages,
+    timestamp: new Date(),
+  });
 }
 
 export function updateConversationTitle(id: string, title: string): Promise<number> {
@@ -41,4 +40,8 @@ export function updateConversationTitle(id: string, title: string): Promise<numb
 
 export function deleteConversation(id: string): Promise<void> {
   return db.conversations.delete(id);
+}
+
+export function observeConversations() {
+  return liveQuery(() => listConversations());
 }
