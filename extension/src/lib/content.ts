@@ -95,33 +95,19 @@ const getPageSnapshot = () => ({
   html: document.documentElement.outerHTML,
 });
 
-const getVisibleTextLength = () =>
-  (document.body?.innerText ?? "").replace(/\s+/g, " ").trim().length;
-
-// Wait until page text is unchanged for several polls (stream finished).
+// Wait until the Copy text control appears (response finished).
 const waitAiModeContent = async () => {
   const POLL_MS = 100;
-  const STABLE_POLLS = 5;
-  const WARMUP_MS = 3000;
   const TIMEOUT_MS = 30000;
-
   const started = Date.now();
-  let lastLen = -1;
-  let stableCount = 0;
 
   while (Date.now() - started < TIMEOUT_MS) {
-    const len = getVisibleTextLength();
-    if (len === lastLen) {
-      stableCount += 1;
-    } else {
-      stableCount = 0;
-      lastLen = len;
-    }
-
-    if (Date.now() - started >= WARMUP_MS && stableCount >= STABLE_POLLS) {
+    const hasCopyText = [...document.querySelectorAll("[aria-label]")].some(
+      (el) => el.getAttribute("aria-label")?.replace(/\s+/g, " ").trim().toLowerCase() === "copy text",
+    );
+    if (hasCopyText) {
       return { status: "success" as const, ...getPageSnapshot() };
     }
-
     await sleep(POLL_MS);
   }
 

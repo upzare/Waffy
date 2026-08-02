@@ -25,7 +25,7 @@ const setOverlay = (tabId: number, enabled: boolean) => {
       type: "INTERACT_DOM",
       name: enabled ? "SHOW_OVERLAY" : "HIDE_OVERLAY",
     })
-    .catch(() => {});
+    .catch(() => { });
   overlayInfo[tabId] = enabled;
 };
 
@@ -86,7 +86,7 @@ const detachDebugger = async (tabId: number): Promise<void> => {
     await chrome.debugger.sendCommand({ tabId }, "Page.disable");
     await chrome.debugger.sendCommand({ tabId }, "DOM.disable");
     await chrome.debugger.sendCommand({ tabId }, "Overlay.disable");
-  } catch (_) {}
+  } catch (_) { }
   return new Promise((resolve) => {
     chrome.debugger.detach({ tabId }, () => resolve());
   });
@@ -228,7 +228,7 @@ const stopGoogleAiMode = async () => {
   if (id == null) return;
   try {
     await Browser.windows.remove(id);
-  } catch (_) {}
+  } catch (_) { }
 };
 
 const fetchGoogleAiMode = async (query: string) => {
@@ -397,7 +397,7 @@ const captureVisibleTab = async (tabId: unknown) => {
     if (previousTabId != null) {
       try {
         await Browser.tabs.update(previousTabId, { active: true });
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 };
