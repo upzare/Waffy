@@ -201,7 +201,7 @@ const App = () => {
   };
 
   const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => {});
+    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => { });
   };
 
   const automateHandler = async (
@@ -576,7 +576,7 @@ const App = () => {
         updateAssistantMessage(
           (msg) => ({
             ...msg,
-            content: { ...msg.content, mode: "automate" as MessageMode },
+            mode: "automate" as MessageMode,
           }),
           true
         );
@@ -977,8 +977,8 @@ const App = () => {
                 taskStatus: "",
                 text: { response: "", execution: [], validation: "", output: "" },
                 files: [],
-                mode,
               },
+              mode,
             },
           ];
           return syncMessages(update);
@@ -987,7 +987,7 @@ const App = () => {
         if (wasFirstMessage) {
           generateTitle(promptText)
             .then(() => fetchConversations())
-            .catch(() => {});
+            .catch(() => { });
         }
       },
     });
@@ -1029,7 +1029,7 @@ const App = () => {
       return;
     }
 
-    const mode = resolveMode(assistantMsg.content.mode);
+    const mode = resolveMode(assistantMsg.mode);
 
     await sendMessage({
       promptText,
@@ -1046,8 +1046,8 @@ const App = () => {
               taskStatus: "",
               text: { response: "", execution: [], validation: "", output: "" },
               files: [],
-              mode,
             },
+            mode,
           }),
           true
         );
@@ -1094,7 +1094,7 @@ const App = () => {
     setToolActivityText(null);
     showError(USER_INTERRUPTED_MESSAGE);
 
-    updateAssistantMessage((msg) => ({ ...msg, content: { ...msg.content, aborted: true } }), true);
+    updateAssistantMessage((msg) => ({ ...msg, aborted: true }), true);
   };
 
   const handleNewChat = async () => {

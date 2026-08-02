@@ -237,7 +237,7 @@ function buildPreviousContext(conversationMessages: Message[]): {
       const task = msg.content.task ?? "";
       const taskStatus = msg.content.taskStatus ?? "";
       const execution = msg.content.text?.execution ?? [];
-      const aborted = msg.content.aborted;
+      const aborted = msg.aborted;
 
       if (output) {
         const taskResponse = `TASK_STATUS: ${taskStatus}\n\nAGENT_OUTPUT: ${output}`;

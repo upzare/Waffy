@@ -88,9 +88,9 @@ export interface Message {
     files?: FileFormat[];
     task?: string;
     taskStatus?: string;
-    aborted?: boolean;
-    mode?: MessageMode;
   };
+  mode?: MessageMode;
+  aborted?: boolean;
 }
 
 export interface FileFormat {
