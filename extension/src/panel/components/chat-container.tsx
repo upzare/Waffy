@@ -173,11 +173,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       )}
       <div
         ref={sticky.containerRef}
-        className={`z-1 ${
-          hidden
-            ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
-            : "min-h-0 flex-1 overflow-y-auto"
-        }`}
+        className={`z-1 ${hidden
+          ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
+          : "min-h-0 flex-1 overflow-y-auto"
+          }`}
         onWheel={sticky.onWheel}
         onTouchStart={sticky.onTouchStart}
         onTouchMove={sticky.onTouchMove}
@@ -186,74 +185,81 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         onPointerCancel={sticky.onPointerUp}
         onScroll={sticky.onScroll}
       >
-        <div ref={sticky.contentRef} className="w-full">
-          {!hidden && <VirtualPadding />}
-          <div
-            className="relative w-full overflow-hidden"
-            style={{ height: virtualizer.getTotalSize() }}
-          >
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const msg = messages[virtualRow.index];
-              if (!msg) return null;
+        <div ref={sticky.contentRef} className="w-full h-full">
+          {!hidden && messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center px-6 text-sm text-white/70">
+              Type a message to get started
+            </div>
+          ) : (
+            <>
+              {!hidden && <VirtualPadding />}
+              <div
+                className="relative w-full"
+                style={{ height: virtualizer.getTotalSize() }}
+              >
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const msg = messages[virtualRow.index];
+                  if (!msg) return null;
 
-              const isUser = msg.id.startsWith("user-");
-              const isStreamingMessage = msg.id === streamingMessageId;
-              const files = msg.content.files ?? [];
+                  const isUser = msg.id.startsWith("user-");
+                  const isStreamingMessage = msg.id === streamingMessageId;
+                  const files = msg.content.files ?? [];
 
-              return (
-                <div
-                  key={msg.id}
-                  data-index={virtualRow.index}
-                  ref={virtualizer.measureElement}
-                  className="absolute top-0 left-0 w-full flex justify-center"
-                  style={{ transform: `translateY(${virtualRow.start}px)` }}
-                >
-                  <div
-                    className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${
-                      isUser
-                        ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
-                        : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
-                    }`}
-                  >
-                    <MessageActions
-                      isUser={isUser}
-                      disabled={isGenerating}
-                      onRevert={() => onRevertMessage(msg.id)}
-                      onRetry={() => onRetryMessage(msg.id)}
-                      onCopy={() => handleCopyMessage(msg)}
-                    />
-                    <div className="flex-1 whitespace-normal wrap-break-word overflow-hidden">
-                      {isUser ? (
-                        <Streamdown
-                          mode="static"
-                          className="wrap-break-word w-full"
-                          controls={false}
-                          lineNumbers={false}
-                          linkSafety={{ enabled: false }}
-                        >
-                          {msg.content.text?.prompt ?? ""}
-                        </Streamdown>
-                      ) : (
-                        <RenderResponse
-                          content={msg.content.text}
-                          isInitial={isStreamingMessage && streaming.response}
-                          isExecuting={isStreamingMessage && streaming.execution}
-                          isValidating={isStreamingMessage && streaming.validation}
-                          isOutput={isStreamingMessage && streaming.output}
-                          taskStatus={msg.content?.taskStatus}
-                          toolActivityText={isStreamingMessage ? toolActivityText : null}
+                  return (
+                    <div
+                      key={msg.id}
+                      data-index={virtualRow.index}
+                      ref={virtualizer.measureElement}
+                      className="absolute top-0 left-0 w-full flex justify-center"
+                      style={{ transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      <div
+                        className={`group relative flex gap-4 text-sm py-4 px-6 rounded-lg animate-fade-in-message w-[95%] transition-all duration-200 ease-out${isUser
+                          ? " bg-[rgba(0,255,70,0.03)] border border-[rgba(0,255,70,0.08)] backdrop-blur-[2px] hover:shadow-[0_0px_10px_1px_#ffffff20] hover:backdrop-blur-[3px]"
+                          : " bg-[rgba(255,255,255,0.05)] border border-border backdrop-blur-xs hover:shadow-[0_0px_10px_1px_#ffffff2b] hover:backdrop-blur-[5px]"
+                          }`}
+                      >
+                        <MessageActions
+                          isUser={isUser}
+                          disabled={isGenerating}
+                          onRevert={() => onRevertMessage(msg.id)}
+                          onRetry={() => onRetryMessage(msg.id)}
+                          onCopy={() => handleCopyMessage(msg)}
                         />
-                      )}
-                      {files.length > 0 && (
-                        <MessageFiles files={files} onFileClick={handleFileClick} />
-                      )}
+                        <div className="flex-1 whitespace-normal wrap-break-word overflow-hidden">
+                          {isUser ? (
+                            <Streamdown
+                              mode="static"
+                              className="wrap-break-word w-full"
+                              controls={false}
+                              lineNumbers={false}
+                              linkSafety={{ enabled: false }}
+                            >
+                              {msg.content.text?.prompt ?? ""}
+                            </Streamdown>
+                          ) : (
+                            <RenderResponse
+                              content={msg.content.text}
+                              isInitial={isStreamingMessage && streaming.response}
+                              isExecuting={isStreamingMessage && streaming.execution}
+                              isValidating={isStreamingMessage && streaming.validation}
+                              isOutput={isStreamingMessage && streaming.output}
+                              taskStatus={msg.content?.taskStatus}
+                              toolActivityText={isStreamingMessage ? toolActivityText : null}
+                            />
+                          )}
+                          {files.length > 0 && (
+                            <MessageFiles files={files} onFileClick={handleFileClick} />
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {!hidden && <VirtualPadding />}
+                  );
+                })}
+              </div>
+              {!hidden && <VirtualPadding />}
+            </>
+          )}
         </div>
       </div>
     </>
