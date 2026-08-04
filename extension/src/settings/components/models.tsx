@@ -82,7 +82,7 @@ const STAGE_GROUPS: StageGroup[] = [
           <>
             Execution works best with vision models that support spatial reasoning and image
             grounding — they can identify UI element coordinates on screenshots. Recommended model:{" "}
-            <strong>gemini-3.5-flash</strong> or similar.
+            <strong>gemini-3.6-flash</strong> or similar.
           </>
         ),
       },
