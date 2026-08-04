@@ -59,7 +59,6 @@ import "@/stylesheets/globals.css";
 
 const App = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isFirstMessage, setIsFirstMessage] = useState(true);
   const [isChat, setIsChat] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showWorkingDialog, setShowWorkingDialog] = useState(false);
@@ -942,7 +941,7 @@ const App = () => {
       return;
     }
 
-    const wasFirstMessage = isFirstMessage;
+    const isFirstMessage = messages.length === 0;
     const conversationContext = messages;
 
     await sendMessage({
@@ -953,9 +952,8 @@ const App = () => {
       conversationContext,
       clearInput: true,
       prepareMessages: async () => {
-        if (wasFirstMessage) {
+        if (isFirstMessage && !conversationIdRef.current) {
           setIsChat(true);
-          setIsFirstMessage(false);
           conversationIdRef.current = uuid4();
           await initConversation();
         }
@@ -981,8 +979,8 @@ const App = () => {
           return syncMessages(update);
         });
 
-        if (wasFirstMessage) {
-          generateTitle(promptText).catch(() => {});
+        if (isFirstMessage) {
+          generateTitle(promptText).catch(() => { });
         }
       },
     });
@@ -1091,7 +1089,6 @@ const App = () => {
       return;
     }
     await handleStopGeneration();
-    setIsFirstMessage(true);
     setMessages([]);
     conversationIdRef.current = null;
     setCurrentTitle("New Chat");
@@ -1116,7 +1113,6 @@ const App = () => {
       await handleStopGeneration();
       setMessages([]);
       await new Promise((resolve) => setTimeout(resolve, 100));
-      setIsFirstMessage(false);
       setMessages(conversation.messages);
       conversationIdRef.current = id;
       setMessage("");

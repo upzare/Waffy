@@ -34,7 +34,7 @@ Waffy runs a multi-stage pipeline. Each stage can use a different model:
 | Stage         | Purpose                                            | Model guidance                                                                                                                                                                                                                               |
 | ------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Planning      | Decides whether to automate and drafts a task plan | Fast text models work well                                                                                                                                                                                                                   |
-| **Execution** | Drives browser actions from screenshots            | Use a **vision model with spatial reasoning and image grounding** — it must identify UI element coordinates on screenshots. Recommended: **gemini-3.5-flash** (Google AI Studio or OpenRouter). Browser built-in AI is not recommended here. |
+| **Execution** | Drives browser actions from screenshots            | Use a **vision model with spatial reasoning and image grounding** — it must identify UI element coordinates on screenshots. Recommended: **gemini-3.6-flash** (Google AI Studio or OpenRouter). Browser built-in AI is not recommended here. |
 | Validation    | Checks whether the task succeeded                  | Fast text models work well                                                                                                                                                                                                                   |
 | Output        | Summarizes results for you                         | Fast text models work well                                                                                                                                                                                                                   |
 | Title / Step  | Short UI labels                                    | Browser built-in AI works well (default)                                                                                                                                                                                                     |
@@ -68,7 +68,7 @@ This produces a `build/` directory and a `.output/Waffy-1.0.0.zip` package.
 
 1. Right-click the Waffy icon → **Options**, or open **Extension settings** from the side panel
 2. Go to **API Keys** and add a key for at least one provider
-3. Go to **Models** and pick models for each pipeline stage. For **Execution**, use a vision model with spatial reasoning — e.g. **gemini-3.5-flash** via Google or OpenRouter.
+3. Go to **Models** and pick models for each pipeline stage. For **Execution**, use a vision model with spatial reasoning — e.g. **gemini-3.6-flash** via Google or OpenRouter.
 4. Start chatting — try something like _"Go to example.com and click the login button"_
 
 ## Development
