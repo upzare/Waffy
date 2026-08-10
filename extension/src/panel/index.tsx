@@ -886,6 +886,13 @@ const App = () => {
       setErrorText("");
       abortControllerRef.current = new AbortController();
 
+      if (clearInput) {
+        setMessage("");
+        setMentions([]);
+        setFiles([]);
+        setInputResetKey((key) => key + 1);
+      }
+
       try {
         await prepareMessages();
         await runModeHandler(mode, promptText, promptFiles, conversationContext);
@@ -897,12 +904,7 @@ const App = () => {
         setIsGenerating(false);
         setStatusText("");
         setToolActivityText(null);
-        if (clearInput) {
-          setMessage("");
-          setMentions([]);
-          setFiles([]);
-          setInputResetKey((key) => key + 1);
-        } else {
+        if (!clearInput) {
           textareaRef.current?.focus();
         }
         messageIdRef.current = null;
