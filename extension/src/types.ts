@@ -37,6 +37,7 @@ export interface StreamingState {
 
 export interface ChatContainerProps {
   hidden: boolean;
+  conversationId: string | null;
   messages: Message[];
   streaming: StreamingState;
   streamingMessageId: string | null;

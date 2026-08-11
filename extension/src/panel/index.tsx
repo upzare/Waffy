@@ -1193,6 +1193,7 @@ const App = () => {
         <Hero hidden={isChat} pinnedPrompts={pinnedPrompts} onPromptClick={handlePromptClick} />
         <ChatContainer
           hidden={!isChat}
+          conversationId={conversationIdRef.current}
           messages={messages}
           streaming={streaming}
           streamingMessageId={streamingMessageId}

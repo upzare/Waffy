@@ -1,7 +1,7 @@
 import toast from "react-hot-toast";
 import { Streamdown } from "streamdown";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Copy, File, Repeat, Undo2, X } from "lucide-react";
+import { ArrowDown, Copy, File, Repeat, Undo2, X } from "lucide-react";
 import RenderResponse from "./render-response";
 import { useStickyScroll } from "../hooks/use-sticky-scroll";
 import type { ChatContainerProps, FileFormat, Message } from "../../types";
@@ -102,6 +102,7 @@ const MessageActions = ({
 
 const ChatContainer: React.FC<ChatContainerProps> = ({
   hidden,
+  conversationId,
   messages,
   streaming,
   streamingMessageId,
@@ -114,6 +115,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   onRevertMessage,
 }) => {
   const sticky = useStickyScroll({
+    conversationId,
     messages,
     streaming,
     toolActivityText,
@@ -122,7 +124,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   });
 
   const virtualizer = useVirtualizer({
-    count: messages.length,
+    count: hidden ? 0 : messages.length,
     getScrollElement: () => sticky.containerRef.current,
     estimateSize: () => MESSAGE_ESTIMATE_PX,
     overscan: VIRTUAL_OVERSCAN,
@@ -152,7 +154,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   };
 
   return (
-    <>
+    <div
+      className={
+        hidden
+          ? "relative max-h-0 max-w-0 overflow-hidden opacity-0 m-0 p-0"
+          : "relative flex min-h-0 flex-1 flex-col overflow-hidden"
+      }
+    >
       {isGenerating && !hidden && (
         <div className="flex justify-center items-center p-1 gap-1 bg-[#ffffff10] shadow-[0_10px_25px_0_#000000b0] backdrop-brightness-[0.1] z-10">
           <div className="w-5 h-5 inline-block relative before:content-[''] after:content-[''] before:box-border after:box-border before:w-5 before:h-5 after:w-5 after:h-5 before:rounded-full after:rounded-full before:bg-green-400 after:bg-green-400 before:absolute after:absolute before:left-0 after:left-0 before:top-0 after:top-0 before:animate-iconloader after:animate-iconloader after:[animation-delay:1s] after:opacity-0" />
@@ -173,10 +181,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       )}
       <div
         ref={sticky.containerRef}
-        className={`z-1 ${hidden
-          ? "max-h-0 max-w-0 opacity-0 m-0 p-0 overflow-hidden"
-          : "min-h-0 flex-1 overflow-y-auto"
-          }`}
+        className="z-1 min-h-0 flex-1 overflow-y-auto"
         onWheel={sticky.onWheel}
         onTouchStart={sticky.onTouchStart}
         onTouchMove={sticky.onTouchMove}
@@ -186,13 +191,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         onScroll={sticky.onScroll}
       >
         <div ref={sticky.contentRef} className="w-full h-full">
-          {!hidden && messages.length === 0 ? (
+          {hidden ? null : messages.length === 0 ? (
             <div className="flex h-full items-center justify-center px-6 text-sm text-white/70">
               Type a message to get started
             </div>
           ) : (
             <>
-              {!hidden && <VirtualPadding />}
+              <VirtualPadding />
               <div
                 className="relative w-full"
                 style={{ height: virtualizer.getTotalSize() }}
@@ -244,7 +249,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                               isExecuting={isStreamingMessage && streaming.execution}
                               isValidating={isStreamingMessage && streaming.validation}
                               isOutput={isStreamingMessage && streaming.output}
-                              taskStatus={msg.content?.taskStatus}
+                              taskStatus={msg.content.taskStatus}
                               toolActivityText={isStreamingMessage ? toolActivityText : null}
                             />
                           )}
@@ -257,12 +262,25 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                   );
                 })}
               </div>
-              {!hidden && <VirtualPadding />}
+              <VirtualPadding />
             </>
           )}
         </div>
       </div>
-    </>
+      {!hidden && !sticky.atBottom && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center">
+          <button
+            type="button"
+            className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/80 text-white/80 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/10 hover:text-white"
+            title="Scroll to bottom"
+            aria-label="Scroll to bottom"
+            onClick={sticky.jumpToBottom}
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
