@@ -128,7 +128,10 @@ export async function resolveModel(
     case "openai":
       return createOpenAI({ apiKey: key })(config.model);
     case "anthropic":
-      return createAnthropic({ apiKey: key })(config.model);
+      return createAnthropic({
+        apiKey: key,
+        headers: { "anthropic-dangerous-direct-browser-access": "true" },
+      })(config.model);
     case "google":
       return createGoogleGenerativeAI({ apiKey: key })(config.model);
     case "xai":
