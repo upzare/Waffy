@@ -5,7 +5,14 @@ import { createXai } from "@ai-sdk/xai";
 import { createGroq } from "@ai-sdk/groq";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
-import type { ApiKeys, FeatureFlags, ModelConfig, ProviderId, StageId } from "@/types";
+import type {
+  ApiKeys,
+  CustomApiConfig,
+  FeatureFlags,
+  ModelConfig,
+  ProviderId,
+  StageId,
+} from "@/types";
 import { isStageEnabled } from "@/lib/features";
 import { ensureBrowserAIModelReady, getBrowserAIStatus } from "./browser-ai";
 
@@ -61,6 +68,7 @@ export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
     "x-ai/grok-4.3",
   ],
   "browser-ai": ["default"],
+  custom: [],
 };
 
 export const CUSTOM_MODEL_OPTION = "__custom__";
@@ -91,17 +99,21 @@ export function getStageConfig(
 export async function findMissingProvider(
   models: Partial<Record<StageId, ModelConfig>> | undefined,
   apiKeys: ApiKeys,
-  flags: FeatureFlags
+  flags: FeatureFlags,
+  customApi?: CustomApiConfig
 ): Promise<StageId | null> {
   let browserAIReady: boolean | null = null;
 
   for (const stage of Object.keys(DEFAULT_MODELS) as StageId[]) {
     if (!isStageEnabled(stage, flags)) continue;
 
-    const { provider } = getStageConfig(models, stage);
+    const config = getStageConfig(models, stage);
+    const { provider } = config;
     if (provider === "browser-ai") {
       browserAIReady ??= (await getBrowserAIStatus()) === "available";
       if (!browserAIReady) return stage;
+    } else if (provider === "custom") {
+      if (!customApi?.baseUrl?.trim() || !config.model?.trim()) return stage;
     } else if (!apiKeys[provider]?.trim()) {
       return stage;
     }
@@ -113,10 +125,26 @@ export async function findMissingProvider(
 export async function resolveModel(
   config: ModelConfig,
   apiKeys: ApiKeys,
+  customApi?: CustomApiConfig,
   onProgress?: (progress: number) => void
 ): Promise<LanguageModel> {
   if (config.provider === "browser-ai") {
     return ensureBrowserAIModelReady(onProgress);
+  }
+
+  if (config.provider === "custom") {
+    const baseURL = customApi?.baseUrl?.trim();
+    if (!baseURL) {
+      throw new Error("No custom API URL configured. Add it in extension settings.");
+    }
+    if (!config.model?.trim()) {
+      throw new Error("No custom API model configured. Add it in extension settings.");
+    }
+    return createOpenAI({
+      apiKey: apiKeys.custom?.trim() || "not-needed",
+      baseURL: baseURL.replace(/\/+$/, ""),
+      name: "custom",
+    }).chat(config.model);
   }
 
   const key = apiKeys[config.provider];

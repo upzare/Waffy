@@ -3,7 +3,14 @@ import { AlertCircle, ChevronDown, Info } from "lucide-react";
 import { CUSTOM_MODEL_OPTION, isPresetModel, PROVIDER_MODELS } from "@/lib/llm/model";
 import { getFeatureFlags, isStageEnabled } from "@/lib/features";
 import { getBrowserAIModelLabel, type BrowserAIStatus } from "@/lib/llm/browser-ai";
-import { BROWSER_AI_PROVIDER, getProviderMeta, hasApiKey, PROVIDERS } from "../providers";
+import {
+  BROWSER_AI_PROVIDER,
+  CUSTOM_PROVIDER,
+  getProviderMeta,
+  hasApiKey,
+  isCustomApiReady,
+  PROVIDERS,
+} from "../providers";
 import type { CloudProviderId } from "../providers";
 import BrowserAISection from "./browser-ai";
 import type { ApiKeys, ModelConfig, ProviderId, Settings, StageId } from "@/types";
@@ -124,6 +131,9 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     if (provider === "browser-ai") {
       return browserAIStatus === "available";
     }
+    if (provider === "custom") {
+      return isCustomApiReady(settings.customApi);
+    }
     return hasApiKey(apiKeys, provider as CloudProviderId);
   };
 
@@ -168,8 +178,10 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
       model: PROVIDER_MODELS.openai[0],
     };
     const isBrowserAI = config.provider === "browser-ai";
+    const isCustomProvider = config.provider === "custom";
     const models = PROVIDER_MODELS[config.provider] ?? [];
-    const isCustom = !isBrowserAI && !isPresetModel(config.provider, config.model);
+    const isCustom =
+      !isBrowserAI && !isCustomProvider && !isPresetModel(config.provider, config.model);
     const selectValue = isCustom ? CUSTOM_MODEL_OPTION : config.model;
     const providerMeta = isBrowserAI ? BROWSER_AI_PROVIDER : getProviderMeta(config.provider);
     const keyMissing = !isProviderReady(config.provider);
@@ -212,7 +224,9 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                   <div className={alertError}>
                     <AlertCircle size={15} />
                     <span>
-                      No API key for {providerMeta.label}. Add one in the API Keys section.
+                      {isCustomProvider
+                        ? "No custom API URL configured. Add one in the Custom API section."
+                        : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
                     </span>
                   </div>
                 )}
@@ -234,12 +248,16 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                     id={`${id}-provider`}
                     className={selectInput}
                     value={config.provider}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const provider = e.target.value as ProviderId;
                       updateStage(id, {
-                        provider: e.target.value as ProviderId,
-                        model: PROVIDER_MODELS[e.target.value as ProviderId][0],
-                      })
-                    }
+                        provider,
+                        model:
+                          provider === "custom"
+                            ? settings.customApi.model || ""
+                            : PROVIDER_MODELS[provider][0],
+                      });
+                    }}
                   >
                     <option value={BROWSER_AI_PROVIDER.id}>
                       {BROWSER_AI_PROVIDER.label}
@@ -251,6 +269,10 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                         {isProviderReady(provider.id) ? "" : " (not configured)"}
                       </option>
                     ))}
+                    <option value={CUSTOM_PROVIDER.id}>
+                      {CUSTOM_PROVIDER.label}
+                      {isProviderReady(CUSTOM_PROVIDER.id) ? "" : " (not configured)"}
+                    </option>
                   </select>
                   <ChevronDown
                     size={16}
@@ -259,7 +281,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                 </div>
               </div>
 
-              {!isBrowserAI && (
+              {!isBrowserAI && !isCustomProvider && (
                 <div className="flex min-w-0 flex-col gap-2">
                   <label htmlFor={`${id}-model`} className={fieldLabel}>
                     Model
@@ -290,6 +312,22 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                       className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-text-muted"
                     />
                   </div>
+                </div>
+              )}
+
+              {isCustomProvider && (
+                <div className="flex min-w-0 flex-col gap-2">
+                  <label htmlFor={`${id}-custom`} className={fieldLabel}>
+                    Model
+                  </label>
+                  <input
+                    id={`${id}-custom`}
+                    className={monoInput}
+                    type="text"
+                    placeholder="e.g. llama3.1"
+                    value={config.model}
+                    onChange={(e) => updateStage(id, { model: e.target.value })}
+                  />
                 </div>
               )}
             </div>

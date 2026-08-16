@@ -1,6 +1,6 @@
-import type { ApiKeys, ProviderId } from "@/types";
+import type { ApiKeys, CustomApiConfig, ProviderId } from "@/types";
 
-export type CloudProviderId = Exclude<ProviderId, "browser-ai">;
+export type CloudProviderId = Exclude<ProviderId, "browser-ai" | "custom">;
 
 export interface ProviderMeta {
   id: CloudProviderId;
@@ -27,6 +27,25 @@ export const BROWSER_AI_PROVIDER: BrowserAIProviderMeta = {
   description: "On-device Chromium models (Chrome/Edge/Brave when available). No API key required.",
   placeholder: "",
   docsUrl: "https://www.browser-ai.dev/docs/ai-sdk-v6/core/installation",
+};
+
+export interface CustomProviderMeta {
+  id: "custom";
+  label: string;
+  shortLabel: string;
+  description: string;
+  placeholder: string;
+  docsUrl: string;
+}
+
+export const CUSTOM_PROVIDER: CustomProviderMeta = {
+  id: "custom",
+  label: "Custom API",
+  shortLabel: "Custom",
+  description:
+    "OpenAI-compatible endpoint. Configure URL, API key, and model in Custom API Endpoint settings.",
+  placeholder: "sk-...",
+  docsUrl: "",
 };
 
 export const PROVIDERS: ProviderMeta[] = [
@@ -84,13 +103,22 @@ const PROVIDER_META_BY_ID: Record<CloudProviderId, ProviderMeta> = Object.fromEn
   PROVIDERS.map((provider) => [provider.id, provider])
 ) as Record<CloudProviderId, ProviderMeta>;
 
-export function getProviderMeta(id: ProviderId): ProviderMeta | BrowserAIProviderMeta {
+export function getProviderMeta(
+  id: ProviderId
+): ProviderMeta | BrowserAIProviderMeta | CustomProviderMeta {
   if (id === "browser-ai") {
     return BROWSER_AI_PROVIDER;
+  }
+  if (id === "custom") {
+    return CUSTOM_PROVIDER;
   }
   return PROVIDER_META_BY_ID[id];
 }
 
 export function hasApiKey(apiKeys: ApiKeys, provider: CloudProviderId): boolean {
   return Boolean(apiKeys[provider]?.trim());
+}
+
+export function isCustomApiReady(customApi: CustomApiConfig | undefined): boolean {
+  return Boolean(customApi?.baseUrl?.trim());
 }

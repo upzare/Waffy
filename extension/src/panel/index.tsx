@@ -103,7 +103,12 @@ const App = () => {
     const data = await getAppSettings();
     setAppSettings(data);
     const flags = getFeatureFlags(data.settings);
-    const missingStage = await findMissingProvider(data.settings.models, data.apiKeys, flags);
+    const missingStage = await findMissingProvider(
+      data.settings.models,
+      data.apiKeys,
+      flags,
+      data.settings.customApi
+    );
     setMissingApiKeys(missingStage !== null);
   };
 
@@ -197,7 +202,7 @@ const App = () => {
   };
 
   const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => { });
+    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => {});
   };
 
   const automateHandler = async (
@@ -815,13 +820,16 @@ const App = () => {
     const missingStage = await findMissingProvider(
       appSettings.settings.models,
       appSettings.apiKeys,
-      features
+      features,
+      appSettings.settings.customApi
     );
     if (!missingStage) return true;
 
     const provider = getStageConfig(appSettings.settings.models, missingStage).provider;
     if (provider === "browser-ai") {
       toast.error("Download Browser AI in extension settings.");
+    } else if (provider === "custom") {
+      toast.error("Configure Custom API in extension settings.");
     } else {
       toast.error("Configure API keys in extension settings.");
     }
@@ -982,7 +990,7 @@ const App = () => {
         });
 
         if (isFirstMessage) {
-          generateTitle(promptText).catch(() => { });
+          generateTitle(promptText).catch(() => {});
         }
       },
     });
