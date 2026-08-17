@@ -42,7 +42,7 @@ const WorkingDialog: React.FC<WorkingDialogProps> = ({ open, onClose }) => {
         </button>
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold leading-none tracking-tight text-text-primary">
-            Agent is Working
+            Agent is Running
           </h2>
           <p className="text-sm text-text-muted">
             Please wait for it to finish or stop it manually.

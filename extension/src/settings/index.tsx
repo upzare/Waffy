@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
-import { Settings as SettingsIcon, Key, Server, Cpu, Info } from "lucide-react";
+import { Settings as SettingsIcon, Key, Server, Cpu, LifeBuoy, Info } from "lucide-react";
 import {
   getAppSettings,
   saveAppSettings,
@@ -16,6 +16,7 @@ import GeneralSection from "./components/general";
 import ApiKeysSection from "./components/api-keys";
 import CustomApiSection from "./components/custom-api";
 import ModelsSection from "./components/models";
+import SupportSection from "./components/support";
 import AboutSection from "./components/about";
 import { dangerButton, primaryButton, secondaryButton, thinScroll } from "./styles";
 
@@ -43,6 +44,12 @@ const sections = [
     label: "Custom API",
     description: "Connect an OpenAI-compatible endpoint with a URL, API key, and model.",
     icon: Server,
+  },
+  {
+    id: "support",
+    label: "Support",
+    description: "Report a bug or get help from the community.",
+    icon: LifeBuoy,
   },
   {
     id: "about",
@@ -136,6 +143,8 @@ const Settings = () => {
             setApiKeys={setApiKeys}
           />
         );
+      case "support":
+        return <SupportSection />;
       case "about":
         return <AboutSection logoUrl={logoUrl} />;
       default:
