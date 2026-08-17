@@ -7,7 +7,7 @@ import type { AppSettings, ToolCall } from "@/types";
 export async function generateTitle(prompt: string, appSettings: AppSettings): Promise<string> {
   try {
     const config = getStageConfig(appSettings.settings.models, "title");
-    const model = await resolveModel(config, appSettings.apiKeys);
+    const model = await resolveModel(config, appSettings.apiKeys, appSettings.settings.customApi);
     const flags = getFeatureFlags(appSettings.settings);
     const { text } = await generateText({
       model,
@@ -27,7 +27,7 @@ export async function generateStepLabel(
   appSettings: AppSettings
 ): Promise<string> {
   const config = getStageConfig(appSettings.settings.models, "step");
-  const model = await resolveModel(config, appSettings.apiKeys);
+  const model = await resolveModel(config, appSettings.apiKeys, appSettings.settings.customApi);
   const flags = getFeatureFlags(appSettings.settings);
   const promptContent = `**PREVIOUS REASONING:**\n ${previousReasoning}\n\n**CURRENT REASONING:**\n ${currentReasoning}\n\n**CURRENT TOOL CALL:**\n ${JSON.stringify(toolCalls)}`;
   const { text } = await generateText({

@@ -105,7 +105,7 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
   };
 
   const stageConfig = getStageConfig(settings.settings.models, mode);
-  const model = await resolveModel(stageConfig, settings.apiKeys);
+  const model = await resolveModel(stageConfig, settings.apiKeys, settings.settings.customApi);
   const flags = getFeatureFlags(settings.settings);
   const system = resolvePrompt(mode, flags);
   const tools = resolveTools(mode, flags);

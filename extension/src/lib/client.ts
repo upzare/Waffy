@@ -1,7 +1,7 @@
 import Browser from "webextension-polyfill";
 import { DEFAULT_MODELS } from "./llm/model";
 import { DEFAULT_FEATURES } from "./features";
-import type { ApiKeys, AppSettings, Settings } from "@/types";
+import type { ApiKeys, AppSettings, CustomApiConfig, Settings } from "@/types";
 
 export const initClient = async () => {
   const localStorage = await Browser.storage.local.get();
@@ -26,10 +26,16 @@ export const DEFAULT_PINNED_PROMPTS = [
   "Summarize this page contents",
 ];
 
+export const DEFAULT_CUSTOM_API: CustomApiConfig = {
+  baseUrl: "",
+  model: "",
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   ...DEFAULT_FEATURES,
   pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
   models: { ...DEFAULT_MODELS },
+  customApi: { ...DEFAULT_CUSTOM_API },
 };
 
 const defaultApiKeys: ApiKeys = {};
@@ -79,6 +85,10 @@ export const getAppSettings = async (): Promise<AppSettings> => {
     models: {
       ...DEFAULT_MODELS,
       ...(storedSettings.models ?? {}),
+    },
+    customApi: {
+      ...DEFAULT_CUSTOM_API,
+      ...(storedSettings.customApi ?? {}),
     },
   };
   return {

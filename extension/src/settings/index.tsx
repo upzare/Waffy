@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
-import { Settings as SettingsIcon, Key, Cpu, Info } from "lucide-react";
+import { Settings as SettingsIcon, Key, Server, Cpu, LifeBuoy, Info } from "lucide-react";
 import {
   getAppSettings,
   saveAppSettings,
@@ -14,7 +14,9 @@ import "@/stylesheets/globals.css";
 
 import GeneralSection from "./components/general";
 import ApiKeysSection from "./components/api-keys";
+import CustomApiSection from "./components/custom-api";
 import ModelsSection from "./components/models";
+import SupportSection from "./components/support";
 import AboutSection from "./components/about";
 import { dangerButton, primaryButton, secondaryButton, thinScroll } from "./styles";
 
@@ -36,6 +38,18 @@ const sections = [
     label: "Models",
     description: "Configure cloud and local browser models for each stages.",
     icon: Cpu,
+  },
+  {
+    id: "custom-api",
+    label: "Custom API",
+    description: "Connect an OpenAI-compatible endpoint with a URL, API key, and model.",
+    icon: Server,
+  },
+  {
+    id: "support",
+    label: "Support",
+    description: "Report a bug or get help from the community.",
+    icon: LifeBuoy,
   },
   {
     id: "about",
@@ -120,6 +134,17 @@ const Settings = () => {
         return <ApiKeysSection apiKeys={apiKeys} setApiKeys={setApiKeys} />;
       case "models":
         return <ModelsSection settings={settings} setSettings={setSettings} apiKeys={apiKeys} />;
+      case "custom-api":
+        return (
+          <CustomApiSection
+            settings={settings}
+            setSettings={setSettings}
+            apiKeys={apiKeys}
+            setApiKeys={setApiKeys}
+          />
+        );
+      case "support":
+        return <SupportSection />;
       case "about":
         return <AboutSection logoUrl={logoUrl} />;
       default:
@@ -149,11 +174,10 @@ const Settings = () => {
               <button
                 key={section.id}
                 type="button"
-                className={`flex flex-1 flex-col items-center justify-center gap-1.5 rounded-md border px-1 py-2 text-center transition-colors duration-150 md:w-full md:flex-none md:flex-row md:justify-start md:gap-2.5 md:px-3 md:py-2.5 md:text-left ${
-                  isActive
-                    ? "border-green-border bg-green-dim text-green"
-                    : "border-transparent text-text-secondary hover:bg-white/4 hover:text-text-primary"
-                }`}
+                className={`flex flex-1 flex-col items-center justify-center gap-1.5 rounded-md border px-1 py-2 text-center transition-colors duration-150 md:w-full md:flex-none md:flex-row md:justify-start md:gap-2.5 md:px-3 md:py-2.5 md:text-left ${isActive
+                  ? "border-green-border bg-green-dim text-green"
+                  : "border-transparent text-text-secondary hover:bg-white/4 hover:text-text-primary"
+                  }`}
                 onClick={() => {
                   setActiveSection(section.id);
                   window.location.hash = section.id;
@@ -161,9 +185,8 @@ const Settings = () => {
                 aria-current={isActive ? "page" : undefined}
               >
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${
-                    isActive ? "bg-green-dim text-green" : "bg-white/4"
-                  }`}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${isActive ? "bg-green-dim text-green" : "bg-white/4"
+                    }`}
                 >
                   <Icon size={17} />
                 </span>

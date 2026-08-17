@@ -37,6 +37,7 @@ export interface StreamingState {
 
 export interface ChatContainerProps {
   hidden: boolean;
+  conversationId: string | null;
   messages: Message[];
   streaming: StreamingState;
   streamingMessageId: string | null;
@@ -127,12 +128,18 @@ export interface ParticlesProps {
   refresh?: boolean;
 }
 
+export interface CustomApiConfig {
+  baseUrl: string;
+  model: string;
+}
+
 export interface Settings {
   featureSearch: boolean;
   featureResearch: boolean;
   featureAutomation: boolean;
   pinnedPrompts: string[];
   models: Partial<Record<StageId, ModelConfig>>;
+  customApi: CustomApiConfig;
 }
 
 export type FeatureFlags = Pick<
@@ -141,7 +148,7 @@ export type FeatureFlags = Pick<
 >;
 
 export type ProviderId =
-  "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai";
+  "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai" | "custom";
 
 export type StageId = "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "t4" | "step";
 
@@ -157,6 +164,7 @@ export interface ApiKeys {
   xai?: string;
   groq?: string;
   openrouter?: string;
+  custom?: string;
 }
 
 export interface AppSettings {
