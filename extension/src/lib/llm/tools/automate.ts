@@ -138,9 +138,9 @@ export const T2_TOOLS = {
   }),
   webSearch: tool({
     description:
-      "Search the web via Google AI Mode and return the AI-generated answer as Markdown. Use mid-task when you need a fact, value, URL, or other information that is not available on the current page — without navigating the automation tab away from the task.",
+      "Search the web and return Markdown from the top result pages. Use mid-task when you need a fact, value, URL, or other information that is not available on the current page — without navigating the automation tab away from the task.",
     inputSchema: z.object({
-      query: z.string().describe("Google search query"),
+      query: z.string().describe("Web search query"),
     }),
   }),
 };

@@ -1,6 +1,5 @@
 import Browser from "webextension-polyfill";
 import type { DomMessage } from "../types";
-import { sleep } from "./utils";
 
 async function initOverlay() {
   if (document.querySelector(".waffy-overlay")) {
@@ -95,25 +94,6 @@ const getPageSnapshot = () => ({
   html: document.documentElement.outerHTML,
 });
 
-// Wait until the Copy text control appears (response finished).
-const waitAiModeContent = async () => {
-  const POLL_MS = 100;
-  const TIMEOUT_MS = 30000;
-  const started = Date.now();
-
-  while (Date.now() - started < TIMEOUT_MS) {
-    const hasCopyText = [...document.querySelectorAll("[aria-label]")].some(
-      (el) => el.getAttribute("aria-label")?.replace(/\s+/g, " ").trim().toLowerCase() === "copy text",
-    );
-    if (hasCopyText) {
-      return { status: "success" as const, ...getPageSnapshot() };
-    }
-    await sleep(POLL_MS);
-  }
-
-  return { status: "success" as const, ...getPageSnapshot() };
-};
-
 const getDevicePixelRatio = () =>
   Promise.resolve({ status: "success", value: window.devicePixelRatio });
 
@@ -194,8 +174,6 @@ Browser.runtime.onMessage.addListener((message: any) => {
       return getDevicePixelRatio();
     case "GET_PAGE_CONTENT":
       return getPageContent();
-    case "WAIT_AI_MODE_CONTENT":
-      return waitAiModeContent();
     case "INTERACT_DOM":
       return interactDom(msg.name ?? "", msg.args ?? {});
   }
