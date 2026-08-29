@@ -142,8 +142,7 @@ const setOption = (value: string) => {
   return Promise.resolve({ status: "error", value: "Element is not a select element" });
 };
 
-const displayPointer = async (args: { x?: number; y?: number; timeout?: number }) => {
-  const { x, y, timeout } = args;
+const createPointer = (x?: number, y?: number) => {
   const pointer = document.createElement("img");
   pointer.id = "waffy-pointer";
   pointer.src = Browser.runtime.getURL("shared/cursor.png");
@@ -155,9 +154,35 @@ const displayPointer = async (args: { x?: number; y?: number; timeout?: number }
   pointer.style.zIndex = "999999";
   pointer.style.pointerEvents = "none";
   document.body.appendChild(pointer);
-  await new Promise((resolve) => setTimeout(resolve, timeout || 1500));
+  return pointer;
+};
+
+const displayPointer = async (args: { x?: number; y?: number; timeout?: number }) => {
+  const { x, y, timeout } = args;
+  const pointer = createPointer(x, y);
+  await sleep(timeout || 1500);
   pointer.remove();
   return { status: "success", value: "Pointer displayed" };
+};
+
+const animatePointer = async (args: {
+  path?: Array<{ x: number; y: number }>;
+  duration?: number;
+}) => {
+  const { path, duration } = args;
+  if (!path?.length) {
+    return { status: "error", value: "No path provided" };
+  }
+  const pointer = createPointer(path[0].x, path[0].y);
+  const stepDelay = Math.max(1, (duration || path.length * 12) / path.length);
+  for (const point of path) {
+    pointer.style.left = `${point.x}px`;
+    pointer.style.top = `${point.y}px`;
+    await sleep(stepDelay);
+  }
+  await sleep(300);
+  pointer.remove();
+  return { status: "success", value: "Pointer animated" };
 };
 
 const showOverlay = () => {
@@ -178,6 +203,8 @@ const interactDom = (name: string, args: Record<string, any> = {}) => {
       return setOption(args.value);
     case "DISPLAY_POINTER":
       return displayPointer(args);
+    case "ANIMATE_POINTER":
+      return animatePointer(args);
     case "SHOW_OVERLAY":
       return showOverlay();
     case "HIDE_OVERLAY":

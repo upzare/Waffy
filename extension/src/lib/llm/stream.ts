@@ -147,12 +147,7 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
 
       for (const tc of completedToolCalls) {
         let input = tc.input as Record<string, unknown>;
-        if (
-          config.extra?.convertCoordinates &&
-          screenshotState.image &&
-          input.x !== undefined &&
-          input.y !== undefined
-        ) {
+        if (config.extra?.convertCoordinates && screenshotState.image) {
           const pixelRatio = (screenshotState.metadata?.pixelRatio as number) ?? 1;
           input = await convertToolCoordinates(input, screenshotState.image, pixelRatio);
         }

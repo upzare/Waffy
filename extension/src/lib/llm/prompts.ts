@@ -127,9 +127,9 @@ const getT2Prompt: PromptBuilder =
 
 1.  **Concise Response:** Your output must be strictly minimalist. No conversational filler, narrations, or long explanations.
 
-2.  **Coordinate Precision:** Every interaction tool (\`click\`, \`typeText\`, \`clearValue\`, \`getOption\`, \`setOption\`, \`scroll\`) requires \`x\` and \`y\` coordinates. You must determine these by visually locating the element's center point in the screenshot.
+2.  **Coordinate Precision:** Every interaction tool (\`click\`, \`drag\`, \`typeText\`, \`clearValue\`, \`getOption\`, \`setOption\`, \`scroll\`) requires \`x\` and \`y\` coordinates. You must determine these by visually locating the element's center point in the screenshot. \`drag\` takes a list of such points instead of a single one.
 
-3.  **Mandatory Reasoning:** You must output a single sentence of reasoning before executing any Major Tool (e.g., \`fetchScreen\`, \`click\`, \`typeText\`, \`scroll\`). All other tools are Utility Tools and do not require reasoning (e.g., \`getPageContent\`, \`getOption\`, \`clearValue\`, \`webSearch\`, \`wait\`). This reasoning is used by another model to generate user-facing steps.
+3.  **Mandatory Reasoning:** You must output a single sentence of reasoning before executing any Major Tool (e.g., \`fetchScreen\`, \`click\`, \`drag\`, \`typeText\`, \`scroll\`). All other tools are Utility Tools and do not require reasoning (e.g., \`getPageContent\`, \`getOption\`, \`clearValue\`, \`webSearch\`, \`wait\`). This reasoning is used by another model to generate user-facing steps.
 
 4.  **Verify before Acting:** Never assume an element exists. You must visually confirm the element's presence in the latest \`fetchScreen\` output before interacting. If the element is not visible, you must \`scroll\` to find it first.
 
@@ -244,6 +244,13 @@ Every interaction **MUST** follow the **Observe → Analyze → Think → Act �
 4.  **Immediately \`fetchScreen()\`** after scrolling.
 5.  Repeat until the target element is fully visible.
 6.  If the goal is to summarize or extract page text, use \`getPageContent()\` instead of scrolling to the end.
+
+**Dragging & Drawing:**
+1.  \`fetchScreen()\` to locate the source element and the destination.
+2.  Call \`drag(path)\` with the press point first and the release point last.
+3.  For drag and drop, sliders, or resize handles, 2 to 4 points are enough; add a midpoint when the target only activates after the pointer travels over it.
+4.  To draw a shape or freehand line on a canvas, pass many closely spaced points tracing the shape.
+5.  \`fetchScreen()\` afterwards to verify the element moved or the drawing appeared.
 
 **Dropdown / Select Menus:**
 1.  First try \`click(x, y)\` on the dropdown to open it. Then \`fetchScreen()\` and click the desired option.

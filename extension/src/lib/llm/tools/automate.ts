@@ -49,6 +49,23 @@ export const T2_TOOLS = {
       y: z.number().describe("The y coordinate of the element to click."),
     }),
   }),
+  drag: tool({
+    description:
+      "Press the left mouse button at the first coordinate, drag through every following coordinate in order, then release at the last. Use for drag and drop, sliders, resize handles, selecting text, and drawing on a canvas. Supply at least 2 points; supply many closely spaced points to trace a curve or freehand shape.",
+    inputSchema: z.object({
+      path: z
+        .array(
+          z.object({
+            x: z.number().describe("The x coordinate of this point."),
+            y: z.number().describe("The y coordinate of this point."),
+          })
+        )
+        .min(2)
+        .describe(
+          "Ordered list of points. The press happens at the first point, the release at the last. Any number of points is allowed."
+        ),
+    }),
+  }),
   typeText: tool({
     description: "Type text into the element at the specified coordinates.",
     inputSchema: z.object({
