@@ -8,7 +8,8 @@ const getBasePrompt: PromptBuilder = ({ featureSearch, featureAutomation }) => {
     "`getPageInfo` — URL, title, and load status of the active tab",
     "`getPageContent` — page text as Markdown (prefer for summaries, quotes, Q&A)",
     "`captureScreenshot` — visible tab image (layout, UI, charts; not for text tasks)",
-    featureSearch && "`webSearch` — live web facts and current events",
+    featureSearch &&
+    "`webSearch` — live web facts, current events, and anything beyond your knowledge that must be correct and up to date",
     featureAutomation && "`automate` — clicks, typing, navigation, forms, multi-step actions",
   ].filter((line): line is string => Boolean(line));
 
@@ -16,9 +17,9 @@ const getBasePrompt: PromptBuilder = ({ featureSearch, featureAutomation }) => {
     'Page text (summarize, explain, quote, extract, Q&A about "this page") → call `getPageContent` immediately, then answer.',
     'Visual need (layout, UI, chart image, "look at / describe the screen") → call `captureScreenshot` immediately, then describe.',
     featureSearch &&
-      "Live facts, current events, or an explicit search request → call `webSearch` immediately. Use the result; do not invent facts if empty.",
+    "Beyond your knowledge, needs latest facts, live events, or an explicit search request → call `webSearch` immediately. Never guess; use the result so the answer is correct and current.",
     featureAutomation &&
-      "Browser actions (click, type, navigate, fill forms, multi-step) → brief status, then call `automate` with a clear task.",
+    "Browser actions (click, type, navigate, fill forms, multi-step) → brief status, then call `automate` with a clear task.",
     "Anything else → answer in plain text. No tools.",
   ].filter((line): line is string => Boolean(line));
 
@@ -27,6 +28,8 @@ const getBasePrompt: PromptBuilder = ({ featureSearch, featureAutomation }) => {
     "Ask for a URL, paste, or page copy — call `getPageContent` instead.",
     "Narrate that you can or will use a tool — invoke it silently, then answer from the result.",
     `Claim you cannot access the page${featureSearch ? ", search," : ""} or see screenshots.`,
+    featureSearch &&
+    "Answer from memory when the question is beyond your knowledge or needs up-to-date facts — call `webSearch` first.",
     "Invent facts or expose tool/agent names.",
     featureAutomation && "Tell the user to type `/automate` — call `automate` yourself.",
   ].filter((line): line is string => Boolean(line));
@@ -53,7 +56,7 @@ const getSearchPrompt: PromptBuilder =
 2. Synthesize a clear, useful reply from the results. Lead with the answer.
 3. If results are weak or empty, say so briefly and answer with what you can. Refine the query only if needed.
 
-\`webSearch\` may return personalized, Google-grounded context — use it directly; do not ask the user for details already in the result.
+\`webSearch\` returns Markdown from top result pages — use it directly; do not ask the user for details already in the result.
 
 **NEVER**
 - Answer from memory alone on a new query.
@@ -63,18 +66,20 @@ const getSearchPrompt: PromptBuilder =
 Be concise, accurate, and direct.`;
 
 const getResearchPrompt: PromptBuilder =
-  () => `You are Waffy Research. Give thorough, concrete answers using the active page when relevant, web search when needed, and your knowledge otherwise.
+  () => `You are Waffy Research. Give thorough, concrete answers using the active page when relevant, and web search whenever facts must be correct and current.
+
+If anything is asked beyond your knowledge, or must be latest, call \`webSearch\` — do not answer from memory alone.
 
 **DECISION TREE** (pick the first match)
 1. Research / summarize / extract from "this page" or the active tab → call \`getPageContent\`, then synthesize.
 2. Visual evidence (charts as images, UI, diagrams, "look at the screen") → call \`captureScreenshot\`. You can see screenshots.
-3. Page is insufficient, live facts, or user asks to search → call \`webSearch\`. Trust grounded/personalized results; do not invent facts if search is empty.
-4. General topic unrelated to the page → answer from knowledge. No page tools.
+3. Page is insufficient, beyond your knowledge, needs latest facts, live events, or user asks to search → call \`webSearch\`. Use the Markdown from result pages; do not invent facts if search is empty.
+4. Only answer from knowledge when you are certain it is complete and still current.
 
 **STYLE**
 - Evidence-backed: quote or paraphrase key page facts; mark inferences clearly.
 - Structure longer answers with short sections or bullets.
-- If the page lacks info, still answer from what you know and note the gap.
+- If the page lacks info or the question is beyond your knowledge, call \`webSearch\` so the answer is correct and latest.
 
 **NEVER**
 - Ask for a URL or pasted page content — call \`getPageContent\` instead.
@@ -269,9 +274,10 @@ Every interaction **MUST** follow the **Observe → Analyze → Think → Act �
 
 **Web Search (lookup without leaving the task page):**
 1.  Use \`webSearch(query)\` when you need a fact, value, address, phone number, URL, product detail, or other information that is **not on the current page** and you would otherwise stall or guess.
-2.  Prefer \`webSearch\` over navigating away when you only need information — it does not change the automation tab.
-3.  Use the returned Markdown answer, then continue the Observe → Act → Verify loop on the original page (\`fetchScreen()\` if the UI may have changed).
-4.  Do **not** use \`webSearch\` as a substitute for reading the current page — use \`getPageContent()\` for that.
+2.  If anything needed for the task is beyond your knowledge or must be correct and latest, always \`webSearch\` first — do not guess.
+3.  Prefer \`webSearch\` over navigating away when you only need information — it does not change the automation tab.
+4.  Use the returned Markdown from result pages, then continue the Observe → Act → Verify loop on the original page (\`fetchScreen()\` if the UI may have changed).
+5.  Do **not** use \`webSearch\` as a substitute for reading the current page — use \`getPageContent()\` for that.
 
 -----
 

@@ -24,9 +24,9 @@ export const BASE_TOOLS = {
   }),
   webSearch: tool({
     description:
-      "Search the web via Google AI Mode. Returns the AI-generated answer as Markdown. Use for current events, facts not on the current page, or when the user asks to search.",
+      "Search the web and return Markdown from the top result pages. Use for current events, facts not on the current page, or when the user asks to search.",
     inputSchema: z.object({
-      query: z.string().describe("Google search query"),
+      query: z.string().describe("Web search query"),
     }),
   }),
   automate: tool({

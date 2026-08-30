@@ -24,6 +24,9 @@ const INACCESSIBLE_URL_PREFIXES = [
 export const isInaccessiblePage = (url?: string) =>
   !url || INACCESSIBLE_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
 
+export const isHttpUrl = (url?: string) =>
+  !!url && (url.startsWith("http://") || url.startsWith("https://"));
+
 export async function getActiveTab(): Promise<Tabs.Tab | undefined> {
   const current = await Browser.tabs.query({ active: true, currentWindow: true });
   if (current[0]?.id) return current[0];

@@ -91,7 +91,7 @@ export const getPageContent = async (): Promise<BaseToolResult> => {
 export const webSearch = async ({ query }: { query: string }): Promise<BaseToolResult> => {
   try {
     const response = (await Browser.runtime.sendMessage({
-      action: "FETCH_GOOGLE_AI_MODE",
+      action: "WEB_SEARCH",
       query: query.trim(),
     })) as { status?: string; message?: string };
 
@@ -101,7 +101,7 @@ export const webSearch = async ({ query }: { query: string }): Promise<BaseToolR
 
     return {
       status: "error",
-      message: toolError(response?.message, "Failed to fetch Google AI Mode results."),
+      message: toolError(response?.message, "Failed to search the web."),
     };
   } catch (error) {
     return { status: "error", message: toolError(error) };
