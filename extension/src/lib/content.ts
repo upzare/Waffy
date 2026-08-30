@@ -1,5 +1,6 @@
 import Browser from "webextension-polyfill";
 import type { DomMessage } from "../types";
+import { sleep } from "./utils";
 
 async function initOverlay() {
   if (document.querySelector(".waffy-overlay")) {
