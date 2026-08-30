@@ -23,6 +23,31 @@ const KEY_CODES = {
 
 type KEY_TYPES = keyof typeof KEY_CODES;
 
+type Point = { x: number; y: number };
+
+/** Spacing between synthesized move events, so drop targets and canvases see a continuous stroke. */
+const DRAG_STEP_PX = 12;
+const DRAG_STEP_DELAY_MS = 12;
+const DRAG_HOLD_MS = 80;
+
+const interpolatePath = (path: Point[]): Point[] => {
+  const points: Point[] = [];
+  for (let i = 1; i < path.length; i++) {
+    const from = path[i - 1];
+    const to = path[i];
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    const steps = Math.max(1, Math.ceil(distance / DRAG_STEP_PX));
+    for (let step = 1; step <= steps; step++) {
+      const t = step / steps;
+      points.push({
+        x: Math.round(from.x + (to.x - from.x) * t),
+        y: Math.round(from.y + (to.y - from.y) * t),
+      });
+    }
+  }
+  return points;
+};
+
 const getSessionTab = async () =>
   (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as Tabs.Tab | undefined;
 
@@ -173,6 +198,65 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
       };
     }
     return { status: "success", message: "Success: Click initiated" };
+  } catch (error) {
+    return { status: "error", message: toolError(error) };
+  }
+};
+
+const drag = async ({ path }: { path: Point[] }): Promise<AutomateToolResult> => {
+  console.log("DRAG: ", path);
+  try {
+    if (!Array.isArray(path) || path.length < 2) {
+      return { status: "error", message: toolError("Drag requires at least 2 points") };
+    }
+    const tab = await getSessionTab();
+    if (!tab || !tab.id) {
+      return { status: "error", message: toolError("Tab not found") };
+    }
+    const points = interpolatePath(path);
+    const start = path[0];
+    const end = path[path.length - 1];
+
+    Browser.tabs.sendMessage(tab.id, {
+      type: "INTERACT_DOM",
+      name: "ANIMATE_POINTER",
+      args: {
+        path: points,
+        duration: DRAG_HOLD_MS + points.length * DRAG_STEP_DELAY_MS,
+      },
+    });
+
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x: start.x,
+      y: start.y,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
+    // Let the page register a dragstart before the pointer starts moving.
+    await sleep(DRAG_HOLD_MS);
+
+    for (const point of points) {
+      await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchMouseEvent", {
+        type: "mouseMoved",
+        x: point.x,
+        y: point.y,
+        button: "left",
+        buttons: 1,
+      });
+      await sleep(DRAG_STEP_DELAY_MS);
+    }
+
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x: end.x,
+      y: end.y,
+      button: "left",
+      buttons: 0,
+      clickCount: 1,
+    });
+    return { status: "success", message: "Success: Drag initiated" };
   } catch (error) {
     return { status: "error", message: toolError(error) };
   }
@@ -498,6 +582,7 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<Automat
   fetchScreen: fetchScreen,
   getPageContent: getPageContent,
   click: click,
+  drag: drag,
   typeText: typeText,
   clearValue: clearValue,
   keyPress: keyPress,

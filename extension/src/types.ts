@@ -69,9 +69,9 @@ export interface InputContainerProps {
 export interface HistorySidebarProps {
   currentConversationId: string | null;
   conversations: Conversation[];
-  visible: boolean;
   onSelectConversation: (id: string) => void;
   onRemoveConversation: (id: string) => void;
+  locked?: boolean;
 }
 
 export type MessageMode = "base" | "search" | "research" | "automate";

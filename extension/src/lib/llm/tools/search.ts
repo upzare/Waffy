@@ -9,9 +9,9 @@ export type SearchToolResult = {
 export const SEARCH_TOOLS = {
   webSearch: tool({
     description:
-      "Search the web via Google AI Mode. Returns the AI-generated answer as Markdown. Always call this first with the user's query before answering.",
+      "Search the web and return Markdown from the top result pages. Always call this first with the user's query before answering.",
     inputSchema: z.object({
-      query: z.string().describe("Google search query based on the user's request"),
+      query: z.string().describe("Web search query based on the user's request"),
     }),
   }),
 };
