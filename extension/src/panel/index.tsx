@@ -68,7 +68,6 @@ const App = () => {
   const [message, setMessage] = useState("");
   const [mentions, setMentions] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
-  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [streaming, setStreaming] = useState<StreamingState>({
     response: false,
@@ -135,20 +134,9 @@ const App = () => {
     };
     Browser.runtime.onMessage.addListener(onMessage);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const threshold = window.innerWidth - 10;
-      if (e.clientX > threshold) {
-        setSidebarHovered(true);
-      } else if (e.clientX < window.innerWidth - 300) {
-        setSidebarHovered(false);
-      }
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
     return () => {
       sub.unsubscribe();
       Browser.runtime.onMessage.removeListener(onMessage);
-      document.removeEventListener("mousemove", handleMouseMove);
     };
   }, []);
 
@@ -202,7 +190,7 @@ const App = () => {
   };
 
   const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => {});
+    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => { });
   };
 
   const automateHandler = async (
@@ -990,7 +978,7 @@ const App = () => {
         });
 
         if (isFirstMessage) {
-          generateTitle(promptText).catch(() => {});
+          generateTitle(promptText).catch(() => { });
         }
       },
     });
@@ -1163,9 +1151,9 @@ const App = () => {
       <HistorySidebar
         currentConversationId={conversationIdRef.current}
         conversations={conversations}
-        visible={sidebarHovered}
         onSelectConversation={handleSelectConversation}
         onRemoveConversation={handleItemRemove}
+        locked={showWorkingDialog}
       />
       <div className="w-full h-screen flex flex-col relative overflow-hidden">
         <Header
