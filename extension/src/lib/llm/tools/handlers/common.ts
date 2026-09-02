@@ -107,3 +107,23 @@ export const webSearch = async ({ query }: { query: string }): Promise<BaseToolR
     return { status: "error", message: toolError(error) };
   }
 };
+
+export const webFetch = async ({ url }: { url: string }): Promise<BaseToolResult> => {
+  try {
+    const response = (await Browser.runtime.sendMessage({
+      action: "WEB_FETCH",
+      url: url.trim(),
+    })) as { status?: string; message?: string };
+
+    if (response?.status === "success" && response.message) {
+      return { status: "success", message: response.message };
+    }
+
+    return {
+      status: "error",
+      message: toolError(response?.message, "Failed to fetch the page."),
+    };
+  } catch (error) {
+    return { status: "error", message: toolError(error) };
+  }
+};

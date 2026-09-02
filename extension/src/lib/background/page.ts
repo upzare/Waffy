@@ -5,7 +5,7 @@ import { errorMessage } from "../errors";
 import { htmlToMarkdown, type HtmlToMarkdownResult } from "../html-to-markdown";
 import { sleep } from "../utils";
 
-const MAX_CONTENT_CHARS = 8000;
+const MAX_CONTENT_CHARS = 12000;
 const TAB_FOCUS_SETTLE_MS = 100;
 const SCREENSHOT_QUALITY = 25;
 

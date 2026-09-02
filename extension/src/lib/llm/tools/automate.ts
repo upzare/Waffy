@@ -155,9 +155,16 @@ export const T2_TOOLS = {
   }),
   webSearch: tool({
     description:
-      "Search the web and return Markdown from the top result pages. Use mid-task when you need a fact, value, URL, or other information that is not available on the current page — without navigating the automation tab away from the task.",
+      "Search the web. Returns titles, URLs, and snippets. Then call webFetch on the most relevant URL to read the page. Use mid-task when you need a fact, value, URL, or other information that is not available on the current page — without navigating the automation tab away from the task.",
     inputSchema: z.object({
       query: z.string().describe("Web search query"),
+    }),
+  }),
+  webFetch: tool({
+    description:
+      "Fetch the contents of a URL. Use after webSearch to read a chosen result.",
+    inputSchema: z.object({
+      url: z.string().describe("The URL to fetch"),
     }),
   }),
 };

@@ -12,7 +12,7 @@ import {
   stopSession,
 } from "./background/automation";
 import { captureVisibleTab, getPageContent, getPageInfo } from "./background/page";
-import { closeSearchTabs, fetchWebSearch } from "./background/search";
+import { closeSearchTabs, fetchWebPage, fetchWebSearch } from "./background/search";
 import { initClient, initSettings } from "./client";
 
 const stopGeneration = async () => {
@@ -50,6 +50,8 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
       return captureVisibleTab(request.tabId);
     case "WEB_SEARCH":
       return fetchWebSearch(request.query);
+    case "WEB_FETCH":
+      return fetchWebPage(request.url);
     default:
       return undefined;
   }

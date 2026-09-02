@@ -38,6 +38,7 @@ export const MODES: Record<StreamMode, ModeConfig> = {
     prompt: PROMPTS.base,
     toolFeatures: {
       webSearch: "featureSearch",
+      webFetch: "featureSearch",
       automate: "featureAutomation",
     },
   },

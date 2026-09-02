@@ -2,6 +2,8 @@ export function getToolActivityLabel(toolName: string, args?: Record<string, unk
   switch (toolName) {
     case "webSearch":
       return "Searching the web...";
+    case "webFetch":
+      return "Reading web page...";
     case "getPageContent":
       return "Reading page content...";
     case "captureScreenshot":
