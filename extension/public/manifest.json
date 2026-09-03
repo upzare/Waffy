@@ -39,6 +39,7 @@
   "permissions": [
     "storage",
     "tabs",
+    "tabGroups",
     "sidePanel",
     "activeTab",
     "debugger"
