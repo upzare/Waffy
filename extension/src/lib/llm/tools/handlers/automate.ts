@@ -2,7 +2,7 @@ import Browser from "webextension-polyfill";
 import type { Tabs } from "webextension-polyfill";
 import { isInaccessiblePage } from "@/helper";
 import { AutomateToolResult } from "../automate";
-import { webSearch } from "./common";
+import { webFetch, webSearch } from "./common";
 import { toolError } from "@/lib/errors";
 import { sleep } from "@/lib/utils";
 
@@ -598,4 +598,5 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<Automat
   reload: reload,
   wait: wait,
   webSearch: webSearch,
+  webFetch: webFetch,
 };

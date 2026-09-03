@@ -1,4 +1,4 @@
-import { captureScreenshot, getPageContent, getPageInfo, webSearch } from "./common";
+import { captureScreenshot, getPageContent, getPageInfo, webFetch, webSearch } from "./common";
 import type { BaseToolResult } from "../base";
 
 export const availableFunctions: { [key: string]: (args: any) => Promise<BaseToolResult> } = {
@@ -6,4 +6,5 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<BaseToo
   captureScreenshot,
   getPageContent,
   webSearch,
+  webFetch,
 };

@@ -19,7 +19,7 @@ const DOMAINS = ["Network", "Page", "Runtime"];
 const ATTACH_RETRIES = 5;
 const ATTACH_RETRY_DELAY_MS = 200;
 
-const RESULT_LIMIT = 3;
+const RESULT_LIMIT = 10;
 const TAB_LOAD_TIMEOUT_MS = 15000;
 const NETWORK_IDLE_MS = 500;
 const NETWORK_IDLE_TIMEOUT_MS = 10000;
@@ -32,6 +32,7 @@ const SNAPSHOT_EXPRESSION =
   "({ url: location.href, title: document.title, html: document.documentElement.outerHTML })";
 
 type PageSnapshot = { url: string; title: string; html: string };
+type SearchResult = { url: string; title: string; snippet: string };
 type SearchTab = { tabId: number; idle: Promise<void> };
 
 /** Tabs this module owns, so automation leaves them alone and cancellation can close them. */
@@ -148,11 +149,26 @@ const snapshotPage = async (tabId: number): Promise<PageSnapshot | null> => {
   }
 };
 
-/** DuckDuckGo Lite wraps every result in a redirect carrying the real destination. */
-const extractResultUrls = (html: string, limit = RESULT_LIMIT): string[] => {
-  const urls = new Set<string>();
+const decodeHtml = (value: string) =>
+  value
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  for (const match of html.matchAll(/\/\/duckduckgo\.com\/l\/\?uddg=([^&"'<\s]+)/g)) {
+/** DuckDuckGo Lite wraps every result in a redirect carrying the real destination. */
+const extractSearchResults = (html: string, limit = RESULT_LIMIT): SearchResult[] => {
+  const results: SearchResult[] = [];
+  const seen = new Set<string>();
+  const linkRe =
+    /<a[^>]+href="\/\/duckduckgo\.com\/l\/\?uddg=([^&"'<\s]+)[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+
+  for (const match of html.matchAll(linkRe)) {
     let destination: string;
     try {
       destination = decodeURIComponent(match[1]);
@@ -160,12 +176,24 @@ const extractResultUrls = (html: string, limit = RESULT_LIMIT): string[] => {
       continue;
     }
 
-    if (!isHttpUrl(destination)) continue;
-    urls.add(destination);
-    if (urls.size >= limit) break;
+    if (!isHttpUrl(destination) || seen.has(destination)) continue;
+
+    const title = decodeHtml(match[2]);
+    if (!title) continue;
+
+    const after = html.slice((match.index ?? 0) + match[0].length);
+    const snippetMatch = after.match(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i);
+
+    seen.add(destination);
+    results.push({
+      url: destination,
+      title,
+      snippet: snippetMatch ? decodeHtml(snippetMatch[1]) : "",
+    });
+    if (results.length >= limit) break;
   }
 
-  return [...urls];
+  return results;
 };
 
 /** A new tab reports "complete" on about:blank before navigation starts. Wait until
@@ -269,21 +297,35 @@ export const fetchWebSearch = async (query: string) => {
       return { status: "error", message: `DuckDuckGo search failed (${response.status}).` };
     }
 
-    const urls = extractResultUrls(await response.text());
-    if (urls.length === 0) return { status: "error", message: "No search results found." };
+    const results = extractSearchResults(await response.text());
+    if (results.length === 0) return { status: "error", message: "No search results found." };
 
-    const tabs = await Promise.all(urls.map((url) => openSearchTab(url)));
-    const captured = await Promise.all(
-      tabs.map((tab) => (tab ? captureSearchTab(tab.tabId, tab.idle) : null))
-    );
-    const sources = captured.filter((page): page is string => page != null);
+    const body = results
+      .map(
+        (result, i) =>
+          `index: ${i + 1}\ntitle: ${result.title}\nurl: ${result.url}\ndescription: ${result.snippet}`
+      )
+      .join("\n\n");
 
-    if (sources.length === 0) {
-      return { status: "error", message: "Failed to read search result pages." };
-    }
-
-    const body = sources.map((source, i) => `## Source ${i + 1}\n${source}`).join("\n\n");
     return { status: "success" as const, message: `Query: ${trimmed}\n\n${body}` };
+  } catch (e) {
+    return { status: "error", message: errorMessage(e) };
+  }
+};
+
+export const fetchWebPage = async (url: string) => {
+  const trimmed = url.trim();
+  if (!trimmed) return { status: "error", message: "URL is required." };
+  if (!isHttpUrl(trimmed)) return { status: "error", message: "A valid http(s) URL is required." };
+
+  try {
+    const tab = await openSearchTab(trimmed);
+    if (!tab) return { status: "error", message: "Failed to open the page." };
+
+    const page = await captureSearchTab(tab.tabId, tab.idle);
+    if (!page) return { status: "error", message: "Failed to read the page." };
+
+    return { status: "success" as const, message: page };
   } catch (e) {
     return { status: "error", message: errorMessage(e) };
   } finally {

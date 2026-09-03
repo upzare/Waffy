@@ -1,4 +1,4 @@
-import { captureScreenshot, getPageContent, getPageInfo, webSearch } from "./common";
+import { captureScreenshot, getPageContent, getPageInfo, webFetch, webSearch } from "./common";
 import type { ResearchToolResult } from "../research";
 
 export const availableFunctions: { [key: string]: (args: any) => Promise<ResearchToolResult> } = {
@@ -6,4 +6,5 @@ export const availableFunctions: { [key: string]: (args: any) => Promise<Researc
   captureScreenshot,
   getPageContent,
   webSearch,
+  webFetch,
 };

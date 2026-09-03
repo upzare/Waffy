@@ -7,6 +7,8 @@ import { isSearchTab } from "./search";
 
 /** Domains the automation session drives: Overlay draws the cursor, DOM/Page back the actions. */
 const DOMAINS = ["Page", "DOM", "Overlay"];
+const WAFFY_GROUP_TITLE = "Waffy";
+const WAFFY_GROUP_COLOR = "green" as const;
 
 let openedTabs: Tabs.Tab[] = [];
 let activeTabId: number | null = null;
@@ -38,6 +40,47 @@ const focusTab = (tabId: number) => {
   setOverlay(tabId, true);
 };
 
+const addTabToWaffyGroup = async (tabId: number) => {
+  if (!active || isSearchTab(tabId) || !chrome.tabGroups) return;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.windowId == null) return;
+
+    const existing = await chrome.tabGroups.query({
+      title: WAFFY_GROUP_TITLE,
+      windowId: tab.windowId,
+    });
+    const groupId = existing[0]?.id;
+    const nextGroupId = await chrome.tabs.group({
+      tabIds: tabId,
+      ...(groupId != null ? { groupId } : {}),
+    });
+    await chrome.tabGroups.update(nextGroupId, {
+      title: WAFFY_GROUP_TITLE,
+      color: WAFFY_GROUP_COLOR,
+      collapsed: false,
+    });
+  } catch {
+    // Tab closed, restricted, or grouping unavailable — never fail the session.
+  }
+};
+
+const clearWaffyGroups = async () => {
+  if (!chrome.tabGroups) return;
+  try {
+    const groups = await chrome.tabGroups.query({ title: WAFFY_GROUP_TITLE });
+    await Promise.all(
+      groups.map(async (group) => {
+        const tabs = await chrome.tabs.query({ groupId: group.id });
+        const tabIds = tabs.map((tab) => tab.id).filter((id): id is number => id != null);
+        if (tabIds.length) await chrome.tabs.ungroup(tabIds as [number, ...number[]]);
+      })
+    );
+  } catch {
+    // Group already gone or grouping unavailable.
+  }
+};
+
 const attachDebugger = async (tabId: number) => {
   await attachTab(tabId);
   await enableDomains(tabId, DOMAINS);
@@ -65,6 +108,7 @@ const setActiveTab = async (tabId: number) => {
   await syncOpenedTabs();
   if (!openedTabs.some((tab) => tab.id === tabId)) return;
   focusTab(tabId);
+  await addTabToWaffyGroup(tabId);
 };
 
 export const startSession = async (tabId: number) => {
@@ -84,7 +128,7 @@ export const stopSession = async () => {
     active = false;
     activeTabId = null;
     const tabs = await Browser.tabs.query({});
-    await Promise.all(automationTabIds(tabs).map(detachDebugger));
+    await Promise.all([...automationTabIds(tabs).map(detachDebugger), clearWaffyGroups()]);
     return { status: "success" };
   } catch (e) {
     return { status: "error", value: errorMessage(e) };
@@ -96,6 +140,7 @@ export const setTab = (tabId: number) => {
   if (tab?.id == null) return Promise.resolve({ status: "error", value: "Tab not found" });
 
   focusTab(tab.id);
+  void addTabToWaffyGroup(tab.id);
   return Promise.resolve({ status: "success", value: "Tab set successfully" });
 };
 
@@ -126,6 +171,11 @@ export const getOverlayStatus = (sender: Runtime.MessageSender) => {
 export const registerAutomationListeners = () => {
   Browser.tabs.onCreated.addListener(async (tab) => {
     if (!active || tab.id == null) return;
+    // Search/fetch tabs are created inactive; skip them so they never join the Waffy group.
+    if (isSearchTab(tab.id) || !tab.active) {
+      await syncOpenedTabs();
+      return;
+    }
 
     if (tab.openerTabId != null && tab.openerTabId === activeTabId) {
       await setActiveTab(tab.id);

@@ -24,9 +24,16 @@ export const BASE_TOOLS = {
   }),
   webSearch: tool({
     description:
-      "Search the web and return Markdown from the top result pages. Use for current events, facts not on the current page, or when the user asks to search.",
+      "Search the web. Returns titles, URLs, and snippets. Then call webFetch on the most relevant URL to read the page.",
     inputSchema: z.object({
       query: z.string().describe("Web search query"),
+    }),
+  }),
+  webFetch: tool({
+    description:
+      "Fetch the contents of a URL. Use after webSearch to read a chosen result.",
+    inputSchema: z.object({
+      url: z.string().describe("The URL to fetch"),
     }),
   }),
   automate: tool({
