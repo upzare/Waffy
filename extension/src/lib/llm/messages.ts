@@ -35,13 +35,9 @@ type ToolResultContent = {
 };
 
 function filePayloadToPart(payload: FileFormat["payload"]) {
-  const dataUri = `data:${payload.mimeType};base64,${payload.content}`;
-  if (payload.mimeType.startsWith("image")) {
-    return { type: "image" as const, image: dataUri };
-  }
   return {
     type: "file" as const,
-    data: dataUri,
+    data: `data:${payload.mimeType};base64,${payload.content}`,
     mediaType: payload.mimeType,
     filename: payload.name,
   };
@@ -107,7 +103,7 @@ function toToolResult(
         type: "content",
         value: [
           { type: "text", text: formatToolResultText(msg) },
-          { type: "image-data", data: image, mediaType: "image/jpeg" },
+          { type: "file", mediaType: "image/jpeg", data: { type: "data", data: image } },
         ],
       },
     };

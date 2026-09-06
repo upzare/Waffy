@@ -29,6 +29,16 @@ const fileExtensions = ["jpg", "jpeg", "png", "gif", "eot", "otf", "svg", "ttf",
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
+const tsLoader = {
+  loader: "ts-loader",
+  options: {
+    getCustomTransformers: () => ({
+      before: [isDevelopment && ReactRefreshTypeScript()].filter(Boolean),
+    }),
+    transpileOnly: true,
+  },
+};
+
 const config: webpack.Configuration = {
   mode: process.env.NODE_ENV === "production" ? "production" : "development",
 
@@ -67,23 +77,20 @@ const config: webpack.Configuration = {
         exclude: /node_modules/,
       },
       {
-        test: /\.(ts|tsx)$/,
+        test: /\.tsx$/,
         exclude: /node_modules/,
         use: [
-          {
-            loader: "ts-loader",
-            options: {
-              getCustomTransformers: () => ({
-                before: [isDevelopment && ReactRefreshTypeScript()].filter(Boolean),
-              }),
-              transpileOnly: true,
-            },
-          },
+          tsLoader,
           {
             loader: reactCompilerLoader,
             options: defineReactCompilerLoaderOption({}),
           },
         ],
+      },
+      {
+        test: /\.ts$/,
+        exclude: /node_modules/,
+        use: [tsLoader],
       },
       {
         test: /\.(js|jsx)$/,
