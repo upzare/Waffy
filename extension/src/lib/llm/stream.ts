@@ -120,13 +120,13 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
   try {
     const result = streamText({
       model,
-      system,
+      instructions: system,
       messages: toCoreMessages(messages, screenshotState),
       tools: Object.keys(tools).length > 0 ? tools : undefined,
       abortSignal,
     });
 
-    for await (const part of result.fullStream) {
+    for await (const part of result.stream) {
       if (part.type === "text-delta") {
         textResponse += part.text;
         if (config.extra?.streamAsReasoning) {

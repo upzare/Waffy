@@ -11,7 +11,7 @@ export async function generateTitle(prompt: string, appSettings: AppSettings): P
     const flags = getFeatureFlags(appSettings.settings);
     const { text } = await generateText({
       model,
-      system: PROMPTS.title(flags),
+      instructions: PROMPTS.title(flags),
       prompt,
     });
     return text.trim() || "Untitled";
@@ -32,7 +32,7 @@ export async function generateStepLabel(
   const promptContent = `**PREVIOUS REASONING:**\n ${previousReasoning}\n\n**CURRENT REASONING:**\n ${currentReasoning}\n\n**CURRENT TOOL CALL:**\n ${JSON.stringify(toolCalls)}`;
   const { text } = await generateText({
     model,
-    system: PROMPTS.step(flags),
+    instructions: PROMPTS.step(flags),
     prompt: promptContent,
   });
   return text.trim();
