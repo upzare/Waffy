@@ -11,12 +11,13 @@ import {
   startSession,
   stopSession,
 } from "./background/automation";
+import { closeOwnedTabs, fetchWebPage } from "./background/fetch";
 import { captureVisibleTab, getPageContent, getPageInfo } from "./background/page";
-import { closeSearchTabs, fetchWebPage, fetchWebSearch } from "./background/search";
+import { fetchWebSearch } from "./background/search";
 import { initClient, initSettings } from "./client";
 
 const stopGeneration = async () => {
-  await Promise.all([closeSearchTabs(), stopSession()]);
+  await Promise.all([closeOwnedTabs(), stopSession()]);
   return { status: "success" };
 };
 

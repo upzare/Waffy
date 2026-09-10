@@ -9,9 +9,9 @@ export type SearchToolResult = {
 export const SEARCH_TOOLS = {
   webSearch: tool({
     description:
-      "Search the web. Returns titles, URLs, and snippets. Always call this first with the user's query, then call webFetch on the most relevant URL before answering.",
+      "Search the web. Returns titles, URLs, and snippets. Always call this first, then webFetch the most relevant URL before answering.",
     inputSchema: z.object({
-      query: z.string().describe("Web search query based on the user's request"),
+      query: z.string().describe("Short keyword search query"),
     }),
   }),
   webFetch: tool({
