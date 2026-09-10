@@ -3,7 +3,7 @@ import type { Runtime, Tabs } from "webextension-polyfill";
 import { isInaccessiblePage } from "@/helper";
 import { attachTab, detachTab, disableDomains, enableDomains, isAttached } from "../cdp";
 import { errorMessage } from "../errors";
-import { isSearchTab } from "./search";
+import { isOwnedTab } from "./fetch";
 
 /** Domains the automation session drives: Overlay draws the cursor, DOM/Page back the actions. */
 const DOMAINS = ["Page", "DOM", "Overlay"];
@@ -41,7 +41,7 @@ const focusTab = (tabId: number) => {
 };
 
 const addTabToWaffyGroup = async (tabId: number) => {
-  if (!active || isSearchTab(tabId) || !chrome.tabGroups) return;
+  if (!active || isOwnedTab(tabId) || !chrome.tabGroups) return;
   try {
     const tab = await chrome.tabs.get(tabId);
     if (tab.windowId == null) return;
@@ -97,12 +97,12 @@ const syncOpenedTabs = async () => {
   openedTabs = await Browser.tabs.query({});
 };
 
-/** Tabs automation may drive: real web pages that search does not own. */
+/** Tabs automation may drive: real web pages that fetch/search does not own. */
 const automationTabIds = (tabs: Tabs.Tab[]) =>
   tabs
     .filter((tab) => !isInaccessiblePage(tab.url))
     .map((tab) => tab.id)
-    .filter((tabId): tabId is number => tabId != null && !isSearchTab(tabId));
+    .filter((tabId): tabId is number => tabId != null && !isOwnedTab(tabId));
 
 const setActiveTab = async (tabId: number) => {
   await syncOpenedTabs();
@@ -172,7 +172,7 @@ export const registerAutomationListeners = () => {
   Browser.tabs.onCreated.addListener(async (tab) => {
     if (!active || tab.id == null) return;
     // Search/fetch tabs are created inactive; skip them so they never join the Waffy group.
-    if (isSearchTab(tab.id) || !tab.active) {
+    if (isOwnedTab(tab.id) || !tab.active) {
       await syncOpenedTabs();
       return;
     }
@@ -187,8 +187,8 @@ export const registerAutomationListeners = () => {
   });
 
   Browser.tabs.onUpdated.addListener((tabId, _changeInfo, tab) => {
-    // Search runs its own debugger session, so its tabs must not get the automation overlay.
-    if (!active || isSearchTab(tabId) || isInaccessiblePage(tab.url)) return;
+    // Fetch/search runs its own debugger session, so its tabs must not get the automation overlay.
+    if (!active || isOwnedTab(tabId) || isInaccessiblePage(tab.url)) return;
     attachDebugger(tabId).catch((e) => console.error("Error attaching debugger:", errorMessage(e)));
   });
 };

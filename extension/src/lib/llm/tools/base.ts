@@ -26,7 +26,7 @@ export const BASE_TOOLS = {
     description:
       "Search the web. Returns titles, URLs, and snippets. Then call webFetch on the most relevant URL to read the page.",
     inputSchema: z.object({
-      query: z.string().describe("Web search query"),
+      query: z.string().describe("Short keyword search query"),
     }),
   }),
   webFetch: tool({

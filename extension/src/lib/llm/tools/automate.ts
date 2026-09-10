@@ -157,7 +157,7 @@ export const T2_TOOLS = {
     description:
       "Search the web. Returns titles, URLs, and snippets. Then call webFetch on the most relevant URL to read the page. Use mid-task when you need a fact, value, URL, or other information that is not available on the current page — without navigating the automation tab away from the task.",
     inputSchema: z.object({
-      query: z.string().describe("Web search query"),
+      query: z.string().describe("Short keyword search query"),
     }),
   }),
   webFetch: tool({
