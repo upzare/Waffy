@@ -18,16 +18,19 @@ import { ensureBrowserAIModelReady, getBrowserAIStatus } from "./browser-ai";
 
 export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
   openai: [
+    "gpt-6-astra",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
     "gpt-5.5",
     "gpt-5.4",
     "gpt-5.4-mini",
+    "gpt-5.4-nano",
     "gpt-5-mini",
     "gpt-5-nano",
   ],
   anthropic: [
+    "claude-fable-5-1",
     "claude-fable-5",
     "claude-opus-5",
     "claude-sonnet-5",
@@ -37,35 +40,53 @@ export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
   ],
   google: [
     "gemini-3.1-pro-preview",
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
+    "gemini-pro-latest",
     "gemini-flash-latest",
     "gemini-flash-lite-latest",
   ],
-  xai: ["grok-4.5", "grok-4.3", "grok-4.20", "grok-4.20-multi-agent", "grok-build-0.1"],
+  xai: [
+    "grok-4.6",
+    "grok-4.5",
+    "grok-4.3",
+    "grok-4.20",
+    "grok-4.20-multi-agent",
+    "grok-build-0.1",
+  ],
   groq: [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
     "qwen/qwen3.6-27b",
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
   ],
   openrouter: [
+    "openai/gpt-6-astra",
+    "openai/gpt-6-astra-pro",
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",
     "openai/gpt-5.6-luna",
+    "anthropic/claude-fable-5.1",
     "anthropic/claude-fable-5",
     "anthropic/claude-opus-5",
     "anthropic/claude-opus-5-fast",
     "anthropic/claude-sonnet-5",
+    "google/gemini-3.8-flash",
+    "google/gemini-3.7-flash",
     "google/gemini-3.6-flash",
     "google/gemini-3.5-flash",
     "google/gemini-3.5-flash-lite",
     "google/gemini-3.1-pro-preview",
+    "x-ai/grok-4.6",
     "x-ai/grok-4.5",
     "x-ai/grok-4.3",
+    "openrouter/free",
   ],
   "browser-ai": ["default"],
   custom: [],
@@ -113,7 +134,7 @@ export async function findMissingProvider(
       browserAIReady ??= (await getBrowserAIStatus()) === "available";
       if (!browserAIReady) return stage;
     } else if (provider === "custom") {
-      if (!customApi?.baseUrl?.trim() || !config.model?.trim()) return stage;
+      if (!customApi?.baseUrl?.trim() || !customApi?.model?.trim()) return stage;
     } else if (!apiKeys[provider]?.trim()) {
       return stage;
     }
@@ -134,17 +155,18 @@ export async function resolveModel(
 
   if (config.provider === "custom") {
     const baseURL = customApi?.baseUrl?.trim();
+    const model = customApi?.model?.trim();
     if (!baseURL) {
       throw new Error("No custom API URL configured. Add it in extension settings.");
     }
-    if (!config.model?.trim()) {
+    if (!model) {
       throw new Error("No custom API model configured. Add it in extension settings.");
     }
     return createOpenAI({
       apiKey: apiKeys.custom?.trim() || "not-needed",
       baseURL: baseURL.replace(/\/+$/, ""),
       name: "custom",
-    }).chat(config.model);
+    }).chat(model);
   }
 
   const key = apiKeys[config.provider];

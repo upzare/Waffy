@@ -120,5 +120,5 @@ export function hasApiKey(apiKeys: ApiKeys, provider: CloudProviderId): boolean 
 }
 
 export function isCustomApiReady(customApi: CustomApiConfig | undefined): boolean {
-  return Boolean(customApi?.baseUrl?.trim());
+  return Boolean(customApi?.baseUrl?.trim() && customApi?.model?.trim());
 }

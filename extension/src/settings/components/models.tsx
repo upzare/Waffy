@@ -186,7 +186,12 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     const providerMeta = isBrowserAI ? BROWSER_AI_PROVIDER : getProviderMeta(config.provider);
     const keyMissing = !isProviderReady(config.provider);
     const isExpanded = expandedStages[id] ?? false;
-    const modelPreview = isBrowserAI ? getBrowserAIModelLabel() : config.model || "—";
+    const customApiModel = settings.customApi.model.trim();
+    const modelPreview = isBrowserAI
+      ? getBrowserAIModelLabel()
+      : isCustomProvider
+        ? customApiModel || "—"
+        : config.model || "—";
 
     return (
       <div
@@ -209,9 +214,8 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             </span>
             <ChevronDown
               size={16}
-              className={`shrink-0 text-text-muted transition-transform duration-200 ${
-                isExpanded ? "rotate-180" : ""
-              }`}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+                }`}
             />
           </div>
         </button>
@@ -221,15 +225,15 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
-                  <div className={alertError}>
-                    <AlertCircle size={15} />
-                    <span>
-                      {isCustomProvider
-                        ? "No custom API URL configured. Add one in the Custom API section."
-                        : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
-                    </span>
-                  </div>
-                )}
+                <div className={alertError}>
+                  <AlertCircle size={15} />
+                  <span>
+                    {isCustomProvider
+                      ? "Custom API is not configured. Add a URL and model in the Custom API section."
+                      : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
+                  </span>
+                </div>
+              )}
 
             {recommendation && (
               <div className={alertInfo}>
@@ -314,29 +318,22 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                   </div>
                 </div>
               )}
-
-              {isCustomProvider && (
-                <div className="flex min-w-0 flex-col gap-2">
-                  <label htmlFor={`${id}-custom`} className={fieldLabel}>
-                    Model
-                  </label>
-                  <input
-                    id={`${id}-custom`}
-                    className={monoInput}
-                    type="text"
-                    placeholder="e.g. llama3.1"
-                    value={config.model}
-                    onChange={(e) => updateStage(id, { model: e.target.value })}
-                  />
-                </div>
-              )}
             </div>
 
             {isBrowserAI && (
               <div className="flex min-w-0 flex-col gap-2">
                 <span className={fieldLabel}>Model</span>
                 <p className="text-sm text-text-secondary">
-                  {getBrowserAIModelLabel()} (on-device)
+                  {getBrowserAIModelLabel()}
+                </p>
+              </div>
+            )}
+
+            {isCustomProvider && (
+              <div className="flex min-w-0 flex-col gap-2">
+                <span className={fieldLabel}>Model</span>
+                <p className="text-sm text-text-secondary">
+                  {customApiModel || "Configure in Custom API"}
                 </p>
               </div>
             )}
