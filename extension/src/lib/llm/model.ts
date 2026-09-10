@@ -134,7 +134,7 @@ export async function findMissingProvider(
       browserAIReady ??= (await getBrowserAIStatus()) === "available";
       if (!browserAIReady) return stage;
     } else if (provider === "custom") {
-      if (!customApi?.baseUrl?.trim() || !config.model?.trim()) return stage;
+      if (!customApi?.baseUrl?.trim() || !customApi?.model?.trim()) return stage;
     } else if (!apiKeys[provider]?.trim()) {
       return stage;
     }
@@ -155,17 +155,18 @@ export async function resolveModel(
 
   if (config.provider === "custom") {
     const baseURL = customApi?.baseUrl?.trim();
+    const model = customApi?.model?.trim();
     if (!baseURL) {
       throw new Error("No custom API URL configured. Add it in extension settings.");
     }
-    if (!config.model?.trim()) {
+    if (!model) {
       throw new Error("No custom API model configured. Add it in extension settings.");
     }
     return createOpenAI({
       apiKey: apiKeys.custom?.trim() || "not-needed",
       baseURL: baseURL.replace(/\/+$/, ""),
       name: "custom",
-    }).chat(config.model);
+    }).chat(model);
   }
 
   const key = apiKeys[config.provider];
