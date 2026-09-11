@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { CircleStop, File, Paperclip, Send, X } from "lucide-react";
 import { MentionRoot, MentionInput, MentionContent, MentionItem } from "@diceui/mention";
@@ -26,6 +26,8 @@ function InputContainer({
   const canSend = message.trim().length > 0 || files.length > 0;
   const [mentionOpen, setMentionOpen] = useState(false);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const [isFileDrag, setIsFileDrag] = useState(false);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
   const slashCommands = getSlashCommands(features);
 
   const setTextareaRef = (el: HTMLTextAreaElement | null) => {
@@ -64,6 +66,44 @@ function InputContainer({
     textareaRef.current?.focus();
   }, [inputResetKey, textareaRef]);
 
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes("Files") ?? false;
+
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (isGenerating) {
+        e.dataTransfer!.dropEffect = "none";
+        return;
+      }
+      setIsFileDrag(true);
+      const overDropZone = dropZoneRef.current?.contains(e.target as Node);
+      e.dataTransfer!.dropEffect = overDropZone ? "copy" : "none";
+    };
+
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      const next = e.relatedTarget as Node | null;
+      if (next && document.documentElement.contains(next)) return;
+      setIsFileDrag(false);
+    };
+
+    const onDrop = (e: DragEvent) => {
+      setIsFileDrag(false);
+      if (dropZoneRef.current?.contains(e.target as Node)) return;
+      if (hasFiles(e)) e.preventDefault();
+    };
+
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("dragleave", onDragLeave);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("dragleave", onDragLeave);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, [isGenerating]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (mentionOpen && (e.key === "Enter" || e.key === "Tab")) return;
     if (e.key === "Enter" && !e.shiftKey) {
@@ -72,12 +112,10 @@ function InputContainer({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const selected = Array.from(input.files ?? []);
-    input.value = "";
+  const addFiles = (incoming: File[]) => {
+    if (isGenerating || incoming.length === 0) return;
 
-    for (const file of selected) {
+    for (const file of incoming) {
       if (!SUPPORTED_TYPES.includes(file.type)) {
         toast.error("Unsupported File Type", { duration: 3000 });
         return;
@@ -88,8 +126,43 @@ function InputContainer({
       }
     }
 
-    if (selected.length > 0) {
-      setFiles((prev) => [...prev, ...selected]);
+    setFiles((prev) => [...prev, ...incoming]);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const selected = Array.from(input.files ?? []);
+    input.value = "";
+    addFiles(selected);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsFileDrag(false);
+    if (isGenerating) return;
+    addFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (isGenerating) return;
+
+    const pasted: File[] = [];
+    for (const item of e.clipboardData.items) {
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (file) pasted.push(file);
+    }
+    if (pasted.length === 0) return;
+
+    addFiles(pasted);
+    if (!e.clipboardData.getData("text/plain")) {
+      e.preventDefault();
     }
   };
 
@@ -100,8 +173,20 @@ function InputContainer({
   const actionBtn = "rounded-md p-2 transition-colors duration-200 disabled:opacity-40";
 
   return (
-    <div className="z-10 mt-auto border-t border-white/8 bg-black/70 px-4 py-3.5 backdrop-blur-md">
-      <div className="relative flex items-center rounded-xl border border-white/9 bg-white/4">
+    <div
+      ref={dropZoneRef}
+      className={`z-10 mt-auto border-t px-4 py-3.5 backdrop-blur-md transition-colors duration-150 border-white/8 bg-black/70"`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onPaste={handlePaste}
+    >
+      <div
+        className={`relative flex items-center rounded-xl border bg-white/4 transition-[border-color,box-shadow] duration-150
+          ${isFileDrag
+            ? "border-dashed border-green-500/60 shadow-[0_0_0_3px_rgba(34,197,94,0.16)]"
+            : "border-white/9"
+          }`}
+      >
         <MentionRoot
           key={inputResetKey}
           className="relative w-full [&_[data-tag]]:rounded-sm [&_[data-tag]]:bg-[rgba(0,200,83,0.18)] [&_[data-tag]]:text-transparent [&_[data-tag]:empty]:bg-transparent [&_[data-tag]]:[box-decoration-break:clone] [&_[data-tag]]:[-webkit-box-decoration-break:clone]"
