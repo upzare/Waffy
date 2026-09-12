@@ -49,7 +49,5 @@ export function htmlToMarkdown(
   const title = (article?.title || fallbackTitle || "").trim();
   const markdown = contentNode ? turndown.turndown(contentNode).trim() : "";
 
-  console.log("markdown:", markdown);
-
   return { title, markdown };
 }
