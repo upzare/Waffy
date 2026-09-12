@@ -18,6 +18,9 @@ turndown.addRule("stripMedia", {
   replacement: () => "",
 });
 
+// Remove these tags
+const INERT_SELECTOR = "noscript, script, style, template, iframe";
+
 // Extract main page content with Readability and convert to Markdown.
 export function htmlToMarkdown(
   html: string,
@@ -25,6 +28,8 @@ export function htmlToMarkdown(
   fallbackTitle = ""
 ): HtmlToMarkdownResult {
   const { document } = parseHTML(html);
+
+  for (const node of [...document.querySelectorAll(INERT_SELECTOR)]) node.remove();
 
   if (pageUrl) {
     const head = document.head ?? document.documentElement;
@@ -43,8 +48,6 @@ export function htmlToMarkdown(
     (article?.content as HTMLElement | null | undefined) ?? (document.body as HTMLElement | null);
   const title = (article?.title || fallbackTitle || "").trim();
   const markdown = contentNode ? turndown.turndown(contentNode).trim() : "";
-
-  console.log("markdown:", markdown);
 
   return { title, markdown };
 }

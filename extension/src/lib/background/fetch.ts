@@ -1,5 +1,4 @@
 import Browser from "webextension-polyfill";
-import type { Tabs } from "webextension-polyfill";
 import { isHttpUrl, isInaccessiblePage } from "@/helper";
 import {
   attachTab,
@@ -19,7 +18,6 @@ const DOMAINS = ["Network", "Page", "Runtime"];
 const ATTACH_RETRIES = 5;
 const ATTACH_RETRY_DELAY_MS = 200;
 
-const HTTP_URL_TIMEOUT_MS = 10000;
 const MIN_WAIT_MS = 300;
 const CONTENT_POLL_MS = 200;
 const CONTENT_STABLE_MS = 500;
@@ -95,48 +93,6 @@ const probePage = async (tabId: number): Promise<PageProbe | null> => {
     return null;
   }
 };
-
-/**
- * Resolve once the tab has committed an http(s) URL. A new tab starts as about:blank,
- * so attaching earlier would snapshot an empty document. Does not wait for load complete.
- */
-const waitForHttpUrl = (tabId: number, timeoutMs = HTTP_URL_TIMEOUT_MS): Promise<void> =>
-  new Promise((resolve, reject) => {
-    let settled = false;
-
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      Browser.tabs.onUpdated.removeListener(onUpdated);
-      Browser.tabs.onRemoved.removeListener(onRemoved);
-      fn();
-    };
-
-    const timer = setTimeout(() => {
-      settle(() => reject(new Error("Timed out waiting for navigation to start.")));
-    }, timeoutMs);
-
-    const onUpdated = (id: number, info: Tabs.OnUpdatedChangeInfoType, tab: Tabs.Tab) => {
-      if (id === tabId && (isHttpUrl(tab.url) || isHttpUrl(info.url))) {
-        settle(() => resolve());
-      }
-    };
-
-    const onRemoved = (id: number) => {
-      if (id === tabId) settle(() => reject(new Error("Tab was closed.")));
-    };
-
-    Browser.tabs.onUpdated.addListener(onUpdated);
-    Browser.tabs.onRemoved.addListener(onRemoved);
-
-    Browser.tabs.get(tabId).then(
-      (tab) => {
-        if (isHttpUrl(tab.url)) settle(() => resolve());
-      },
-      () => settle(() => reject(new Error("Tab was closed.")))
-    );
-  });
 
 /**
  * Snapshot at the first of: DOM ready + stable text, DOM ready + short network idle,
@@ -273,13 +229,17 @@ export const closeOwnedTabs = async () => {
 
 export const openTab = async (url: string): Promise<OpenedTab | null> => {
   try {
-    const tab = await Browser.tabs.create({ url, active: false });
+    // Open blank and attach first
+    const tab = await Browser.tabs.create({ url: "about:blank", active: false });
     if (tab.id == null) return null;
     ownedTabIds.add(tab.id);
 
-    // Attach once a real document exists; a new tab starts out with no URL.
-    await waitForHttpUrl(tab.id);
     await attachDebugger(tab.id);
+    await sendCommand(tab.id, "Page.setLifecycleEventsEnabled", { enabled: true }).catch(() => { });
+    // Navigate, then reload for reliability
+    await sendCommand(tab.id, "Page.navigate", { url });
+    await waitForPageReady(tab.id);
+    await sendCommand(tab.id, "Page.reload", { ignoreCache: false })
     await waitForPageReady(tab.id);
 
     return { tabId: tab.id };

@@ -66,8 +66,6 @@ export const fetchWebSearch = async (query: string) => {
     const snapshot = await snapshotPage(tab.tabId);
     if (!snapshot) return { status: "error", message: "Failed to read the search page." };
 
-    console.log("Search html:", snapshot.html);
-
     const results = extractSearchResults(snapshot.html);
     if (results.length === 0) return { status: "error", message: "No search results found." };
 
