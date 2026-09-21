@@ -55,12 +55,10 @@ export interface InputContainerProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   fileInputRef: React.RefObject<HTMLInputElement>;
   message: string;
-  mentions: string[];
   files: File[];
   inputResetKey: number;
   features: FeatureFlags;
   setMessage: React.Dispatch<React.SetStateAction<string>>;
-  setMentions: React.Dispatch<React.SetStateAction<string[]>>;
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;
   onSendMessage: () => Promise<void>;
   onStopGeneration: () => Promise<void>;
@@ -76,6 +74,14 @@ export interface HistorySidebarProps {
 
 export type MessageMode = "base" | "search" | "research" | "automate";
 
+export interface PageSource {
+  mention: string;
+  title: string;
+  url: string;
+  tabId: number;
+  content: string;
+}
+
 export interface Message {
   id: string;
   content: {
@@ -86,6 +92,7 @@ export interface Message {
       validation?: string;
       output?: string;
     };
+    pageSources?: string;
     files?: FileFormat[];
     task?: string;
     taskStatus?: string;

@@ -27,6 +27,12 @@ export const isInaccessiblePage = (url?: string) =>
 export const isHttpUrl = (url?: string) =>
   !!url && (url.startsWith("http://") || url.startsWith("https://"));
 
+export async function getCurrentWindowTabs(): Promise<Tabs.Tab[]> {
+  const current = await Browser.windows.getCurrent();
+  if (current.id == null) return [];
+  return Browser.tabs.query({ windowId: current.id });
+}
+
 export async function getActiveTab(): Promise<Tabs.Tab | undefined> {
   const current = await Browser.tabs.query({ active: true, currentWindow: true });
   if (current[0]?.id) return current[0];

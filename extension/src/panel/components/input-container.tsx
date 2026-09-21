@@ -1,45 +1,110 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { CircleStop, File, Paperclip, Send, X } from "lucide-react";
-import { MentionRoot, MentionInput, MentionContent, MentionItem } from "@diceui/mention";
+import { CircleStop, File, Globe, Paperclip, Send, X } from "lucide-react";
+import { Mention, MentionsInput, makeTriggerRegex } from "react-mentions-ts";
 import type { InputContainerProps } from "../../types";
-import { getSlashCommands, hasSlashCommand } from "../utils/slash-commands";
+import { getSlashCommands } from "../utils/slash-commands";
+import { useWindowTabs } from "../hooks/use-window-tabs";
+import {
+  MENTION_CHIP_COMPOSER_CLASS,
+  MENTION_CHIP_MUTED_CLASS,
+  MUTED_PAGE_MARKUP,
+  PAGE_MARKUP,
+  SLASH_MARKUP,
+  type WindowPage,
+} from "../utils/page-mentions";
 
 const SUPPORTED_TYPES = ["image/jpeg", "image/png", "image/gif", "text/plain", "application/pdf"];
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+
+const INPUT_CLASS = "box-border max-h-50 min-h-12 w-full resize-none border-none bg-transparent py-3.5 pr-18 pl-2.5 caret-current outline-none text-[0.9rem] text-white placeholder:text-[0.875rem] placeholder:text-white/40 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar]:bg-[#22222299] [&::-webkit-scrollbar-thumb]:bg-white/30";
+
+const pageTrigger = makeTriggerRegex("@", { allowSpaceInQuery: true });
+
+function SuggestionHeader({ title }: { title: string }) {
+  return <p className="p-1.5 text-xs font-medium tracking-wider text-white/35 uppercase">{title}</p>;
+}
+
+function SuggestionEmpty({ title, message }: { title: string; message: string }) {
+  return (
+    <>
+      <SuggestionHeader title={title} />
+      <p className="px-2 py-1.5 text-sm text-white/50">{message}</p>
+    </>
+  );
+}
+
+function CommandRow({
+  value,
+  description,
+  focused,
+}: {
+  value: string;
+  description?: string;
+  focused: boolean;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[5.25rem_1fr] items-baseline gap-x-3 rounded px-2 py-1.5 ${focused ? "bg-white/[0.06]" : ""}`}
+    >
+      <span className={`text-sm font-medium tracking-tight whitespace-nowrap ${focused ? "text-green-300" : "text-white/90"}`}>
+        /{value}
+      </span>
+      <span className={`text-xs leading-snug ${focused ? "text-white/55" : "text-white/40"}`}>
+        {description}
+      </span>
+    </div>
+  );
+}
+
+function PageRow({
+  page,
+  focused,
+}: {
+  page: { display?: string; favIconUrl?: string; hostname?: string };
+  focused: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-2 rounded px-2 py-1.5 ${focused ? "bg-white/6" : ""}`}>
+      {page.favIconUrl ? (
+        <img src={page.favIconUrl} alt="" className="h-4 w-4 shrink-0 rounded-sm object-contain" />
+      ) : (
+        <Globe className="h-4 w-4 shrink-0 stroke-white/50" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className={`truncate text-sm ${focused ? "text-green-300" : "text-white/90"}`}>{page.display}</p>
+        {page.hostname ? <p className="truncate text-xs text-white/40">{page.hostname}</p> : null}
+      </div>
+    </div>
+  );
+}
 
 function InputContainer({
   isGenerating,
   textareaRef,
   fileInputRef,
   message,
-  mentions,
   files,
   inputResetKey,
   features,
   setMessage,
-  setMentions,
   setFiles,
   onSendMessage,
   onStopGeneration,
 }: InputContainerProps) {
   const canSend = message.trim().length > 0 || files.length > 0;
-  const [mentionOpen, setMentionOpen] = useState(false);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [isFileDrag, setIsFileDrag] = useState(false);
+  const [suggestionKind, setSuggestionKind] = useState<"command" | "page">("command");
+  const [suggestionsHost, setSuggestionsHost] = useState<HTMLDivElement | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const slashCommands = getSlashCommands(features);
+  const windowPages = useWindowTabs();
 
-  const setTextareaRef = (el: HTMLTextAreaElement | null) => {
-    (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+  const setTextareaRef = (el: HTMLTextAreaElement | HTMLInputElement | null) => {
+    (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+      el instanceof HTMLTextAreaElement ? el : null;
   };
-
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [message, textareaRef]);
 
   useEffect(() => {
     const urls = files.map((file) =>
@@ -54,16 +119,12 @@ function InputContainer({
   }, [files]);
 
   useEffect(() => {
-    if (mentions.length > 0 && !hasSlashCommand(message)) {
-      setMentions([]);
-    }
-  }, [message, mentions]);
-
-  // After a programmatic remount, restore focus (focus before remount is lost).
-  useEffect(() => {
     if (inputResetKey === 0) return;
-    setMentionOpen(false);
-    textareaRef.current?.focus();
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    const end = el.value.length;
+    el.setSelectionRange(end, end);
   }, [inputResetKey, textareaRef]);
 
   useEffect(() => {
@@ -104,8 +165,11 @@ function InputContainer({
     };
   }, [isGenerating]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (mentionOpen && (e.key === "Enter" || e.key === "Tab")) return;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    const listbox = (e.currentTarget.getRootNode() as Document | ShadowRoot).querySelector?.(
+      '[role="listbox"]'
+    );
+    if (listbox && (e.key === "Enter" || e.key === "Tab")) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (canSend && !isGenerating) onSendMessage();
@@ -170,12 +234,26 @@ function InputContainer({
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const commandItems = slashCommands.map(({ value, description }) => ({
+    id: value,
+    display: value,
+    description,
+  }));
+
+  const pageItems = windowPages.map((page: WindowPage) => ({
+    id: String(page.tabId),
+    display: page.label,
+    url: page.url,
+    favIconUrl: page.favIconUrl,
+    hostname: page.hostname,
+  }));
+
   const actionBtn = "rounded-md p-2 transition-colors duration-200 disabled:opacity-40";
 
   return (
     <div
       ref={dropZoneRef}
-      className={`z-10 mt-auto border-t px-4 py-3.5 backdrop-blur-md transition-colors duration-150 border-white/8 bg-black/70"`}
+      className="z-10 mt-auto border-t px-4 py-3.5 backdrop-blur-md transition-colors duration-150 border-white/8 bg-black/70"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onPaste={handlePaste}
@@ -187,57 +265,102 @@ function InputContainer({
             : "border-white/9"
           }`}
       >
-        <MentionRoot
-          key={inputResetKey}
-          className="relative w-full [&_[data-tag]]:rounded-sm [&_[data-tag]]:bg-[rgba(0,200,83,0.18)] [&_[data-tag]]:text-transparent [&_[data-tag]:empty]:bg-transparent [&_[data-tag]]:[box-decoration-break:clone] [&_[data-tag]]:[-webkit-box-decoration-break:clone]"
-          trigger="/"
-          modal
-          open={mentionOpen}
-          onOpenChange={setMentionOpen}
-          value={mentions}
-          onValueChange={setMentions}
-          inputValue={message}
-          onInputValueChange={setMessage}
-        >
-          <MentionInput asChild onKeyDown={handleKeyDown}>
-            <textarea
-              ref={setTextareaRef}
-              className="box-border max-h-50 min-h-12 w-full resize-none border-none bg-transparent py-3.5 pr-18 pl-2.5 caret-current outline-none text-sm text-white placeholder:text-white/40 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar]:bg-[#22222299] [&::-webkit-scrollbar-thumb]:bg-white/30"
-              placeholder="Ask or type / for commands"
-              value={message}
-              rows={1}
+        <div className="relative w-full">
+          <div
+            ref={setSuggestionsHost}
+            className="absolute inset-x-0 bottom-[calc(100%+0.5rem)] z-50 *:static! *:w-full!"
+          />
+          <MentionsInput
+            key={inputResetKey}
+            value={message}
+            onMentionsChange={({ value }) => setMessage(value)}
+            onKeyDown={handleKeyDown}
+            inputRef={setTextareaRef}
+            suggestionsPlacement="above"
+            anchorMode="left"
+            suggestionsPortalHost={suggestionsHost}
+            customSuggestionsContainer={(children) => (
+              <>
+                <SuggestionHeader title={suggestionKind === "page" ? "Pages" : "Commands"} />
+                {children}
+              </>
+            )}
+            placeholder="Type / for commands or @ for pages"
+            className="relative w-full"
+            classNames={{
+              control: "relative w-full border-0 bg-transparent",
+              highlighter: `${INPUT_CLASS} pointer-events-none overflow-hidden text-transparent`,
+              input: `${INPUT_CLASS} field-sizing-content overflow-y-auto`,
+              suggestions: "min-w-0 max-h-56 overflow-y-auto rounded-md border border-white/8 bg-[#101010]/96 p-1.5 shadow-lg backdrop-blur-md",
+              suggestionsList: "divide-y-0",
+              suggestionItem: "rounded p-0.5",
+            }}
+            rows={1}
+          >
+            <Mention
+              trigger="/"
+              markup={SLASH_MARKUP}
+              displayTransform={(_, display) => `/${display ?? ""}`}
+              data={(query) => {
+                setSuggestionKind("command");
+                const term = query.toLowerCase();
+                return commandItems.filter(
+                  (item) => !term || item.display.includes(term) || item.description.toLowerCase().includes(term)
+                );
+              }}
+              appendSpaceOnAdd
+              className={MENTION_CHIP_COMPOSER_CLASS}
+              renderEmpty={(query) => (
+                <SuggestionEmpty
+                  title="Commands"
+                  message={query ? "No matching commands" : "No commands available"}
+                />
+              )}
+              renderSuggestion={(entry, _search, _highlighted, _index, focused) => (
+                <CommandRow
+                  value={String(entry.display ?? entry.id)}
+                  description={typeof entry.description === "string" ? entry.description : undefined}
+                  focused={focused}
+                />
+              )}
             />
-          </MentionInput>
-          {slashCommands.length > 0 && (
-            <div className="pointer-events-none absolute inset-x-0 top-auto bottom-[calc(100%+0.5rem)] z-50 [&>*]:pointer-events-auto">
-              <MentionContent
-                className="!static !inset-auto !w-full !transform-none box-border max-h-56 overflow-y-auto rounded-md border border-white/8 bg-[#101010]/96 p-1.5 shadow-lg backdrop-blur-md data-[state=closed]:hidden"
-                avoidCollisions={false}
-              >
-                <p className="p-1.5 text-xs font-medium tracking-wider text-white/35 uppercase">
-                  Commands
-                </p>
-                {slashCommands.map(({ value, description }) => (
-                  <MentionItem
-                    key={value}
-                    className="group cursor-pointer rounded p-0.5 transition-colors duration-150 data-[highlighted]:bg-white/[0.06]"
-                    value={value}
-                    label={value}
-                  >
-                    <div className="grid grid-cols-[5.25rem_1fr] items-baseline gap-x-3 px-2 py-1.5">
-                      <span className="text-sm font-medium tracking-tight whitespace-nowrap text-white/90 group-data-[highlighted]:text-green-300">
-                        /{value}
-                      </span>
-                      <span className="text-xs leading-snug text-white/40 group-data-[highlighted]:text-white/55">
-                        {description}
-                      </span>
-                    </div>
-                  </MentionItem>
-                ))}
-              </MentionContent>
-            </div>
-          )}
-        </MentionRoot>
+            <Mention
+              trigger={pageTrigger}
+              markup={PAGE_MARKUP}
+              displayTransform={(_, display) => `@${display ?? ""}`}
+              data={(query) => {
+                setSuggestionKind("page");
+                const term = query.toLowerCase();
+                return pageItems.filter((item) => {
+                  if (!term) return true;
+                  return (
+                    item.display.toLowerCase().includes(term) ||
+                    item.url.toLowerCase().includes(term) ||
+                    item.hostname.toLowerCase().includes(term)
+                  );
+                });
+              }}
+              appendSpaceOnAdd
+              className={MENTION_CHIP_COMPOSER_CLASS}
+              renderEmpty={(query) => (
+                <SuggestionEmpty
+                  title="Pages"
+                  message={query ? "No matching pages" : "No pages are open"}
+                />
+              )}
+              renderSuggestion={(entry, _search, _highlighted, _index, focused) => (
+                <PageRow page={entry} focused={focused} />
+              )}
+            />
+            <Mention
+              trigger={"\u0001"}
+              markup={MUTED_PAGE_MARKUP}
+              displayTransform={(_, display) => `@${display ?? ""}`}
+              data={[]}
+              className={MENTION_CHIP_MUTED_CLASS}
+            />
+          </MentionsInput>
+        </div>
         <div className="absolute right-2 bottom-2 z-10 flex gap-2">
           {isGenerating ? (
             <button
