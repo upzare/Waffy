@@ -135,8 +135,6 @@ const config: webpack.Configuration = {
     }) as any,
     new LicensePlugin({
       outputFilename: "licenses.json",
-      excludedPackageTest: (packageName) =>
-        packageName === "@diceui/shared" || packageName === "@diceui/mention",
     }),
     new CopyWebpackPlugin({
       patterns: [

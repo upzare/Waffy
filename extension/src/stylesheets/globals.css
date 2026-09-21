@@ -4,6 +4,7 @@
 /* Streamdown utility classes live in its JS bundles — scan them for Tailwind. */
 @source "../../../node_modules/streamdown/dist/*.js";
 @source "../../../node_modules/@streamdown/code/dist/*.js";
+@source "../../../node_modules/react-mentions-ts/dist/*.js";
 
 @theme {
   --font-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -186,6 +187,7 @@
 }
 
 @keyframes wobble1 {
+
   0%,
   100% {
     transform: translateY(0%) scale(1);
@@ -199,6 +201,7 @@
 }
 
 @keyframes wobble2 {
+
   0%,
   100% {
     transform: translateY(0%) scale(1);
@@ -244,12 +247,10 @@
 }
 
 .tool-activity-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.35) 0%,
-    rgba(255, 255, 255, 0.75) 50%,
-    rgba(255, 255, 255, 0.35) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.35) 0%,
+      rgba(255, 255, 255, 0.75) 50%,
+      rgba(255, 255, 255, 0.35) 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;

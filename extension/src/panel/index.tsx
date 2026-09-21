@@ -8,6 +8,17 @@ import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
 import { parseSlashCommand, resolveMode, stripSlashCommands } from "./utils/slash-commands";
+import {
+  buildPageTaggedPrompt,
+  displayToMarkup,
+  fetchPageContent,
+  markupToDisplay,
+  parsePageMentionsFromMarkup,
+  parsePageSources,
+  parseSlashCommandsFromMarkup,
+  rebindStoredPages,
+  toWindowPages,
+} from "./utils/page-mentions";
 import { getToolActivityLabel } from "./utils/tool-activity";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import { availableFunctions as baseFunctions } from "@/lib/llm/tools/handlers/base";
@@ -17,7 +28,7 @@ import {
   availableFunctions as automateFunctions,
   updateOpenedTabs,
 } from "@/lib/llm/tools/handlers/automate";
-import { getActiveTab } from "@/helper";
+import { getActiveTab, getCurrentWindowTabs } from "@/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
 import { DEFAULT_FEATURES, getFeatureFlags, isModeEnabled, MODE_LABELS } from "@/lib/features";
 import {
@@ -54,6 +65,7 @@ import type {
   StreamingState,
   ToolCall,
   FileFormat,
+  PageSource,
 } from "../types";
 import "@/stylesheets/globals.css";
 
@@ -66,7 +78,6 @@ const App = () => {
   const [toolActivityText, setToolActivityText] = useState<string | null>(null);
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
-  const [mentions, setMentions] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [streaming, setStreaming] = useState<StreamingState>({
@@ -884,7 +895,6 @@ const App = () => {
 
       if (clearInput) {
         setMessage("");
-        setMentions([]);
         setFiles([]);
         setInputResetKey((key) => key + 1);
       }
@@ -913,37 +923,105 @@ const App = () => {
 
   const sendUserPrompt = async ({
     text,
-    promptMentions,
     promptFilesInput,
   }: {
     text: string;
-    promptMentions: string[];
     promptFilesInput: File[];
   }) => {
-    if (
-      (!text.trim() && promptFilesInput.length === 0) ||
-      isGenerating ||
-      generationLockRef.current
-    ) {
+    if (isGenerating || generationLockRef.current) return;
+
+    const displayPrompt = markupToDisplay(text).trim();
+    const pageMentions = parsePageMentionsFromMarkup(text);
+    const slashMentions = parseSlashCommandsFromMarkup(text);
+    const command = parseSlashCommand(slashMentions, displayPrompt);
+    const mode = resolveMode(command);
+    const stripped = command ? stripSlashCommands(displayPrompt) : displayPrompt;
+
+    if (!displayPrompt && promptFilesInput.length === 0) return;
+
+    const muted = pageMentions.find((page) => page.muted || page.tabId == null);
+    if (muted) {
+      toast.error(`${muted.label} is no longer open`);
       return;
     }
 
-    const command = parseSlashCommand(promptMentions, text);
-    const mode = resolveMode(command);
-    const messageId = uuid4();
-    const promptText = command ? stripSlashCommands(text) : text.trim();
-    const promptFiles = await fileHandler(promptFilesInput);
+    let pageSources: PageSource[] = [];
+    if (pageMentions.length > 0) {
+      const openPages = toWindowPages(await getCurrentWindowTabs());
+      const missing = pageMentions.find(
+        (page) => page.tabId == null || !openPages.some((open) => open.tabId === page.tabId)
+      );
+      if (missing) {
+        toast.error(`${missing.label} is no longer open`);
+        setMessage(
+          displayToMarkup(
+            displayPrompt,
+            rebindStoredPages(
+              pageMentions.map((page) => ({
+                mention: page.mention,
+                title: page.label,
+                url: page.url ?? "",
+                tabId: page.tabId ?? -1,
+                content: "",
+              })),
+              openPages
+            )
+          )
+        );
+        setInputResetKey((key) => key + 1);
+        return;
+      }
 
-    if (!promptText && promptFiles.length === 0) {
+      const unique: typeof pageMentions = [];
+      const seen = new Set<number>();
+      for (const page of pageMentions) {
+        if (page.tabId == null || seen.has(page.tabId)) continue;
+        seen.add(page.tabId);
+        unique.push(page);
+      }
+
+      const fetched = await Promise.all(
+        unique.map(async (page) => {
+          const result = await fetchPageContent(page.tabId as number);
+          return { page, result };
+        })
+      );
+
+      const failed = fetched.find((item) => !item.result.ok);
+      if (failed && !failed.result.ok) {
+        toast.error(`Couldn't read ${failed.page.label}`);
+        return;
+      }
+
+      pageSources = fetched.flatMap(({ page, result }) => {
+        if (!result.ok || page.tabId == null) return [];
+        const open = openPages.find((item) => item.tabId === page.tabId);
+        return [
+          {
+            mention: page.mention,
+            title: page.label,
+            url: open?.url ?? page.url ?? "",
+            tabId: page.tabId,
+            content: result.content,
+          },
+        ];
+      });
+    }
+
+    const promptFiles = await fileHandler(promptFilesInput);
+    if (!stripped && promptFiles.length === 0 && pageSources.length === 0) {
       toast.error(command ? `Add a message after /${command}` : "Message cannot be empty");
       return;
     }
 
+    const storedPrompt = displayPrompt;
+    const modelPrompt = buildPageTaggedPrompt(storedPrompt, pageSources);
+    const messageId = uuid4();
     const isFirstMessage = messages.length === 0;
     const conversationContext = messages;
 
     await sendMessage({
-      promptText,
+      promptText: modelPrompt,
       promptFiles,
       mode,
       messageId,
@@ -961,7 +1039,13 @@ const App = () => {
             ...prev,
             {
               id: `user-${messageId}`,
-              content: { text: { prompt: promptText }, files: promptFiles },
+              content: {
+                text: {
+                  prompt: storedPrompt,
+                },
+                files: promptFiles,
+                ...(pageSources.length > 0 ? { pageSources: JSON.stringify(pageSources) } : {}),
+              },
             },
             {
               id: `assistant-${messageId}`,
@@ -978,7 +1062,7 @@ const App = () => {
         });
 
         if (isFirstMessage) {
-          generateTitle(promptText).catch(() => { });
+          generateTitle(storedPrompt).catch(() => { });
         }
       },
     });
@@ -987,7 +1071,6 @@ const App = () => {
   const handleSendMessage = async () => {
     await sendUserPrompt({
       text: message,
-      promptMentions: mentions,
       promptFilesInput: files,
     });
   };
@@ -996,7 +1079,6 @@ const App = () => {
     setMessage(prompt);
     sendUserPrompt({
       text: prompt,
-      promptMentions: [],
       promptFilesInput: [],
     });
   };
@@ -1021,9 +1103,13 @@ const App = () => {
     }
 
     const mode = resolveMode(assistantMsg.mode);
+    const modelPrompt = buildPageTaggedPrompt(
+      promptText,
+      parsePageSources(userMsg.content.pageSources)
+    );
 
     await sendMessage({
-      promptText,
+      promptText: modelPrompt,
       promptFiles,
       mode,
       messageId: assistantMessageId.slice("assistant-".length),
@@ -1057,16 +1143,19 @@ const App = () => {
     const promptFiles = userMsg.content.files ?? [];
     const remainingMessages = messages.slice(0, userIndex);
     const conversationId = conversationIdRef.current;
+    const storedPages = parsePageSources(userMsg.content.pageSources);
+    const openPages = toWindowPages(await getCurrentWindowTabs());
+    const rebound = rebindStoredPages(storedPages, openPages);
 
     setMessages(remainingMessages);
     if (conversationId) {
       await updateConversationMessages(conversationId, remainingMessages);
     }
 
-    setMentions([]);
-    setMessage(promptText);
+    setMessage(displayToMarkup(promptText, rebound));
     setFiles(await fileFormatsToFiles(promptFiles));
     setErrorText("");
+    setInputResetKey((key) => key + 1);
     textareaRef.current?.focus();
   };
 
@@ -1094,7 +1183,6 @@ const App = () => {
     setToolActivityText(null);
     setErrorText("");
     setMessage("");
-    setMentions([]);
     setFiles([]);
     setIsChat(false);
     setInputResetKey((key) => key + 1);
@@ -1114,7 +1202,6 @@ const App = () => {
       setMessages(conversation.messages);
       conversationIdRef.current = id;
       setMessage("");
-      setMentions([]);
       setFiles([]);
       setErrorText("");
       setCurrentTitle(conversation.title);
@@ -1206,12 +1293,10 @@ const App = () => {
           textareaRef={textareaRef}
           fileInputRef={fileInputRef as React.RefObject<HTMLInputElement>}
           message={message}
-          mentions={mentions}
           files={files}
           inputResetKey={inputResetKey}
           features={features}
           setMessage={setMessage}
-          setMentions={setMentions}
           setFiles={setFiles}
           onSendMessage={handleSendMessage}
           onStopGeneration={handleStopGeneration}

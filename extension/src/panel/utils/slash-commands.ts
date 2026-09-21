@@ -16,6 +16,8 @@ const COMMAND_PATTERN = new RegExp(
 
 const STRIP_COMMAND_PATTERN = new RegExp(COMMAND_PATTERN.source, "gi");
 
+export const SLASH_COMMAND_VALUES = SLASH_COMMANDS.map(({ value }) => value);
+
 export const getSlashCommands = (flags: FeatureFlags) =>
   SLASH_COMMANDS.filter(({ value }) => isModeEnabled(value, flags));
 

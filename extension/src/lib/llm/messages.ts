@@ -1,5 +1,6 @@
 import type { ModelMessage } from "ai";
 import type { Message, FileFormat } from "@/types";
+import { buildPageTaggedPrompt, parsePageSources } from "@/panel/utils/page-mentions";
 
 type ContentPart =
   { type: "text"; text: string } | { type: "file"; payload: FileFormat["payload"] };
@@ -221,9 +222,13 @@ function buildPreviousContext(conversationMessages: Message[]): {
   for (const msg of conversationMessages) {
     if (msg.id.startsWith("user-") && msg.content.text?.prompt) {
       const files = msg.content.files ?? [];
+      const prompt = buildPageTaggedPrompt(
+        msg.content.text.prompt,
+        parsePageSources(msg.content.pageSources)
+      );
       previousPrompt.push({
         type: "prompt",
-        content: toExtensionContentParts(msg.content.text.prompt, files),
+        content: toExtensionContentParts(prompt, files),
       });
       pendingUserFiles = files;
     } else if (msg.id.startsWith("assistant-")) {

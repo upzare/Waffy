@@ -1,8 +1,8 @@
 import toast from "react-hot-toast";
-import { Streamdown } from "streamdown";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, Copy, File, Repeat, Undo2, X } from "lucide-react";
 import RenderResponse from "./render-response";
+import TaggedPrompt from "./tagged-prompt";
 import { useStickyScroll } from "../hooks/use-sticky-scroll";
 import type { ChatContainerProps, FileFormat, Message } from "../../types";
 
@@ -233,15 +233,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                         />
                         <div className="flex-1 whitespace-normal wrap-break-word overflow-hidden">
                           {isUser ? (
-                            <Streamdown
-                              mode="static"
-                              className="wrap-break-word w-full"
-                              controls={false}
-                              lineNumbers={false}
-                              linkSafety={{ enabled: false }}
-                            >
-                              {msg.content.text?.prompt ?? ""}
-                            </Streamdown>
+                            <TaggedPrompt
+                              prompt={msg.content.text?.prompt ?? ""}
+                              pageSources={msg.content.pageSources}
+                            />
                           ) : (
                             <RenderResponse
                               content={msg.content.text}
