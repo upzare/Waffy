@@ -30,6 +30,12 @@ import {
 } from "@/lib/llm/tools/handlers/automate";
 import { getActiveTab, getCurrentWindowTabs } from "@/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
+import {
+  PENDING_PANEL_ACTION_KEY,
+  PENDING_PANEL_ACTION_TTL_MS,
+  SUMMARIZE_PAGE_ACTION,
+  type PendingPanelAction,
+} from "@/lib/panel-actions";
 import { DEFAULT_FEATURES, getFeatureFlags, isModeEnabled, MODE_LABELS } from "@/lib/features";
 import {
   observeConversations,
@@ -69,9 +75,11 @@ import type {
 } from "../types";
 import "@/stylesheets/globals.css";
 
+type PanelView = "loading" | "home" | "chat";
+
 const App = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isChat, setIsChat] = useState(false);
+  const [panelView, setPanelView] = useState<PanelView>("loading");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showWorkingDialog, setShowWorkingDialog] = useState(false);
   const [statusText, setStatusText] = useState("");
@@ -79,7 +87,6 @@ const App = () => {
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [streaming, setStreaming] = useState<StreamingState>({
     response: false,
     execution: false,
@@ -103,6 +110,7 @@ const App = () => {
   const generationLockRef = useRef(false);
   const conversationIdRef = useRef<string>(null);
   const messageIdRef = useRef<string>(null);
+  const lastPanelActionRef = useRef<number>(null);
   const t2SessionRef = useRef<StreamSession>({
     screenshot: null,
     screenshotMetadata: null,
@@ -111,7 +119,6 @@ const App = () => {
 
   const checkAppSettings = async () => {
     const data = await getAppSettings();
-    setAppSettings(data);
     const flags = getFeatureFlags(data.settings);
     const missingStage = await findMissingProvider(
       data.settings.models,
@@ -119,7 +126,36 @@ const App = () => {
       flags,
       data.settings.customApi
     );
-    setMissingApiKeys(missingStage !== null);
+    return { data, missingApiKeys: missingStage !== null };
+  };
+
+  const consumePendingAction = async (): Promise<boolean> => {
+    const stored = await chrome.storage.session.get(PENDING_PANEL_ACTION_KEY);
+    const action = stored[PENDING_PANEL_ACTION_KEY] as PendingPanelAction | undefined;
+    if (!action || action.type !== SUMMARIZE_PAGE_ACTION) return false;
+
+    if (Date.now() - action.createdAt > PENDING_PANEL_ACTION_TTL_MS) {
+      await chrome.storage.session.remove(PENDING_PANEL_ACTION_KEY);
+      return false;
+    }
+    const current = await Browser.windows.getCurrent();
+    if (action.windowId !== current.id || lastPanelActionRef.current === action.createdAt) {
+      return false;
+    }
+
+    lastPanelActionRef.current = action.createdAt;
+    await chrome.storage.session.remove(PENDING_PANEL_ACTION_KEY);
+    await handleSummarizePage(action.tabId);
+    return true;
+  };
+
+  const onStorageChanged = (
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string
+  ) => {
+    if (areaName === "session" && changes[PENDING_PANEL_ACTION_KEY]?.newValue) {
+      void consumePendingAction();
+    }
   };
 
   useEffect(() => {
@@ -129,11 +165,9 @@ const App = () => {
 
     const init = async () => {
       const minDelay = new Promise((resolve) => setTimeout(resolve, 600));
-      try {
-        await Promise.all([checkAppSettings(), minDelay]);
-      } finally {
-        setIsLoading(false);
-      }
+      const [{ data, missingApiKeys }] = await Promise.all([checkAppSettings(), minDelay]);
+      setAppSettings(data);
+      setMissingApiKeys(missingApiKeys);
     };
 
     init();
@@ -150,6 +184,19 @@ const App = () => {
       Browser.runtime.onMessage.removeListener(onMessage);
     };
   }, []);
+
+  useEffect(() => {
+    if (!appSettings) return;
+
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    void consumePendingAction().then((handled) => {
+      if (!handled) {
+        setPanelView((current) => (current === "loading" ? "home" : current));
+      }
+    });
+
+    return () => chrome.storage.onChanged.removeListener(onStorageChanged);
+  }, [appSettings]);
 
   const initConversation = async () => {
     if (!conversationIdRef.current) return;
@@ -816,6 +863,7 @@ const App = () => {
 
   const ensureProvidersConfigured = async () => {
     if (!appSettings) return false;
+
     const missingStage = await findMissingProvider(
       appSettings.settings.models,
       appSettings.apiKeys,
@@ -879,12 +927,12 @@ const App = () => {
     generationLockRef.current = true;
 
     try {
+      if (!(await ensureProvidersConfigured())) return;
+
       if (!isModeEnabled(mode, features)) {
         toast.error(`Enable ${MODE_LABELS[mode] ?? mode} in extension settings.`);
         return;
       }
-
-      if (!(await ensureProvidersConfigured())) return;
 
       messageIdRef.current = messageId;
       setIsGenerating(true);
@@ -924,148 +972,163 @@ const App = () => {
   const sendUserPrompt = async ({
     text,
     promptFilesInput,
+    conversationContextOverride,
+    onPrepared,
   }: {
     text: string;
     promptFilesInput: File[];
+    conversationContextOverride?: Message[];
+    onPrepared?: (prepared: boolean) => void;
   }) => {
-    if (isGenerating || generationLockRef.current) return;
-
-    const displayPrompt = markupToDisplay(text).trim();
-    const pageMentions = parsePageMentionsFromMarkup(text);
-    const slashMentions = parseSlashCommandsFromMarkup(text);
-    const command = parseSlashCommand(slashMentions, displayPrompt);
-    const mode = resolveMode(command);
-    const stripped = command ? stripSlashCommands(displayPrompt) : displayPrompt;
-
-    if (!displayPrompt && promptFilesInput.length === 0) return;
-
-    const muted = pageMentions.find((page) => page.muted || page.tabId == null);
-    if (muted) {
-      toast.error(`${muted.label} is no longer open`);
+    if (generationLockRef.current) {
+      onPrepared?.(false);
       return;
     }
 
-    let pageSources: PageSource[] = [];
-    if (pageMentions.length > 0) {
-      const openPages = toWindowPages(await getCurrentWindowTabs());
-      const missing = pageMentions.find(
-        (page) => page.tabId == null || !openPages.some((open) => open.tabId === page.tabId)
-      );
-      if (missing) {
-        toast.error(`${missing.label} is no longer open`);
-        setMessage(
-          displayToMarkup(
-            displayPrompt,
-            rebindStoredPages(
-              pageMentions.map((page) => ({
-                mention: page.mention,
-                title: page.label,
-                url: page.url ?? "",
-                tabId: page.tabId ?? -1,
-                content: "",
-              })),
-              openPages
-            )
-          )
+    let wasPrepared = false;
+    try {
+      const displayPrompt = markupToDisplay(text).trim();
+      const pageMentions = parsePageMentionsFromMarkup(text);
+      const slashMentions = parseSlashCommandsFromMarkup(text);
+      const command = parseSlashCommand(slashMentions, displayPrompt);
+      const mode = resolveMode(command);
+      const stripped = command ? stripSlashCommands(displayPrompt) : displayPrompt;
+
+      if (!displayPrompt && promptFilesInput.length === 0) return;
+
+      const muted = pageMentions.find((page) => page.muted || page.tabId == null);
+      if (muted) {
+        toast.error(`${muted.label} is no longer open`);
+        return;
+      }
+
+      let pageSources: PageSource[] = [];
+      if (pageMentions.length > 0) {
+        const openPages = toWindowPages(await getCurrentWindowTabs());
+        const missing = pageMentions.find(
+          (page) => page.tabId == null || !openPages.some((open) => open.tabId === page.tabId)
         );
-        setInputResetKey((key) => key + 1);
-        return;
-      }
-
-      const unique: typeof pageMentions = [];
-      const seen = new Set<number>();
-      for (const page of pageMentions) {
-        if (page.tabId == null || seen.has(page.tabId)) continue;
-        seen.add(page.tabId);
-        unique.push(page);
-      }
-
-      const fetched = await Promise.all(
-        unique.map(async (page) => {
-          const result = await fetchPageContent(page.tabId as number);
-          return { page, result };
-        })
-      );
-
-      const failed = fetched.find((item) => !item.result.ok);
-      if (failed && !failed.result.ok) {
-        toast.error(`Couldn't read ${failed.page.label}`);
-        return;
-      }
-
-      pageSources = fetched.flatMap(({ page, result }) => {
-        if (!result.ok || page.tabId == null) return [];
-        const open = openPages.find((item) => item.tabId === page.tabId);
-        return [
-          {
-            mention: page.mention,
-            title: page.label,
-            url: open?.url ?? page.url ?? "",
-            tabId: page.tabId,
-            content: result.content,
-          },
-        ];
-      });
-    }
-
-    const promptFiles = await fileHandler(promptFilesInput);
-    if (!stripped && promptFiles.length === 0 && pageSources.length === 0) {
-      toast.error(command ? `Add a message after /${command}` : "Message cannot be empty");
-      return;
-    }
-
-    const storedPrompt = displayPrompt;
-    const modelPrompt = buildPageTaggedPrompt(storedPrompt, pageSources);
-    const messageId = uuid4();
-    const isFirstMessage = messages.length === 0;
-    const conversationContext = messages;
-
-    await sendMessage({
-      promptText: modelPrompt,
-      promptFiles,
-      mode,
-      messageId,
-      conversationContext,
-      clearInput: true,
-      prepareMessages: async () => {
-        if (isFirstMessage && !conversationIdRef.current) {
-          setIsChat(true);
-          conversationIdRef.current = uuid4();
-          await initConversation();
+        if (missing) {
+          toast.error(`${missing.label} is no longer open`);
+          setMessage(
+            displayToMarkup(
+              displayPrompt,
+              rebindStoredPages(
+                pageMentions.map((page) => ({
+                  mention: page.mention,
+                  title: page.label,
+                  url: page.url ?? "",
+                  tabId: page.tabId ?? -1,
+                  content: "",
+                })),
+                openPages
+              )
+            )
+          );
+          setInputResetKey((key) => key + 1);
+          return;
         }
 
-        setMessages((prev) => {
-          const update = [
-            ...prev,
+        const unique: typeof pageMentions = [];
+        const seen = new Set<number>();
+        for (const page of pageMentions) {
+          if (page.tabId == null || seen.has(page.tabId)) continue;
+          seen.add(page.tabId);
+          unique.push(page);
+        }
+
+        const fetched = await Promise.all(
+          unique.map(async (page) => {
+            const result = await fetchPageContent(page.tabId as number);
+            return { page, result };
+          })
+        );
+
+        const failed = fetched.find((item) => !item.result.ok);
+        if (failed && !failed.result.ok) {
+          toast.error(`Couldn't read ${failed.page.label}`);
+          return;
+        }
+
+        pageSources = fetched.flatMap(({ page, result }) => {
+          if (!result.ok || page.tabId == null) return [];
+          const open = openPages.find((item) => item.tabId === page.tabId);
+          return [
             {
-              id: `user-${messageId}`,
-              content: {
-                text: {
-                  prompt: storedPrompt,
-                },
-                files: promptFiles,
-                ...(pageSources.length > 0 ? { pageSources: JSON.stringify(pageSources) } : {}),
-              },
-            },
-            {
-              id: `assistant-${messageId}`,
-              content: {
-                task: "",
-                taskStatus: "",
-                text: { response: "", execution: [], validation: "", output: "" },
-                files: [],
-              },
-              mode,
+              mention: page.mention,
+              title: page.label,
+              url: open?.url ?? page.url ?? "",
+              tabId: page.tabId,
+              content: result.content,
             },
           ];
-          return syncMessages(update);
         });
+      }
 
-        if (isFirstMessage) {
-          generateTitle(storedPrompt).catch(() => { });
-        }
-      },
-    });
+      const promptFiles = await fileHandler(promptFilesInput);
+      if (!stripped && promptFiles.length === 0 && pageSources.length === 0) {
+        toast.error(command ? `Add a message after /${command}` : "Message cannot be empty");
+        return;
+      }
+
+      const storedPrompt = displayPrompt;
+      const modelPrompt = buildPageTaggedPrompt(storedPrompt, pageSources);
+      const messageId = uuid4();
+      const conversationContext = conversationContextOverride ?? messages;
+      const isFirstMessage = conversationContext.length === 0;
+
+      await sendMessage({
+        promptText: modelPrompt,
+        promptFiles,
+        mode,
+        messageId,
+        conversationContext,
+        clearInput: true,
+        prepareMessages: async () => {
+          if (isFirstMessage && !conversationIdRef.current) {
+            conversationIdRef.current = uuid4();
+            await initConversation();
+          }
+
+          setMessages(() => {
+            const update = [
+              ...conversationContext,
+              {
+                id: `user-${messageId}`,
+                content: {
+                  text: {
+                    prompt: storedPrompt,
+                  },
+                  files: promptFiles,
+                  ...(pageSources.length > 0 ? { pageSources: JSON.stringify(pageSources) } : {}),
+                },
+              },
+              {
+                id: `assistant-${messageId}`,
+                content: {
+                  task: "",
+                  taskStatus: "",
+                  text: { response: "", execution: [], validation: "", output: "" },
+                  files: [],
+                },
+                mode,
+              },
+            ];
+            return syncMessages(update);
+          });
+
+          setPanelView("chat");
+          wasPrepared = true;
+          onPrepared?.(true);
+
+          if (isFirstMessage) {
+            generateTitle(storedPrompt).catch(() => { });
+          }
+        },
+      });
+    } finally {
+      if (!wasPrepared) onPrepared?.(false);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -1084,9 +1147,7 @@ const App = () => {
   };
 
   const handleRetryMessage = async (assistantMessageId: string) => {
-    if (isGenerating || generationLockRef.current || !assistantMessageId.startsWith("assistant-")) {
-      return;
-    }
+    if (generationLockRef.current || !assistantMessageId.startsWith("assistant-")) return;
 
     const assistantIndex = messages.findIndex((msg) => msg.id === assistantMessageId);
     if (assistantIndex < 1) return;
@@ -1133,7 +1194,7 @@ const App = () => {
   };
 
   const handleRevertMessage = async (userMessageId: string) => {
-    if (isGenerating || generationLockRef.current || !userMessageId.startsWith("user-")) return;
+    if (generationLockRef.current || !userMessageId.startsWith("user-")) return;
 
     const userIndex = messages.findIndex((msg) => msg.id === userMessageId);
     if (userIndex < 0) return;
@@ -1170,11 +1231,7 @@ const App = () => {
     updateAssistantMessage((msg) => ({ ...msg, aborted: true }), true);
   };
 
-  const handleNewChat = async () => {
-    if (isGenerating) {
-      setShowWorkingDialog(true);
-      return;
-    }
+  const resetConversation = async () => {
     await handleStopGeneration();
     setMessages([]);
     conversationIdRef.current = null;
@@ -1184,13 +1241,21 @@ const App = () => {
     setErrorText("");
     setMessage("");
     setFiles([]);
-    setIsChat(false);
     setInputResetKey((key) => key + 1);
+  };
+
+  const handleNewChat = async () => {
+    if (generationLockRef.current) {
+      setShowWorkingDialog(true);
+      return;
+    }
+    await resetConversation();
+    setPanelView("home");
   };
 
   const handleSelectConversation = async (id: string) => {
     if (id === conversationIdRef.current) return;
-    if (isGenerating) {
+    if (generationLockRef.current) {
       setShowWorkingDialog(true);
       return;
     }
@@ -1205,13 +1270,13 @@ const App = () => {
       setFiles([]);
       setErrorText("");
       setCurrentTitle(conversation.title);
-      setIsChat(true);
+      setPanelView("chat");
       setInputResetKey((key) => key + 1);
     }
   };
 
   const handleItemRemove = async (id: string) => {
-    if (conversationIdRef.current === id && isGenerating) {
+    if (conversationIdRef.current === id && generationLockRef.current) {
       setShowWorkingDialog(true);
       return;
     }
@@ -1226,7 +1291,27 @@ const App = () => {
     }
   };
 
-  if (isLoading) {
+  const handleSummarizePage = async (tabId: number) => {
+    const page = toWindowPages(await getCurrentWindowTabs()).find((item) => item.tabId === tabId);
+    if (generationLockRef.current) {
+      setShowWorkingDialog(true);
+      return;
+    }
+    if (!page) {
+      toast.error("This page can't be summarized");
+      return;
+    }
+    setPanelView("loading");
+    await resetConversation();
+    await sendUserPrompt({
+      text: `Summarize this page @[${page.label}](tab:${tabId})`,
+      promptFilesInput: [],
+      conversationContextOverride: [],
+      onPrepared: (prepared) => setPanelView(prepared ? "chat" : "home"),
+    });
+  };
+
+  if (panelView === "loading") {
     return <Loader />;
   }
 
@@ -1273,9 +1358,13 @@ const App = () => {
             </button>
           </div>
         )}
-        <Hero hidden={isChat} pinnedPrompts={pinnedPrompts} onPromptClick={handlePromptClick} />
+        <Hero
+          hidden={panelView !== "home"}
+          pinnedPrompts={pinnedPrompts}
+          onPromptClick={handlePromptClick}
+        />
         <ChatContainer
-          hidden={!isChat}
+          hidden={panelView !== "chat"}
           conversationId={conversationIdRef.current}
           messages={messages}
           streaming={streaming}

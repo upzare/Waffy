@@ -42,7 +42,8 @@
     "tabGroups",
     "sidePanel",
     "activeTab",
-    "debugger"
+    "debugger",
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"
