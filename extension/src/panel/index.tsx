@@ -173,7 +173,8 @@ const App = () => {
     init();
 
     const onMessage = (request: unknown) => {
-      if ((request as { action?: string })?.action === "RELOAD_PANEL") {
+      const action = (request as { action?: string })?.action;
+      if (action === "RELOAD_PANEL") {
         window.location.reload();
       }
     };
