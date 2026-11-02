@@ -19,6 +19,10 @@ type ContentScriptResponse = {
   title?: string;
 };
 
+export type PageMarkdownResult =
+  | { status: "success"; title: string; url: string; markdown: string }
+  | { status: "error"; message: string };
+
 /** Resolve a tab that content scripts and CDP can actually read. */
 const resolveAccessibleTab = async (tabId: unknown, verb: string): Promise<ResolvedTab> => {
   if (typeof tabId !== "number") return { ok: false, message: "tabId is required." };
@@ -71,7 +75,7 @@ export const getPageInfo = async (tabId: unknown) => {
   }
 };
 
-export const getPageContent = async (tabId: unknown) => {
+export const getPageMarkdown = async (tabId: unknown): Promise<PageMarkdownResult> => {
   try {
     const resolved = await resolveAccessibleTab(tabId, "read");
     if (!resolved.ok) return { status: "error", message: resolved.message };
@@ -85,10 +89,27 @@ export const getPageContent = async (tabId: unknown) => {
     }
 
     const pageUrl = response.url ?? "";
-    return renderPageMessage(htmlToMarkdown(response.html, pageUrl, response.title ?? ""), pageUrl);
+    const page = htmlToMarkdown(response.html, pageUrl, response.title ?? "");
+    if (!page.markdown.trim()) {
+      return { status: "error", message: "Page had no extractable content." };
+    }
+
+    return {
+      status: "success",
+      title: page.title,
+      url: pageUrl,
+      markdown: page.markdown,
+    };
   } catch (e) {
     return { status: "error", message: errorMessage(e) };
   }
+};
+
+export const getPageContent = async (tabId: unknown) => {
+  const page = await getPageMarkdown(tabId);
+  if (page.status === "error") return page;
+
+  return renderPageMessage({ title: page.title, markdown: page.markdown }, page.url);
 };
 
 export const captureVisibleTab = async (tabId: unknown) => {
@@ -128,7 +149,7 @@ export const captureVisibleTab = async (tabId: unknown) => {
     return { status: "error", message: errorMessage(e) };
   } finally {
     if (previousTabId != null) {
-      await Browser.tabs.update(previousTabId, { active: true }).catch(() => { });
+      await Browser.tabs.update(previousTabId, { active: true }).catch(() => {});
     }
   }
 };

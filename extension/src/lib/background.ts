@@ -11,6 +11,7 @@ import {
   startSession,
   stopSession,
 } from "./background/automation";
+import { createContextMenus, registerContextMenuListeners } from "./background/context-menu";
 import { closeOwnedTabs, fetchWebPage } from "./background/fetch";
 import { captureVisibleTab, getPageContent, getPageInfo } from "./background/page";
 import { fetchWebSearch } from "./background/search";
@@ -22,6 +23,7 @@ const stopGeneration = async () => {
 };
 
 registerAutomationListeners();
+registerContextMenuListeners();
 
 Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSender) => {
   switch (request.action) {
@@ -62,6 +64,7 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 Browser.runtime.onInstalled.addListener(async () => {
+  createContextMenus();
   try {
     await Promise.all([initClient(), initSettings()]);
   } catch (error) {
