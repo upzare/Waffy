@@ -64,6 +64,14 @@ const config: webpack.Configuration = {
         use: ["style-loader", "css-loader", "@tailwindcss/webpack"],
       },
       {
+        test: /\.woff2?$/,
+        type: "asset/resource",
+        include: /[\\/]node_modules[\\/]@fontsource[\\/]/,
+        generator: {
+          filename: "fonts/[name][ext]",
+        },
+      },
+      {
         test: new RegExp(".(" + fileExtensions.join("|") + ")$"),
         type: "asset/resource",
         exclude: /node_modules/,
