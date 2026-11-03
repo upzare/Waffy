@@ -46,6 +46,7 @@ const config: webpack.Configuration = {
     background: path.join(EXTENSION_DIR, "src", "lib", "background.ts"),
     content: path.join(EXTENSION_DIR, "src", "lib", "content.ts"),
     settings: path.join(EXTENSION_DIR, "src", "settings", "index.tsx"),
+    setup: path.join(EXTENSION_DIR, "src", "setup", "index.tsx"),
     main: path.join(EXTENSION_DIR, "src", "panel", "index.tsx"),
   },
 
@@ -61,6 +62,14 @@ const config: webpack.Configuration = {
       {
         test: /\.css$/i,
         use: ["style-loader", "css-loader", "@tailwindcss/webpack"],
+      },
+      {
+        test: /\.woff2?$/,
+        type: "asset/resource",
+        include: /[\\/]node_modules[\\/]@fontsource[\\/]/,
+        generator: {
+          filename: "fonts/[name][ext]",
+        },
       },
       {
         test: new RegExp(".(" + fileExtensions.join("|") + ")$"),
@@ -155,6 +164,12 @@ const config: webpack.Configuration = {
       template: path.join(EXTENSION_DIR, "src", "settings", "settings.html"),
       filename: "settings.html",
       chunks: ["settings"],
+      cache: false,
+    }),
+    new HtmlWebpackPlugin({
+      template: path.join(EXTENSION_DIR, "src", "setup", "setup.html"),
+      filename: "setup.html",
+      chunks: ["setup"],
       cache: false,
     }),
   ].filter(Boolean),

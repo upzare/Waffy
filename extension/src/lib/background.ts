@@ -63,19 +63,14 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
 // chrome-only
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-Browser.runtime.onInstalled.addListener(async () => {
+Browser.runtime.onInstalled.addListener(async (details) => {
   createContextMenus();
   try {
     await Promise.all([initClient(), initSettings()]);
+    if (details.reason === "install") {
+      await Browser.tabs.create({ url: Browser.runtime.getURL("setup.html") });
+    }
   } catch (error) {
     console.error("Failed to initialize extension:", error);
-  }
-});
-
-Browser.commands.onCommand.addListener((command) => {
-  if (command === "open_side_panel") {
-    Browser.windows.getCurrent().then((w) => {
-      if (w.id) chrome.sidePanel.open({ windowId: w.id });
-    });
   }
 });

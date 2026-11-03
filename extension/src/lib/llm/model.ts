@@ -67,6 +67,7 @@ export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
     "llama-3.1-8b-instant",
   ],
   openrouter: [
+    "openrouter/free",
     "openai/gpt-6-astra",
     "openai/gpt-6-astra-pro",
     "openai/gpt-5.6-sol",
@@ -86,7 +87,6 @@ export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
     "x-ai/grok-4.6",
     "x-ai/grok-4.5",
     "x-ai/grok-4.3",
-    "openrouter/free",
   ],
   "browser-ai": ["default"],
   custom: [],

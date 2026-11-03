@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { v4 as uuid4 } from "uuid";
 import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
+import { TriangleAlert, WrenchOff } from "lucide-react";
 import { AI, createTitle } from "@/lib/agent";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
@@ -1335,27 +1336,16 @@ const App = () => {
           onNewChat={handleNewChat}
         />
         {missingApiKeys && (
-          <div
-            style={{
-              padding: "8px 16px",
-              background: "#3d2a00",
-              color: "#f5c542",
-              fontSize: "13px",
-              textAlign: "center",
-            }}
-          >
-            Models not configured.{" "}
+          <div className="bg-[#3d2a00] px-4 py-2 text-center text-[13px] text-[#f5c542]">
             <button
-              style={{
-                color: "#fff",
-                textDecoration: "underline",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
+              className="inline-flex items-center gap-1.5 cursor-pointer"
+              onClick={() => {
+                void Browser.tabs.create({ url: Browser.runtime.getURL("settings.html#models") });
+                window.close();
               }}
-              onClick={() => Browser.runtime.openOptionsPage()}
             >
-              Open Settings
+              <TriangleAlert size={14} />
+              Models not configured correctly.
             </button>
           </div>
         )}
