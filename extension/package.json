@@ -19,6 +19,8 @@
     "@ai-sdk/xai": "^4.0.54",
     "@base-ui/react": "^1.8.0",
     "@browser-ai/core": "^3.0.2",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
     "@mozilla/readability": "^0.6.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@streamdown/code": "^1.1.1",

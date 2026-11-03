@@ -63,10 +63,13 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
 // chrome-only
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-Browser.runtime.onInstalled.addListener(async () => {
+Browser.runtime.onInstalled.addListener(async (details) => {
   createContextMenus();
   try {
     await Promise.all([initClient(), initSettings()]);
+    if (details.reason === "install") {
+      await Browser.tabs.create({ url: Browser.runtime.getURL("setup.html") });
+    }
   } catch (error) {
     console.error("Failed to initialize extension:", error);
   }
