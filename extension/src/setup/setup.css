@@ -2,7 +2,7 @@
   --font-sans: "Space Grotesk", Inter, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   min-height: 100dvh;
-  background: #070807;
+  background: #000000;
   color: white;
   font-family: var(--font-sans);
 }

@@ -30,38 +30,42 @@ const FeatureStory = () => {
   const logo = logoSrc();
 
   return (
-    <div>
-      <div>
-        {logo ? <img src={logo} alt="Waffy" className="h-10" /> : null}
+    <div className="relative min-h-full bg-[#070807] px-5 py-8 sm:px-8 lg:px-10 lg:py-8 xl:px-14">
+      <div className="setup-noise pointer-events-none absolute inset-0 opacity-[0.14]" />
+      <div className="pointer-events-none absolute -left-24 top-0 h-[28rem] w-[28rem] rounded-full bg-[#00ff00]/15 blur-[120px]" />
+      <div className="relative">
+        <div>
+          {logo ? <img src={logo} alt="Waffy" className="h-10" /> : null}
 
-        <p className="mt-6 font-mono text-xs font-medium uppercase tracking-[0.28em] text-[#00ff00]">
-          Autonomous Browser Agent
-        </p>
+          <p className="mt-6 font-mono text-xs font-medium uppercase tracking-[0.28em] text-[#00ff00]">
+            Autonomous Browser Agent
+          </p>
 
-        <h1 className="mt-3 text-6xl font-bold leading-[0.88] tracking-[-0.06em]">
-          RUNS ON YOUR
-          <br />
-          <span className="bg-linear-to-tr from-[#00ff00] to-white bg-clip-text text-transparent">
-            MACHINE.
-          </span>
-        </h1>
+          <h1 className="mt-3 text-6xl font-bold leading-[0.88] tracking-[-0.06em]">
+            RUNS ON YOUR
+            <br />
+            <span className="bg-linear-to-tr from-[#00ff00] to-white bg-clip-text text-transparent">
+              MACHINE.
+            </span>
+          </h1>
 
-        <p className="mt-3 max-w-md text-base leading-snug text-white/55">
-          Your keys, chats, and browser session stay with you.
-        </p>
+          <p className="mt-3 max-w-md text-base leading-snug text-white/55">
+            Your keys, chats, and browser session stay with you.
+          </p>
+        </div>
+
+        <ol>
+          {POINTS.map((point) => (
+            <li key={point.number} className="border-l border-white/10 pl-5">
+              <p className="mt-5 font-mono text-xs font-bold tracking-[0.22em] text-[#00ff00]/80">
+                {point.number}
+              </p>
+              <h2 className="mt-1 text-lg font-bold tracking-[-0.03em]">{point.title}</h2>
+              <p className="mt-0.5 max-w-md text-base leading-snug text-white/45">{point.body}</p>
+            </li>
+          ))}
+        </ol>
       </div>
-
-      <ol>
-        {POINTS.map((point) => (
-          <li key={point.number} className="border-l border-white/10 pl-5">
-            <p className="mt-5 font-mono text-xs font-bold tracking-[0.22em] text-[#00ff00]/80">
-              {point.number}
-            </p>
-            <h2 className="mt-1 text-lg font-bold tracking-[-0.03em]">{point.title}</h2>
-            <p className="mt-0.5 max-w-md text-base leading-snug text-white/45">{point.body}</p>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 };

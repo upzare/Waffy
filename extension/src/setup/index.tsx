@@ -252,15 +252,12 @@ const Onboarding = () => {
 
   return (
     <div className="setup-root relative">
-      <div className="setup-noise pointer-events-none absolute inset-0 opacity-[0.14]" />
-      <div className="pointer-events-none absolute -left-24 top-0 h-[28rem] w-[28rem] rounded-full bg-[#00ff00]/15 blur-[120px]" />
-
       <div className="relative mx-auto grid min-h-dvh max-w-[1500px] lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <aside className="hidden h-dvh min-h-0 overflow-y-auto border-white/10 lg:block lg:border-r lg:px-10 lg:py-8 xl:px-14">
+        <aside className="hidden h-dvh min-h-0 overflow-y-auto border-white/10 bg-[#070807] lg:block lg:border-r">
           <FeatureStory />
         </aside>
 
-        <section className="flex h-dvh min-h-0 flex-col">
+        <section className="flex h-dvh min-h-0 flex-col bg-black">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
             <div className="flex min-h-full flex-1 flex-col">
               {done ? (
@@ -725,8 +722,8 @@ const ModelStep = ({
               aria-selected={selected}
               onClick={() => onModel(id)}
               className={`rounded-xl border px-4 py-3 text-left font-mono text-sm transition-colors ${selected
-                ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
-                : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
+                  ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
+                  : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
                 }`}
             >
               {id}
@@ -816,11 +813,10 @@ const DoneStep = () => (
       </span>
     </h2>
     <ul className="mt-5 max-w-md list-disc space-y-2.5 pl-5 text-base leading-relaxed text-white/55 marker:text-[#00ff00]">
+      <li>Pin the Waffy extension to the toolbar.</li>
       <li>
-        Pin the Waffy extension to the toolbar.
-      </li>
-      <li>
-        Open the side panel with <Shortcut keys={["Ctrl", "I"]} /> or <Shortcut keys={["⌘", "I"]} />.
+        Open the side panel with <Shortcut keys={["Ctrl", "I"]} /> or <Shortcut keys={["⌘", "I"]} />
+        .
       </li>
       <li>You can change models anytime in settings.</li>
     </ul>
