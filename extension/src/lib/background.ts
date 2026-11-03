@@ -74,11 +74,3 @@ Browser.runtime.onInstalled.addListener(async (details) => {
     console.error("Failed to initialize extension:", error);
   }
 });
-
-Browser.commands.onCommand.addListener((command) => {
-  if (command === "open_side_panel") {
-    Browser.windows.getCurrent().then((w) => {
-      if (w.id) chrome.sidePanel.open({ windowId: w.id });
-    });
-  }
-});
