@@ -16,6 +16,7 @@ export async function* AI(
   messages: ExtensionMessage[],
   mode: StreamMode,
   abortController: AbortController | null,
+  memory?: string,
   session?: StreamSession
 ): AsyncGenerator<StreamEvent> {
   const { settings, apiKeys } = await getAppSettings();
@@ -25,6 +26,7 @@ export async function* AI(
     messages,
     settings: { settings, apiKeys },
     abortSignal: abortController?.signal,
+    memory,
     session,
   });
 }

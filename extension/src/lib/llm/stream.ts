@@ -21,6 +21,7 @@ export interface StreamOptions {
   messages: ExtensionMessage[];
   settings: AppSettings;
   abortSignal?: AbortSignal;
+  memory?: string;
   session?: StreamSession;
 }
 
@@ -93,7 +94,7 @@ function toolCallToRecord(
 }
 
 export async function* runStream(options: StreamOptions): AsyncGenerator<StreamEvent> {
-  const { mode, messages, settings, abortSignal, session } = options;
+  const { mode, messages, settings, abortSignal, memory, session } = options;
   const config = MODES[mode];
   const responseId = crypto.randomUUID();
 
@@ -107,7 +108,8 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
   const stageConfig = getStageConfig(settings.settings.models, mode);
   const model = await resolveModel(stageConfig, settings.apiKeys, settings.settings.customApi);
   const flags = getFeatureFlags(settings.settings);
-  const system = resolvePrompt(mode, flags);
+  const prompt = resolvePrompt(mode, flags);
+  const system = memory?.trim() ? `${prompt}\n\n${memory.trim()}` : prompt;
   const tools = resolveTools(mode, flags);
 
   const screenshotState = {

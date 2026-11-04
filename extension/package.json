@@ -21,6 +21,7 @@
     "@browser-ai/core": "^3.0.2",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/space-grotesk": "^5.3.0",
+    "@huggingface/transformers": "^4.3.2",
     "@mozilla/readability": "^0.6.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@streamdown/code": "^1.1.1",
@@ -37,6 +38,7 @@
     "react-mentions-ts": "^6.0.0",
     "streamdown": "^2.6.0",
     "tailwind-merge": "^3.6.0",
+    "turbomem": "^0.8.4",
     "turndown": "^7.2.4",
     "uuid": "^14.0.2",
     "webextension-polyfill": "^0.12.0"

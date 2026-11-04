@@ -119,6 +119,18 @@ const STAGE_GROUPS: StageGroup[] = [
         label: "Step Model",
         description: "Creates short labels for each execution step",
       },
+      {
+        id: "memory",
+        label: "Memory Model",
+        description:
+          "Used for fact extraction, summarizing what is saved, and the other memory tasks.",
+        recommendation: (
+          <>
+            A fast cloud model extracts cleaner facts. The built-in browser model keeps that work on
+            this device.
+          </>
+        ),
+      },
     ],
   },
 ];
@@ -214,8 +226,9 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             </span>
             <ChevronDown
               size={16}
-              className={`shrink-0 text-text-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
-                }`}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${
+                isExpanded ? "rotate-180" : ""
+              }`}
             />
           </div>
         </button>
@@ -225,15 +238,15 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
-                <div className={alertError}>
-                  <AlertCircle size={15} />
-                  <span>
-                    {isCustomProvider
-                      ? "Custom API is not configured. Add a URL and model in the Custom API section."
-                      : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
-                  </span>
-                </div>
-              )}
+                  <div className={alertError}>
+                    <AlertCircle size={15} />
+                    <span>
+                      {isCustomProvider
+                        ? "Custom API is not configured. Add a URL and model in the Custom API section."
+                        : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
+                    </span>
+                  </div>
+                )}
 
             {recommendation && (
               <div className={alertInfo}>
@@ -323,9 +336,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI && (
               <div className="flex min-w-0 flex-col gap-2">
                 <span className={fieldLabel}>Model</span>
-                <p className="text-sm text-text-secondary">
-                  {getBrowserAIModelLabel()}
-                </p>
+                <p className="text-sm text-text-secondary">{getBrowserAIModelLabel()}</p>
               </div>
             )}
 

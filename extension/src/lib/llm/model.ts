@@ -108,6 +108,7 @@ export const DEFAULT_MODELS: Record<StageId, ModelConfig> = {
   t3: { provider: "openai", model: "gpt-5.6-luna" },
   t4: { provider: "openai", model: "gpt-5.6-luna" },
   step: { provider: "browser-ai", model: "default" },
+  memory: { provider: "browser-ai", model: "default" },
 };
 
 export function getStageConfig(

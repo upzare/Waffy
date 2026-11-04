@@ -1,31 +1,41 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
-import { Settings as SettingsIcon, Key, Server, Cpu, LifeBuoy, Info } from "lucide-react";
+import { Brain, Cpu, Info, Key, LifeBuoy, Server, Settings as SettingsIcon } from "lucide-react";
 import {
-  getAppSettings,
-  saveAppSettings,
   DEFAULT_PINNED_PROMPTS,
   DEFAULT_SETTINGS,
+  getAppSettings,
+  saveAppSettings,
 } from "@/lib/client";
-import type { ApiKeys, Settings as SettingsType } from "../types";
+import type { ApiKeys, AppSettings, Settings as SettingsType } from "@/types";
 import "@/stylesheets/globals.css";
 
 import GeneralSection from "./components/general";
+import MemorySection from "./components/memory";
 import ApiKeysSection from "./components/api-keys";
 import CustomApiSection from "./components/custom-api";
 import ModelsSection from "./components/models";
 import SupportSection from "./components/support";
 import AboutSection from "./components/about";
-import { dangerButton, primaryButton, secondaryButton, thinScroll } from "./styles";
+import { thinScroll } from "./styles";
 
-const sections = [
+const SAVE_DELAY_MS = 400;
+const LOGO_URL = Browser.runtime.getURL("assets/logo.svg");
+
+const SECTIONS = [
   {
     id: "general",
     label: "General",
     description: "Manage your core extension preferences.",
     icon: SettingsIcon,
+  },
+  {
+    id: "memory",
+    label: "Memory",
+    description: "Turn personalized memory on or off, and review what has been saved.",
+    icon: Brain,
   },
   {
     id: "api-keys",
@@ -36,7 +46,7 @@ const sections = [
   {
     id: "models",
     label: "Models",
-    description: "Configure cloud and local browser models for each stages.",
+    description: "Configure cloud and local browser models for each stage.",
     icon: Cpu,
   },
   {
@@ -57,66 +67,233 @@ const sections = [
     description: "Version and product information.",
     icon: Info,
   },
-];
+] as const;
 
-const getHashSection = () => {
+type SectionId = (typeof SECTIONS)[number]["id"];
+
+interface SettingsForm {
+  settings: SettingsType;
+  apiKeys: ApiKeys;
+  pinnedPrompts: string[];
+}
+
+const createDefaultSettings = (): SettingsType => ({
+  ...DEFAULT_SETTINGS,
+  pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
+  models: Object.fromEntries(
+    Object.entries(DEFAULT_SETTINGS.models).map(([stage, config]) => [
+      stage,
+      config && { ...config },
+    ])
+  ) as SettingsType["models"],
+  customApi: { ...DEFAULT_SETTINGS.customApi },
+});
+
+const createDefaultForm = (): SettingsForm => ({
+  settings: createDefaultSettings(),
+  apiKeys: {},
+  pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
+});
+
+const getEditablePrompts = (settings: SettingsType) =>
+  settings.pinnedPrompts.length > 0 ? [...settings.pinnedPrompts] : [""];
+
+const buildPayload = ({ settings, apiKeys, pinnedPrompts }: SettingsForm): AppSettings => ({
+  settings: {
+    ...settings,
+    pinnedPrompts: pinnedPrompts.map((prompt) => prompt.trim()).filter(Boolean),
+  },
+  apiKeys,
+});
+
+const serializePayload = (form: SettingsForm) => JSON.stringify(buildPayload(form));
+
+const isSectionId = (value: string): value is SectionId =>
+  SECTIONS.some((section) => section.id === value);
+
+const getHashSection = (): SectionId => {
   const hash = window.location.hash.replace("#", "");
-  if (hash === "" || !sections.some((section) => section.id === hash)) {
-    return sections[0].id;
-  }
-  return hash;
+  return isSectionId(hash) ? hash : SECTIONS[0].id;
 };
 
-const Settings = () => {
-  const [activeSection, setActiveSection] = useState(getHashSection);
-  const activeSectionMeta = sections.find((section) => section.id === activeSection) ?? sections[0];
-  const logoUrl = Browser.runtime.getURL("assets/logo.svg");
+const useSettingsForm = () => {
+  const [defaults] = useState(createDefaultForm);
+  const [settings, setSettings] = useState(defaults.settings);
+  const [apiKeys, setApiKeys] = useState(defaults.apiKeys);
+  const [pinnedPrompts, setPinnedPrompts] = useState(defaults.pinnedPrompts);
+  const [loaded, setLoaded] = useState(false);
 
-  const [settings, setSettings] = useState<SettingsType>({ ...DEFAULT_SETTINGS });
-  const [apiKeys, setApiKeys] = useState<ApiKeys>({});
-  const [pinnedPrompts, setPinnedPrompts] = useState<string[]>([...DEFAULT_PINNED_PROMPTS]);
+  const formRef = useRef<SettingsForm>(defaults);
+  const lastSavedRef = useRef<string | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+
+  formRef.current = { settings, apiKeys, pinnedPrompts };
+
+  const clearPendingSave = useCallback(() => {
+    if (saveTimerRef.current === null) return;
+    window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+  }, []);
+
+  const persist = useCallback((form: SettingsForm) => {
+    const payload = buildPayload(form);
+    const serialized = JSON.stringify(payload);
+
+    const save = async () => {
+      if (serialized === lastSavedRef.current) return true;
+
+      try {
+        await saveAppSettings(payload.settings, payload.apiKeys);
+        lastSavedRef.current = serialized;
+        void Browser.runtime.sendMessage({ action: "RELOAD_PANEL" }).catch(() => { });
+        return true;
+      } catch (error) {
+        console.error("Error saving settings:", error);
+        toast.error("Failed to save settings");
+        return false;
+      }
+    };
+
+    const next = saveQueueRef.current.then(save, save);
+    saveQueueRef.current = next;
+    return next;
+  }, []);
 
   useEffect(() => {
+    let active = true;
     const loadSettings = async () => {
       try {
         const data = await getAppSettings();
+        if (!active) return;
+
+        const pins = getEditablePrompts(data.settings);
+        const form = { settings: data.settings, apiKeys: data.apiKeys, pinnedPrompts: pins };
+        formRef.current = form;
+        lastSavedRef.current = serializePayload(form);
         setSettings(data.settings);
         setApiKeys(data.apiKeys);
-        setPinnedPrompts(
-          data.settings.pinnedPrompts !== undefined
-            ? data.settings.pinnedPrompts.length > 0
-              ? data.settings.pinnedPrompts
-              : [""]
-            : [...DEFAULT_PINNED_PROMPTS]
-        );
+        setPinnedPrompts(pins);
+        setLoaded(true);
       } catch (error) {
         console.error("Error loading settings:", error);
       }
     };
-    loadSettings();
+    void loadSettings();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const handleSave = async () => {
-    try {
-      const merged: SettingsType = {
-        ...settings,
-        pinnedPrompts: pinnedPrompts.map((prompt) => prompt.trim()).filter(Boolean),
-      };
-      await saveAppSettings(merged, apiKeys);
-      setSettings(merged);
-      Browser.runtime.sendMessage({ action: "RELOAD_PANEL" });
-      toast.success("Settings saved successfully");
-    } catch (error) {
-      console.error("Error saving settings:", error);
-      toast.error("Failed to save settings");
-    }
-  };
+  useEffect(() => {
+    if (!loaded) return;
+    if (serializePayload(formRef.current) === lastSavedRef.current) return;
 
-  const handleReset = () => {
-    setSettings({ ...DEFAULT_SETTINGS });
-    setApiKeys({});
-    setPinnedPrompts([...DEFAULT_PINNED_PROMPTS]);
-    toast.success("Changes reset to default values");
+    clearPendingSave();
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      void persist(formRef.current);
+    }, SAVE_DELAY_MS);
+
+    return clearPendingSave;
+  }, [settings, apiKeys, pinnedPrompts, loaded, clearPendingSave, persist]);
+
+  useEffect(() => {
+    const flush = () => {
+      clearPendingSave();
+      if (loaded) void persist(formRef.current);
+    };
+
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [loaded, clearPendingSave, persist]);
+
+  const resetDefaults = useCallback(() => {
+    const form = createDefaultForm();
+    formRef.current = form;
+    setSettings(form.settings);
+    setApiKeys(form.apiKeys);
+    setPinnedPrompts(form.pinnedPrompts);
+    clearPendingSave();
+
+    void persist(form).then((saved) => {
+      if (saved) toast.success("Settings reset to defaults");
+    });
+  }, [clearPendingSave, persist]);
+
+  return {
+    settings,
+    setSettings,
+    apiKeys,
+    setApiKeys,
+    pinnedPrompts,
+    setPinnedPrompts,
+    loaded,
+    resetDefaults,
+  };
+};
+
+interface SettingsSidebarProps {
+  activeSection: SectionId;
+  onSelect: (section: SectionId) => void;
+}
+
+const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeSection, onSelect }) => (
+  <aside className="flex shrink-0 flex-col border-b border-border bg-surface-1 md:w-70 md:border-r md:border-b-0">
+    <div className="flex items-center gap-2.5 px-4 py-3 md:gap-3 md:px-5 md:pb-5 md:pt-6">
+      <img src={LOGO_URL} alt="Waffy Logo" className="h-8 w-8 shrink-0 md:h-9 md:w-9" />
+      <h1 className="truncate text-lg font-bold tracking-tight md:text-xl">Extension Settings</h1>
+    </div>
+
+    <nav
+      className={`flex w-full gap-1 px-2 pb-2 md:flex-1 md:flex-col md:gap-1 md:overflow-y-auto md:px-3 md:pb-4 ${thinScroll}`}
+    >
+      {SECTIONS.map((section) => {
+        const Icon = section.icon;
+        const isActive = activeSection === section.id;
+
+        return (
+          <button
+            key={section.id}
+            type="button"
+            className={`flex flex-1 flex-col items-center justify-center gap-1.5 rounded-md border px-1 py-2 text-center transition-colors duration-150 md:w-full md:flex-none md:flex-row md:justify-start md:gap-2.5 md:px-3 md:py-2.5 md:text-left ${isActive
+              ? "border-green-border bg-green-dim text-green"
+              : "border-transparent text-text-secondary hover:bg-white/4 hover:text-text-primary"
+              }`}
+            onClick={() => onSelect(section.id)}
+            aria-current={isActive ? "page" : undefined}
+          >
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${isActive ? "bg-green-dim text-green" : "bg-white/4"
+                }`}
+            >
+              <Icon size={17} />
+            </span>
+            <span className="text-[11px] font-medium leading-none md:text-sm">{section.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  </aside>
+);
+
+const Settings = () => {
+  const [activeSection, setActiveSection] = useState<SectionId>(getHashSection);
+  const activeSectionMeta = SECTIONS.find((section) => section.id === activeSection) ?? SECTIONS[0];
+  const {
+    settings,
+    setSettings,
+    apiKeys,
+    setApiKeys,
+    pinnedPrompts,
+    setPinnedPrompts,
+    loaded,
+    resetDefaults,
+  } = useSettingsForm();
+
+  const selectSection = (section: SectionId) => {
+    setActiveSection(section);
+    window.location.hash = section;
   };
 
   const renderSection = () => {
@@ -128,8 +305,12 @@ const Settings = () => {
             setSettings={setSettings}
             pinnedPrompts={pinnedPrompts}
             setPinnedPrompts={setPinnedPrompts}
+            onResetDefaults={resetDefaults}
+            canReset={loaded}
           />
         );
+      case "memory":
+        return <MemorySection settings={settings} setSettings={setSettings} />;
       case "api-keys":
         return <ApiKeysSection apiKeys={apiKeys} setApiKeys={setApiKeys} />;
       case "models":
@@ -146,58 +327,14 @@ const Settings = () => {
       case "support":
         return <SupportSection />;
       case "about":
-        return <AboutSection logoUrl={logoUrl} />;
-      default:
-        return null;
+        return <AboutSection logoUrl={LOGO_URL} />;
     }
   };
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-surface-0 font-sans text-text-primary md:flex-row">
       <Toaster position="top-center" reverseOrder={false} />
-
-      <aside className="flex shrink-0 flex-col border-b border-border bg-surface-1 md:w-70 md:border-r md:border-b-0">
-        <div className="flex items-center gap-2.5 px-4 py-3 md:gap-3 md:px-5 md:pb-5 md:pt-6">
-          <img src={logoUrl} alt="Waffy Logo" className="h-8 w-8 shrink-0 md:h-9 md:w-9" />
-          <h1 className="truncate text-lg font-bold tracking-tight md:text-xl">
-            Extension Settings
-          </h1>
-        </div>
-
-        <nav
-          className={`flex w-full gap-1 px-2 pb-2 md:flex-1 md:flex-col md:gap-1 md:overflow-y-auto md:px-3 md:pb-4 ${thinScroll}`}
-        >
-          {sections.map((section) => {
-            const Icon = section.icon;
-            const isActive = activeSection === section.id;
-            return (
-              <button
-                key={section.id}
-                type="button"
-                className={`flex flex-1 flex-col items-center justify-center gap-1.5 rounded-md border px-1 py-2 text-center transition-colors duration-150 md:w-full md:flex-none md:flex-row md:justify-start md:gap-2.5 md:px-3 md:py-2.5 md:text-left ${isActive
-                  ? "border-green-border bg-green-dim text-green"
-                  : "border-transparent text-text-secondary hover:bg-white/4 hover:text-text-primary"
-                  }`}
-                onClick={() => {
-                  setActiveSection(section.id);
-                  window.location.hash = section.id;
-                }}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ${isActive ? "bg-green-dim text-green" : "bg-white/4"
-                    }`}
-                >
-                  <Icon size={17} />
-                </span>
-                <span className="text-[11px] font-medium leading-none md:text-sm">
-                  {section.label}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+      <SettingsSidebar activeSection={activeSection} onSelect={selectSection} />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex justify-center border-b border-border bg-black/20 px-5 pb-5 pt-6 md:px-10 md:pt-8">
@@ -216,20 +353,6 @@ const Settings = () => {
         >
           <div className="mx-auto w-full min-w-0 max-w-4xl animate-fade-in">{renderSection()}</div>
         </main>
-
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-1 px-5 py-4 md:gap-4 md:px-10">
-          <button type="button" className={dangerButton} onClick={handleReset}>
-            Reset Defaults
-          </button>
-          <div className="flex gap-3">
-            <button type="button" className={secondaryButton} onClick={() => window.close()}>
-              Cancel
-            </button>
-            <button type="button" className={primaryButton} onClick={handleSave}>
-              Save Changes
-            </button>
-          </div>
-        </footer>
       </div>
     </div>
   );

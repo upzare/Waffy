@@ -14,6 +14,13 @@ import { defineReactCompilerLoaderOption, reactCompilerLoader } from "react-comp
 
 const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(EXTENSION_DIR, "..");
+const ONNX_DIST = path.dirname(
+  fileURLToPath(import.meta.resolve("onnxruntime-web"))
+);
+const ONNX_WASM_FILES = [
+  "ort-wasm-simd-threaded.asyncify.mjs",
+  "ort-wasm-simd-threaded.asyncify.wasm",
+];
 
 const MANIFEST = JSON.parse(
   fs.readFileSync(path.join(EXTENSION_DIR, "public", "manifest.json"), "utf8")
@@ -129,6 +136,11 @@ const config: webpack.Configuration = {
   },
   resolve: {
     alias: alias,
+    fallback: {
+      crypto: false,
+      fs: false,
+      path: false,
+    },
     extensions: fileExtensions
       .map((extension) => "." + extension)
       .concat([".js", ".jsx", ".ts", ".tsx", ".css"]),
@@ -138,6 +150,10 @@ const config: webpack.Configuration = {
     new CleanWebpackPlugin({ verbose: false }),
     new webpack.ProgressPlugin(),
     new webpack.EnvironmentPlugin(["NODE_ENV"]),
+    new webpack.IgnorePlugin({
+      resourceRegExp:
+        /^(better-sqlite3|sqlite-vec|@pinecone-database\/pinecone|@upstash\/vector|@anthropic-ai\/sdk)$/,
+    }),
     new ZipPlugin({
       filename: `${MANIFEST.name}-${MANIFEST.version}.zip`,
       path: path.join(ROOT_DIR, ".output"),
@@ -152,6 +168,10 @@ const config: webpack.Configuration = {
           to: path.join(ROOT_DIR, "build"),
           force: true,
         },
+        ...ONNX_WASM_FILES.map((file) => ({
+          from: path.join(ONNX_DIST, file),
+          to: path.join(ROOT_DIR, "build", "ort", file),
+        })),
       ],
     }),
     new HtmlWebpackPlugin({

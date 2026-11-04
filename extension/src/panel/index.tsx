@@ -31,6 +31,7 @@ import {
 } from "@/lib/llm/tools/handlers/automate";
 import { getActiveTab, getCurrentWindowTabs } from "@/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
+import { recallMemory, rememberMemory } from "@/lib/memory/engine";
 import {
   PENDING_PANEL_ACTION_KEY,
   PENDING_PANEL_ACTION_TTL_MS,
@@ -231,6 +232,18 @@ const App = () => {
     });
   };
 
+  const getAssistantMessage = (): Promise<Message | undefined> => {
+    const messageId = messageIdRef.current;
+    if (!messageId) return Promise.resolve(undefined);
+    const assistantId = `assistant-${messageId}`;
+    return new Promise((resolve) => {
+      setMessages((current) => {
+        resolve(current.find((message) => message.id === assistantId));
+        return current;
+      });
+    });
+  };
+
   const isAborted = () => Boolean(abortControllerRef.current?.signal.aborted);
 
   const assertNotAborted = () => {
@@ -256,11 +269,12 @@ const App = () => {
   const automateHandler = async (
     prompt_text: string,
     prompt_files: FileFormat[],
-    conversationMessages: Message[]
+    conversationMessages: Message[],
+    memoryContext: string
   ) => {
     await attachController();
     try {
-      const task = await t1Handler(prompt_text, prompt_files, conversationMessages);
+      const task = await t1Handler(prompt_text, prompt_files, conversationMessages, memoryContext);
       if (task) {
         const t2Reasoning = await t2Handler(task, prompt_files, conversationMessages);
         if (t2Reasoning) {
@@ -280,14 +294,15 @@ const App = () => {
   const t1Handler = async (
     prompt_text: string,
     prompt_files: FileFormat[],
-    conversationMessages: Message[]
+    conversationMessages: Message[],
+    memoryContext: string
   ) => {
     assertNotAborted();
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
     const t1Messages = buildT1Messages(prompt_text, prompt_files, conversationMessages);
     console.log("t1Messages:", t1Messages);
-    const responseStream = AI(t1Messages, "t1", abortControllerRef?.current);
+    const responseStream = AI(t1Messages, "t1", abortControllerRef?.current, memoryContext);
     const toolCalls: Record<string, ToolCall> = {};
     let textResponse = "";
     for await (const res of responseStream) {
@@ -378,6 +393,7 @@ const App = () => {
         t2Messages,
         "t2",
         abortControllerRef?.current,
+        undefined,
         t2SessionRef.current
       );
 
@@ -552,7 +568,8 @@ const App = () => {
   const baseHandler = async (
     prompt_text: string,
     prompt_files: FileFormat[],
-    conversationMessages: Message[]
+    conversationMessages: Message[],
+    memoryContext: string
   ) => {
     assertNotAborted();
     setStatusText("GENERATING");
@@ -567,7 +584,7 @@ const App = () => {
       assertNotAborted();
       const iterationStart = textResponse.length;
       const baseToolCalls: Record<string, ToolCall> = {};
-      const baseStream = AI(baseMessages, "base", abortControllerRef?.current);
+      const baseStream = AI(baseMessages, "base", abortControllerRef?.current, memoryContext);
 
       for await (const res of baseStream) {
         if (res.type === "text.stream") {
@@ -632,7 +649,7 @@ const App = () => {
 
         setToolActivityText(null);
         setStreaming((prev) => ({ ...prev, response: false }));
-        await automateHandler(task, prompt_files, conversationMessages);
+        await automateHandler(task, prompt_files, conversationMessages, memoryContext);
         return;
       }
 
@@ -680,7 +697,8 @@ const App = () => {
   const searchHandler = async (
     prompt_text: string,
     prompt_files: FileFormat[],
-    conversationMessages: Message[]
+    conversationMessages: Message[],
+    memoryContext: string
   ) => {
     assertNotAborted();
     setStatusText("GENERATING");
@@ -695,7 +713,7 @@ const App = () => {
       assertNotAborted();
       const iterationStart = textResponse.length;
       const searchToolCalls: Record<string, ToolCall> = {};
-      const searchStream = AI(searchMessages, "search", abortControllerRef?.current);
+      const searchStream = AI(searchMessages, "search", abortControllerRef?.current, memoryContext);
 
       for await (const res of searchStream) {
         if (res.type === "text.stream") {
@@ -770,7 +788,8 @@ const App = () => {
   const researchHandler = async (
     prompt_text: string,
     prompt_files: FileFormat[],
-    conversationMessages: Message[]
+    conversationMessages: Message[],
+    memoryContext: string
   ) => {
     assertNotAborted();
     setStatusText("GENERATING");
@@ -785,7 +804,7 @@ const App = () => {
       assertNotAborted();
       const iterationStart = textResponse.length;
       const researchToolCalls: Record<string, ToolCall> = {};
-      const researchStream = AI(researchMessages, "research", abortControllerRef?.current);
+      const researchStream = AI(researchMessages, "research", abortControllerRef?.current, memoryContext);
 
       for await (const res of researchStream) {
         if (res.type === "text.stream") {
@@ -890,20 +909,21 @@ const App = () => {
     mode: MessageMode,
     promptText: string,
     promptFiles: FileFormat[],
-    conversationMessages: Message[]
+    conversationMessages: Message[],
+    memoryContext: string
   ) => {
     switch (mode) {
       case "base":
-        await baseHandler(promptText, promptFiles, conversationMessages);
+        await baseHandler(promptText, promptFiles, conversationMessages, memoryContext);
         break;
       case "search":
-        await searchHandler(promptText, promptFiles, conversationMessages);
+        await searchHandler(promptText, promptFiles, conversationMessages, memoryContext);
         break;
       case "research":
-        await researchHandler(promptText, promptFiles, conversationMessages);
+        await researchHandler(promptText, promptFiles, conversationMessages, memoryContext);
         break;
       case "automate":
-        await automateHandler(promptText, promptFiles, conversationMessages);
+        await automateHandler(promptText, promptFiles, conversationMessages, memoryContext);
         break;
     }
   };
@@ -951,7 +971,25 @@ const App = () => {
 
       try {
         await prepareMessages();
-        await runModeHandler(mode, promptText, promptFiles, conversationContext);
+        let memoryContext = "";
+        if (appSettings?.settings.featureMemory) {
+          setStatusText("RECALLING");
+          memoryContext = await recallMemory(promptText);
+        }
+
+        await runModeHandler(mode, promptText, promptFiles, conversationContext, memoryContext);
+
+        if (appSettings?.settings.featureMemory) {
+          const assistantMessage = await getAssistantMessage();
+          const assistantText = [
+            assistantMessage?.content.text?.response,
+            assistantMessage?.content.text?.output,
+          ].filter(Boolean).join("\n");
+
+          void rememberMemory(promptText, assistantText).catch((error) =>
+            console.warn("Memory update failed", error)
+          );
+        }
       } catch (error: unknown) {
         showError(error);
       } finally {
