@@ -121,13 +121,12 @@ const STAGE_GROUPS: StageGroup[] = [
       },
       {
         id: "memory",
-        label: "Memory Model",
-        description:
-          "Used for fact extraction, summarizing what is saved, and the other memory tasks.",
+        label: "Memory Summarize Model",
+        description: "Turns your saved memories into the summary shown in Settings",
         recommendation: (
           <>
-            A fast cloud model extracts cleaner facts. The built-in browser model keeps that work on
-            this device.
+            This runs only when you summarize saved memory. A small model is enough, and the
+            built-in browser model keeps that summary on this device.
           </>
         ),
       },
@@ -226,9 +225,8 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             </span>
             <ChevronDown
               size={16}
-              className={`shrink-0 text-text-muted transition-transform duration-200 ${
-                isExpanded ? "rotate-180" : ""
-              }`}
+              className={`shrink-0 text-text-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+                }`}
             />
           </div>
         </button>
@@ -238,15 +236,15 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
-                  <div className={alertError}>
-                    <AlertCircle size={15} />
-                    <span>
-                      {isCustomProvider
-                        ? "Custom API is not configured. Add a URL and model in the Custom API section."
-                        : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
-                    </span>
-                  </div>
-                )}
+                <div className={alertError}>
+                  <AlertCircle size={15} />
+                  <span>
+                    {isCustomProvider
+                      ? "Custom API is not configured. Add a URL and model in the Custom API section."
+                      : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
+                  </span>
+                </div>
+              )}
 
             {recommendation && (
               <div className={alertInfo}>

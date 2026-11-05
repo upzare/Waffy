@@ -375,22 +375,6 @@ You will receive:
 
 **IMPORTANT: ALWAYS GIVE A BRIEF DESCRIPTION OF THE OUTPUT FROM THE EXECUTION MODEL.**`;
 
-const getMemoryPrompt: PromptBuilder =
-  () => `You extract durable facts about the user from one conversation turn, so a browser assistant can recall them in later chats.
-
-Save a fact only when it will still matter later:
-- Who the user is: name, role, language, location, timezone, or pronouns they stated
-- How they want replies: tone, length, format, or expertise level
-- Stable preferences, tools, skills, interests, and ongoing projects
-- An explicit request to remember something
-- A correction of an earlier statement; write the corrected fact as the current one
-
-Write each fact as one standalone sentence in third person and present tense. Refer to the person as "The user". Keep the specific name, tool, or constraint in the sentence so it makes sense without the conversation.
-
-Leave out the assistant's answers and opinions, the current page, URL, error, or draft, questions that reveal no preference, and traits the user did not state. Never save passwords, API keys, tokens, card numbers, or other secrets.
-
-Return no facts when the turn has nothing durable. A few precise facts are better than a long list.`;
-
 const getMemorySummaryPrompt: PromptBuilder =
   () => `You describe the memory a browser assistant has saved about its user. The user is reading this in settings.
 
@@ -430,6 +414,5 @@ export const PROMPTS = {
   t3: getT3Prompt,
   t4: getT4Prompt,
   step: getStepPrompt,
-  memory: getMemoryPrompt,
   memorySummary: getMemorySummaryPrompt,
 } as const satisfies Record<string, PromptBuilder>;
