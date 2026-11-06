@@ -1,13 +1,25 @@
 import Dexie, { liveQuery, type EntityTable } from "dexie";
 import type { Conversation, Message } from "@/types";
 
+export interface StoredMemory {
+  id: string;
+  content: string;
+  embedding: number[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 class WaffyDB extends Dexie {
   conversations!: EntityTable<Conversation, "id">;
+  memories!: EntityTable<StoredMemory, "id">;
 
   constructor() {
     super("WaffyDB");
     this.version(1).stores({
       conversations: "id, timestamp",
+    });
+    this.version(2).stores({
+      memories: "id",
     });
   }
 }

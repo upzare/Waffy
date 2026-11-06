@@ -14,6 +14,13 @@ import { defineReactCompilerLoaderOption, reactCompilerLoader } from "react-comp
 
 const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(EXTENSION_DIR, "..");
+const ONNX_DIST = path.dirname(
+  fileURLToPath(import.meta.resolve("onnxruntime-web"))
+);
+const ONNX_WASM_FILES = [
+  "ort-wasm-simd-threaded.asyncify.mjs",
+  "ort-wasm-simd-threaded.asyncify.wasm",
+];
 
 const MANIFEST = JSON.parse(
   fs.readFileSync(path.join(EXTENSION_DIR, "public", "manifest.json"), "utf8")
@@ -152,6 +159,10 @@ const config: webpack.Configuration = {
           to: path.join(ROOT_DIR, "build"),
           force: true,
         },
+        ...ONNX_WASM_FILES.map((file) => ({
+          from: path.join(ONNX_DIST, file),
+          to: path.join(ROOT_DIR, "build", "ort", file),
+        })),
       ],
     }),
     new HtmlWebpackPlugin({
