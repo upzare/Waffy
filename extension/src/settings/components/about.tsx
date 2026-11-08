@@ -1,39 +1,36 @@
 import React from "react";
 import { ArrowUpRight, Code2, Globe, Scale, Shield } from "lucide-react";
 import Browser from "webextension-polyfill";
-
-interface AboutSectionProps {
-  logoUrl: string;
-}
+import { GITHUB_URL, LOGO_URL, PRIVACY_URL, TERMS_URL, WEBSITE_URL } from "@/config";
 
 const LINKS = [
   {
-    href: "https://waffy.io",
+    href: WEBSITE_URL,
     label: "Website",
     description: "Product overview and updates",
     icon: Globe,
   },
   {
-    href: "https://github.com/upzare/Waffy",
+    href: GITHUB_URL,
     label: "GitHub",
     description: "Source code and contributions",
     icon: Code2,
   },
   {
-    href: "https://waffy.io/terms",
+    href: TERMS_URL,
     label: "Terms of Service",
     description: "Usage terms and conditions",
     icon: Scale,
   },
   {
-    href: "https://waffy.io/privacy",
+    href: PRIVACY_URL,
     label: "Privacy Policy",
     description: "How your data is handled",
     icon: Shield,
   },
 ];
 
-const AboutSection: React.FC<AboutSectionProps> = ({ logoUrl }) => {
+const AboutSection: React.FC = () => {
   const manifest = Browser.runtime.getManifest();
   const version = manifest.version;
   const year = new Date().getFullYear();
@@ -43,7 +40,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({ logoUrl }) => {
       <div className="overflow-hidden rounded-md border border-border bg-surface-2">
         <div className="flex flex-col items-center px-5 py-8 text-center sm:px-8 sm:py-10">
           <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-black/25">
-            <img src={logoUrl} alt="Waffy" className="h-9 w-9" />
+            <img src={LOGO_URL} alt="Waffy" className="h-9 w-9" />
           </div>
 
           <h2 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Waffy Extension</h2>

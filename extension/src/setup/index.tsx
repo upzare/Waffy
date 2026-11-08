@@ -77,6 +77,11 @@ const FEATURE_TOGGLES: {
       label: "Automation",
       description: "Give a task. It clicks, types, and scrolls until the task is done.",
     },
+    {
+      key: "featureMemory",
+      label: "Personalized Memory",
+      description: "Remember useful facts from chats and use them in later conversations.",
+    },
   ];
 
 const pillPrimary =
@@ -122,6 +127,7 @@ const Onboarding = () => {
   const [featureSearch, setFeatureSearch] = useState(DEFAULT_FEATURES.featureSearch);
   const [featureResearch, setFeatureResearch] = useState(DEFAULT_FEATURES.featureResearch);
   const [featureAutomation, setFeatureAutomation] = useState(DEFAULT_FEATURES.featureAutomation);
+  const [featureMemory, setFeatureMemory] = useState(DEFAULT_FEATURES.featureMemory);
   const [browserStatus, setBrowserStatus] = useState<BrowserAIStatus | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloading, setDownloading] = useState(false);
@@ -212,6 +218,7 @@ const Onboarding = () => {
         featureSearch,
         featureResearch,
         featureAutomation,
+        featureMemory,
         models: assignStages(provider, modelId),
         customApi:
           provider === "custom"
@@ -243,11 +250,12 @@ const Onboarding = () => {
     setStep((current) => current + 1);
   };
 
-  const flags = { featureSearch, featureResearch, featureAutomation };
+  const flags = { featureSearch, featureResearch, featureAutomation, featureMemory };
   const setFlag = (key: keyof typeof flags, value: boolean) => {
     if (key === "featureSearch") setFeatureSearch(value);
     if (key === "featureResearch") setFeatureResearch(value);
     if (key === "featureAutomation") setFeatureAutomation(value);
+    if (key === "featureMemory") setFeatureMemory(value);
   };
 
   return (
@@ -722,8 +730,8 @@ const ModelStep = ({
               aria-selected={selected}
               onClick={() => onModel(id)}
               className={`rounded-xl border px-4 py-3 text-left font-mono text-sm transition-colors ${selected
-                  ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
-                  : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
+                ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
+                : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
                 }`}
             >
               {id}
@@ -754,7 +762,7 @@ const FinishStep = ({
       <StepHeading
         eyebrow="05 · Finish"
         title="Turn on what you need."
-        body="Search and research start on. Automation stays off until you want the browser to act."
+        body="Pick the features you want Waffy to use. You can change them anytime in settings."
       />
       <div className="mt-8 flex flex-col divide-y divide-white/10 rounded-2xl border border-white/12 bg-white/6">
         {FEATURE_TOGGLES.map((toggle) => (

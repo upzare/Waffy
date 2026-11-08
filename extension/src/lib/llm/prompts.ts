@@ -375,6 +375,15 @@ You will receive:
 
 **IMPORTANT: ALWAYS GIVE A BRIEF DESCRIPTION OF THE OUTPUT FROM THE EXECUTION MODEL.**`;
 
+const getMemorySummaryPrompt: PromptBuilder =
+  () => `You describe the memory a browser assistant has saved about its user. The user is reading this in settings.
+
+Write in second person ("You ..."). Turn the saved facts into a short description that can be read in a few seconds. Group related facts into brief paragraphs, such as who they are, how they like to work, and what they are working on. Keep names, tools, and constraints exact.
+
+Use only the provided facts. Drop a fact that repeats another. When two facts conflict, include both without deciding which is newer. Add no advice, title, or detail that is not in the list.
+
+If there are no facts, reply: "I don't remember anything yet."`;
+
 const getStepPrompt: PromptBuilder =
   () => `You are a specialized AI model within the Waffy automation system. Your sole function is to receive reasoning logs and a specific tool call from an Execution Model, and then generate a single, short, and contextually-aware description of the action for the user interface.
 
@@ -405,4 +414,5 @@ export const PROMPTS = {
   t3: getT3Prompt,
   t4: getT4Prompt,
   step: getStepPrompt,
+  memorySummary: getMemorySummaryPrompt,
 } as const satisfies Record<string, PromptBuilder>;

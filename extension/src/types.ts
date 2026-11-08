@@ -144,6 +144,7 @@ export interface Settings {
   featureSearch: boolean;
   featureResearch: boolean;
   featureAutomation: boolean;
+  featureMemory: boolean;
   pinnedPrompts: string[];
   models: Partial<Record<StageId, ModelConfig>>;
   customApi: CustomApiConfig;
@@ -151,13 +152,14 @@ export interface Settings {
 
 export type FeatureFlags = Pick<
   Settings,
-  "featureSearch" | "featureResearch" | "featureAutomation"
+  "featureSearch" | "featureResearch" | "featureAutomation" | "featureMemory"
 >;
 
 export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai" | "custom";
 
-export type StageId = "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "t4" | "step";
+export type StageId =
+  "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "t4" | "step" | "memory";
 
 export interface ModelConfig {
   provider: ProviderId;

@@ -1,0 +1,87 @@
+html,
+body,
+#root {
+  height: auto;
+  min-height: 100%;
+}
+
+.release-notes {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.release-notes :is(h1, h2, h3) {
+  color: white;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.release-notes h1 {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.75rem;
+}
+
+.release-notes h2 {
+  margin: 1.75rem 0 0.6rem;
+  font-size: 1.35rem;
+}
+
+.release-notes h3 {
+  margin: 1.25rem 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+.release-notes :first-child :is(h1, h2, h3),
+.release-notes> :is(h1, h2, h3):first-child {
+  margin-top: 0;
+}
+
+.release-notes :is(p, ul, ol) {
+  margin: 0.75rem 0;
+}
+
+.release-notes :is(ul, ol) {
+  padding-left: 1.25rem;
+}
+
+.release-notes ul {
+  list-style: disc;
+}
+
+.release-notes ol {
+  list-style: decimal;
+}
+
+.release-notes li {
+  margin: 0.35rem 0;
+}
+
+.release-notes li::marker {
+  color: #00ff00;
+}
+
+.release-notes a {
+  color: #00ff00;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.release-notes strong {
+  color: white;
+  font-weight: 700;
+}
+
+.release-notes pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.release-notes code {
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.1em 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}

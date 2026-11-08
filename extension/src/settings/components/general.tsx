@@ -1,7 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 import { Pin, Plus, X } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { iconBox, iconButton, panel, panelSubtitle, panelTitle } from "../styles";
+import {
+  dangerButton,
+  iconBox,
+  iconButton,
+  panel,
+  panelSubtitle,
+  panelTitle,
+  secondaryButton,
+} from "../styles";
 import type { FeatureFlags, Settings } from "@/types";
 
 interface GeneralSectionProps {
@@ -9,6 +26,8 @@ interface GeneralSectionProps {
   setSettings: React.Dispatch<React.SetStateAction<Settings>>;
   pinnedPrompts: string[];
   setPinnedPrompts: (value: string[]) => void;
+  onResetDefaults: () => void;
+  canReset: boolean;
 }
 
 const MIN_PINNED_PROMPTS = 2;
@@ -25,7 +44,10 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
   setSettings,
   pinnedPrompts,
   setPinnedPrompts,
+  onResetDefaults,
+  canReset,
 }) => {
+  const [resetOpen, setResetOpen] = useState(false);
   const updatePrompt = (index: number, value: string) => {
     setPinnedPrompts(pinnedPrompts.map((prompt, i) => (i === index ? value : prompt)));
   };
@@ -110,6 +132,49 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
           ))}
         </div>
       </div>
+
+      <div className={panel}>
+        <div className="mb-4">
+          <h3 className={panelTitle}>Reset defaults</h3>
+          <p className={panelSubtitle}>
+            Restore pinned prompts, features, models, custom API, and API keys to their original
+            values.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={`${dangerButton} disabled:cursor-not-allowed disabled:opacity-40`}
+          onClick={() => setResetOpen(true)}
+          disabled={!canReset}
+        >
+          Reset Defaults
+        </button>
+      </div>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset defaults</DialogTitle>
+            <DialogDescription>
+              This restores pinned prompts, features, models, custom API, and API keys to their
+              original values. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose className={secondaryButton}>No</DialogClose>
+            <button
+              type="button"
+              className={dangerButton}
+              onClick={() => {
+                setResetOpen(false);
+                onResetDefaults();
+              }}
+            >
+              Yes
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

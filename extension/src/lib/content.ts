@@ -1,4 +1,5 @@
 import Browser from "webextension-polyfill";
+import { CURSOR_URL } from "@/config";
 import type { DomMessage } from "../types";
 import { sleep } from "./utils";
 
@@ -126,7 +127,7 @@ const setOption = (value: string) => {
 const createPointer = (x?: number, y?: number) => {
   const pointer = document.createElement("img");
   pointer.id = "waffy-pointer";
-  pointer.src = Browser.runtime.getURL("shared/cursor.png");
+  pointer.src = CURSOR_URL;
   pointer.style.position = "fixed";
   pointer.style.left = `${x}px`;
   pointer.style.top = `${y}px`;

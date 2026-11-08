@@ -4,6 +4,7 @@ export const DEFAULT_FEATURES: FeatureFlags = {
   featureSearch: true,
   featureResearch: true,
   featureAutomation: false,
+  featureMemory: false,
 };
 
 /** Model stages owned by an optional feature. Stages left out are always active. */
@@ -11,6 +12,7 @@ const FEATURE_STAGES: Record<keyof FeatureFlags, StageId[]> = {
   featureSearch: ["search"],
   featureResearch: ["research"],
   featureAutomation: ["t1", "t2", "t3", "t4", "step"],
+  featureMemory: ["memory"],
 };
 
 /** Message modes that require a feature flag. `base` is always available. */
@@ -30,6 +32,7 @@ export const getFeatureFlags = (settings: Settings): FeatureFlags => ({
   featureSearch: settings.featureSearch ?? DEFAULT_FEATURES.featureSearch,
   featureResearch: settings.featureResearch ?? DEFAULT_FEATURES.featureResearch,
   featureAutomation: settings.featureAutomation ?? DEFAULT_FEATURES.featureAutomation,
+  featureMemory: settings.featureMemory ?? DEFAULT_FEATURES.featureMemory,
 });
 
 export function isStageEnabled(stage: StageId, flags: FeatureFlags): boolean {

@@ -1,4 +1,4 @@
-import Browser from "webextension-polyfill";
+import { LOGO_URL } from "@/config";
 
 const POINTS = [
   {
@@ -18,24 +18,14 @@ const POINTS = [
   },
 ] as const;
 
-function logoSrc(): string {
-  try {
-    return Browser.runtime.getURL("assets/logo.svg");
-  } catch {
-    return "";
-  }
-}
-
 const FeatureStory = () => {
-  const logo = logoSrc();
-
   return (
     <div className="relative min-h-full bg-[#070807] px-5 py-8 sm:px-8 lg:px-10 lg:py-8 xl:px-14">
       <div className="setup-noise pointer-events-none absolute inset-0 opacity-[0.14]" />
       <div className="pointer-events-none absolute -left-24 top-0 h-[28rem] w-[28rem] rounded-full bg-[#00ff00]/15 blur-[120px]" />
       <div className="relative">
         <div>
-          {logo ? <img src={logo} alt="Waffy" className="h-10" /> : null}
+          <img src={LOGO_URL} alt="Waffy" className="h-10" />
 
           <p className="mt-6 font-mono text-xs font-medium uppercase tracking-[0.28em] text-[#00ff00]">
             Autonomous Browser Agent

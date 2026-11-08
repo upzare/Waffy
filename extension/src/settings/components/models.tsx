@@ -119,6 +119,17 @@ const STAGE_GROUPS: StageGroup[] = [
         label: "Step Model",
         description: "Creates short labels for each execution step",
       },
+      {
+        id: "memory",
+        label: "Memory Summarize Model",
+        description: "Turns your saved memories into the summary shown in Settings",
+        recommendation: (
+          <>
+            This runs only when you summarize saved memory. A small model is enough, and the
+            built-in browser model keeps that summary on this device.
+          </>
+        ),
+      },
     ],
   },
 ];
@@ -323,9 +334,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI && (
               <div className="flex min-w-0 flex-col gap-2">
                 <span className={fieldLabel}>Model</span>
-                <p className="text-sm text-text-secondary">
-                  {getBrowserAIModelLabel()}
-                </p>
+                <p className="text-sm text-text-secondary">{getBrowserAIModelLabel()}</p>
               </div>
             )}
 

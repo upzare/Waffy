@@ -14,6 +14,11 @@ import { defineReactCompilerLoaderOption, reactCompilerLoader } from "react-comp
 
 const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(EXTENSION_DIR, "..");
+const ONNX_DIST = path.dirname(fileURLToPath(import.meta.resolve("onnxruntime-web")));
+const ONNX_WASM_FILES = [
+  "ort-wasm-simd-threaded.asyncify.mjs",
+  "ort-wasm-simd-threaded.asyncify.wasm",
+];
 
 const MANIFEST = JSON.parse(
   fs.readFileSync(path.join(EXTENSION_DIR, "public", "manifest.json"), "utf8")
@@ -47,6 +52,7 @@ const config: webpack.Configuration = {
     content: path.join(EXTENSION_DIR, "src", "lib", "content.ts"),
     settings: path.join(EXTENSION_DIR, "src", "settings", "index.tsx"),
     setup: path.join(EXTENSION_DIR, "src", "setup", "index.tsx"),
+    release: path.join(EXTENSION_DIR, "src", "release", "index.tsx"),
     main: path.join(EXTENSION_DIR, "src", "panel", "index.tsx"),
   },
 
@@ -152,6 +158,10 @@ const config: webpack.Configuration = {
           to: path.join(ROOT_DIR, "build"),
           force: true,
         },
+        ...ONNX_WASM_FILES.map((file) => ({
+          from: path.join(ONNX_DIST, file),
+          to: path.join(ROOT_DIR, "build", "ort", file),
+        })),
       ],
     }),
     new HtmlWebpackPlugin({
@@ -170,6 +180,12 @@ const config: webpack.Configuration = {
       template: path.join(EXTENSION_DIR, "src", "setup", "setup.html"),
       filename: "setup.html",
       chunks: ["setup"],
+      cache: false,
+    }),
+    new HtmlWebpackPlugin({
+      template: path.join(EXTENSION_DIR, "src", "release", "release.html"),
+      filename: "release.html",
+      chunks: ["release"],
       cache: false,
     }),
   ].filter(Boolean),
