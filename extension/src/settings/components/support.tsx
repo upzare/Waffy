@@ -1,22 +1,23 @@
 import React from "react";
 import { ArrowUpRight, CircleAlert, Mail, MessageCircle } from "lucide-react";
+import { DISCORD_URL, GITHUB_ISSUES_URL, SUPPORT_EMAIL } from "@/config";
 
 const CHANNELS = [
   {
-    href: "https://github.com/upzare/Waffy/issues/new",
+    href: GITHUB_ISSUES_URL,
     label: "GitHub Issues",
     description: "Open a public bug report or feature request",
     icon: CircleAlert,
   },
   {
-    href: "https://dsc.gg/waffy",
+    href: DISCORD_URL,
     label: "Discord",
     description: "Chat with the community and the Waffy team",
     icon: MessageCircle,
   },
   {
-    href: "mailto:support@waffy.io",
-    label: "support@waffy.io",
+    href: `mailto:${SUPPORT_EMAIL}`,
+    label: SUPPORT_EMAIL,
     description: "Reach us directly by email",
     icon: Mail,
   },

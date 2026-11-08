@@ -11,11 +11,7 @@ import "@fontsource/jetbrains-mono/latin-500.css";
 import "@/stylesheets/globals.css";
 import "@/setup/setup.css";
 import "./release.css";
-
-const RELEASE_NOTES_URL = "https://x-version.waffy.io";
-const WEBSTORE_LINK = "https://chromewebstore.google.com/detail/waffy-ai-copilot-for-web/badjijohkpnecfhjkondhcgacchekldm";
-const GITHUB_LINK = "https://github.com/upzare/Waffy";
-const FOUNDER_LINK = "https://x.com/aravindmanoj_";
+import { FOUNDER_URL, GITHUB_URL, LOGO_URL, X_VERSION_URL, WEBSTORE_URL } from "@/config";
 
 const streamdownPlugins = { code };
 const streamdownControls = {
@@ -32,29 +28,19 @@ function extensionVersion(): string {
   }
 }
 
-function logoSrc(): string {
-  try {
-    return Browser.runtime.getURL("assets/logo.svg");
-  } catch {
-    return "";
-  }
-}
-
 const fetchReleaseNotes = async (version: string) => {
-  const url = new URL(RELEASE_NOTES_URL);
+  const url = new URL(X_VERSION_URL);
   url.searchParams.set("version", version);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Release notes request failed (${response.status})`);
   }
   const result = await response.json();
-  console.log(result);
-  return result.markdown;
+  return result.notes;
 }
 
 const Release = () => {
   const version = extensionVersion();
-  const logo = logoSrc();
   const [notes, setNotes] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,7 +56,7 @@ const Release = () => {
           <div className="setup-noise pointer-events-none absolute inset-0 opacity-15" />
           <div className="pointer-events-none absolute -left-24 top-0 size-96 rounded-full bg-[#00ff00]/10 blur-3xl" />
           <div className="relative">
-            {logo ? <img src={logo} alt="Waffy" className="h-10" /> : null}
+            <img src={LOGO_URL} alt="Waffy" className="h-10" />
             <p className="mt-10 font-mono text-xs font-medium uppercase tracking-widest text-[#00ff00]">
               {version ? `Version ${version}` : "Release"}
             </p>
@@ -88,7 +74,7 @@ const Release = () => {
                 I've been trying to ship as many features as I can. Getting each one right takes
                 longer than it looks. If Waffy is useful to you, kindly star the repo on{" "}
                 <a
-                  href={GITHUB_LINK}
+                  href={GITHUB_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="underline underline-offset-3"
@@ -97,7 +83,7 @@ const Release = () => {
                 </a>{" "}
                 and leave a review on the{" "}
                 <a
-                  href={WEBSTORE_LINK}
+                  href={WEBSTORE_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="underline underline-offset-3"
@@ -109,7 +95,7 @@ const Release = () => {
               <Quote size={28} className="mt-3 ml-auto text-[#00ff00]" aria-hidden="true" />
               <figcaption className="mt-2 text-right">
                 <span className="block text-base font-bold text-white">
-                  <a href={FOUNDER_LINK} target="_blank" rel="noreferrer">
+                  <a href={FOUNDER_URL} target="_blank" rel="noreferrer">
                     Aravind Manoj
                   </a>
                 </span>

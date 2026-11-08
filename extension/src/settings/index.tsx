@@ -20,9 +20,9 @@ import ModelsSection from "./components/models";
 import SupportSection from "./components/support";
 import AboutSection from "./components/about";
 import { thinScroll } from "./styles";
+import { LOGO_URL } from "@/config";
 
 const SAVE_DELAY_MS = 400;
-const LOGO_URL = Browser.runtime.getURL("assets/logo.svg");
 
 const SECTIONS = [
   {
@@ -327,7 +327,7 @@ const Settings = () => {
       case "support":
         return <SupportSection />;
       case "about":
-        return <AboutSection logoUrl={LOGO_URL} />;
+        return <AboutSection />;
     }
   };
 
