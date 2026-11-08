@@ -4,7 +4,7 @@ export const DEFAULT_FEATURES: FeatureFlags = {
   featureSearch: true,
   featureResearch: true,
   featureAutomation: false,
-  featureMemory: true,
+  featureMemory: false,
 };
 
 /** Model stages owned by an optional feature. Stages left out are always active. */

@@ -69,6 +69,8 @@ Browser.runtime.onInstalled.addListener(async (details) => {
     await Promise.all([initClient(), initSettings()]);
     if (details.reason === "install") {
       await Browser.tabs.create({ url: Browser.runtime.getURL("setup.html") });
+    } else if (details.reason === "update") {
+      await Browser.tabs.create({ url: Browser.runtime.getURL("release.html") });
     }
   } catch (error) {
     console.error("Failed to initialize extension:", error);

@@ -762,7 +762,7 @@ const FinishStep = ({
       <StepHeading
         eyebrow="05 · Finish"
         title="Turn on what you need."
-        body="Search, research, and memory start on. Automation stays off until you want the browser to act."
+        body="Pick the features you want Waffy to use. You can change them anytime in settings."
       />
       <div className="mt-8 flex flex-col divide-y divide-white/10 rounded-2xl border border-white/12 bg-white/6">
         {FEATURE_TOGGLES.map((toggle) => (
