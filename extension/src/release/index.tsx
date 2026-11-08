@@ -12,8 +12,7 @@ import "@/stylesheets/globals.css";
 import "@/setup/setup.css";
 import "./release.css";
 
-// const RELEASE_NOTES_URL = "https://x-version.waffy.io";
-const RELEASE_NOTES_URL = "https://waffy-x-version-api.upzare.workers.dev";
+const RELEASE_NOTES_URL = "https://x-version.waffy.io";
 const WEBSTORE_LINK = "https://chromewebstore.google.com/detail/waffy-ai-copilot-for-web/badjijohkpnecfhjkondhcgacchekldm";
 const GITHUB_LINK = "https://github.com/upzare/Waffy";
 const FOUNDER_LINK = "https://x.com/aravindmanoj_";
