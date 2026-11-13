@@ -6,8 +6,8 @@ export type PromptBuilder = (flags: FeatureFlags) => string;
 const getBasePrompt: PromptBuilder = ({ featureSearch, featureAutomation }) => {
   const tools = [
     "`getPageInfo` — URL, title, and load status of the active tab",
-    "`getPageContent` — page text as Markdown (prefer for summaries, quotes, Q&A)",
-    "`captureScreenshot` — visible tab image (layout, UI, charts; not for text tasks)",
+    "`getPageContent` — page text as Markdown (first call for summaries, quotes, Q&A)",
+    "`captureScreenshot` — visible tab image. Call it immediately to look at or describe the screen. After `getPageContent`, also call it when that Markdown is too thin to answer from.",
     featureSearch &&
     "`webSearch` — titles, URLs, and snippets for live facts; pass a short keyword query (not the raw prompt); call more than once if needed",
     featureSearch &&
@@ -16,7 +16,7 @@ const getBasePrompt: PromptBuilder = ({ featureSearch, featureAutomation }) => {
   ].filter((line): line is string => Boolean(line));
 
   const routes = [
-    'Page text (summarize, explain, quote, extract, Q&A about "this page") → call `getPageContent` immediately, then answer.',
+    'Page text (summarize, explain, quote, extract, Q&A about "this page") → call `getPageContent` immediately. If that Markdown is short, mostly navigation or chrome, or does not represent the page (dashboards, canvas, charts, image-heavy or app layouts), call `captureScreenshot` before answering and use the Markdown and the image together.',
     'Visual need (layout, UI, chart image, "look at / describe the screen") → call `captureScreenshot` immediately, then describe.',
     featureSearch &&
     "Beyond your knowledge, needs latest facts, live events, or an explicit search request → call `webSearch` immediately with a short keyword query (not the raw prompt; use several queries if needed), then `webFetch` on the best hit before answering. Never guess; do not treat snippets as full page content.",
@@ -85,8 +85,8 @@ If anything is asked beyond your knowledge, or must be latest, call \`webSearch\
 - Call \`webSearch\` multiple times with different queries when the question has several parts, first results are weak, or another angle is needed. You may issue several searches in one turn.
 
 **DECISION TREE** (pick the first match)
-1. Research / summarize / extract from "this page" or the active tab → call \`getPageContent\`, then synthesize.
-2. Visual evidence (charts as images, UI, diagrams, "look at the screen") → call \`captureScreenshot\`. You can see screenshots.
+1. Research / summarize / extract from "this page" or the active tab → call \`getPageContent\` first. If that Markdown is short, mostly navigation or chrome, or does not represent the page (dashboards, canvas, charts, image-heavy or app layouts), call \`captureScreenshot\` before answering, then synthesize from the Markdown and the image together.
+2. Visual evidence (charts as images, UI, diagrams, "look at the screen") → call \`captureScreenshot\` immediately. You can see screenshots.
 3. Page is insufficient, beyond your knowledge, needs latest facts, live events, or user asks to search → call \`webSearch\` with short keyword queries (several if needed), then \`webFetch\` the most relevant URL when snippets are not enough. Do not invent facts if search is empty.
 4. Only answer from knowledge when you are certain it is complete and still current.
 

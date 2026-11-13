@@ -1,5 +1,6 @@
 import Browser from "webextension-polyfill";
 import type { Runtime } from "webextension-polyfill";
+import { X_VERSION_URL } from "@/config";
 import {
   disableOverlay,
   enableOverlay,
@@ -20,6 +21,17 @@ import { initClient, initSettings } from "./client";
 const stopGeneration = async () => {
   await Promise.all([closeOwnedTabs(), stopSession()]);
   return { status: "success" };
+};
+
+const releaseNotesAvailable = async () => {
+  try {
+    const url = new URL(X_VERSION_URL);
+    url.searchParams.set("version", Browser.runtime.getManifest().version);
+    const response = await fetch(url);
+    return response.status === 200;
+  } catch {
+    return false;
+  }
 };
 
 registerAutomationListeners();
@@ -69,7 +81,7 @@ Browser.runtime.onInstalled.addListener(async (details) => {
     await Promise.all([initClient(), initSettings()]);
     if (details.reason === "install") {
       await Browser.tabs.create({ url: Browser.runtime.getURL("setup.html") });
-    } else if (details.reason === "update") {
+    } else if (details.reason === "update" && (await releaseNotesAvailable())) {
       await Browser.tabs.create({ url: Browser.runtime.getURL("release.html") });
     }
   } catch (error) {

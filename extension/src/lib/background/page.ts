@@ -149,7 +149,7 @@ export const captureVisibleTab = async (tabId: unknown) => {
     return { status: "error", message: errorMessage(e) };
   } finally {
     if (previousTabId != null) {
-      await Browser.tabs.update(previousTabId, { active: true }).catch(() => {});
+      await Browser.tabs.update(previousTabId, { active: true }).catch(() => { });
     }
   }
 };
