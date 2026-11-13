@@ -14,12 +14,12 @@ export const BASE_TOOLS = {
   }),
   captureScreenshot: tool({
     description:
-      "Capture a screenshot image of the visible active tab for visual context only (layout, UI, charts as images, or when the user asks you to look at / describe the screen). Do not use for summarization or text Q&A — prefer getPageContent instead.",
+      "Capture a screenshot of the visible active tab. Call it to look at or describe the screen.",
     inputSchema: z.object({}),
   }),
   getPageContent: tool({
     description:
-      "Read the main content of the currently active browser tab as Markdown. No URL or pasted text needed — it always targets the active tab. Call this immediately to summarize, explain, extract, or answer questions about the current page. Prefer over captureScreenshot for text tasks.",
+      "Read the main content of the currently active browser tab as Markdown. No URL or pasted text needed — it always targets the active tab. Call this immediately to summarize, explain, extract, or answer questions about the current page.",
     inputSchema: z.object({}),
   }),
   webSearch: tool({

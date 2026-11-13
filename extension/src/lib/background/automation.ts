@@ -22,7 +22,7 @@ const setOverlay = (tabId: number, enabled: boolean) => {
       type: "INTERACT_DOM",
       name: enabled ? "SHOW_OVERLAY" : "HIDE_OVERLAY",
     })
-    .catch(() => {});
+    .catch(() => { });
   overlayInfo[tabId] = enabled;
 };
 
