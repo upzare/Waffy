@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
-import Browser from "webextension-polyfill";
+import { EXTENSION_VERSION } from "@/config";
 import { Quote } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
@@ -20,14 +20,6 @@ const streamdownControls = {
   mermaid: false,
 } as const;
 
-function extensionVersion(): string {
-  try {
-    return Browser.runtime.getManifest().version;
-  } catch {
-    return "";
-  }
-}
-
 const fetchReleaseNotes = async (version: string) => {
   const url = new URL(X_VERSION_URL);
   url.searchParams.set("version", version);
@@ -40,14 +32,13 @@ const fetchReleaseNotes = async (version: string) => {
 }
 
 const Release = () => {
-  const version = extensionVersion();
   const [notes, setNotes] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchReleaseNotes(version)
+    fetchReleaseNotes(EXTENSION_VERSION)
       .then((content) => setNotes(content))
       .catch(() => setNotes("Release notes not found"));
-  }, [version]);
+  }, [EXTENSION_VERSION]);
 
   return (
     <div className="setup-root overflow-x-hidden">
@@ -58,7 +49,7 @@ const Release = () => {
           <div className="relative">
             <img src={LOGO_URL} alt="Waffy" className="h-10" />
             <p className="mt-10 font-mono text-xs font-medium uppercase tracking-widest text-[#00ff00]">
-              {version ? `Version ${version}` : "Release"}
+              {EXTENSION_VERSION ? `Version ${EXTENSION_VERSION}` : "Release"}
             </p>
             <h1 className="mt-7 text-6xl font-bold leading-none tracking-tight">
               Waffy just

@@ -8,6 +8,8 @@ const assetUrl = (path: string) => {
   }
 };
 
+export const EXTENSION_VERSION = Browser.runtime.getManifest().version;
+
 export const LOGO_URL = assetUrl("assets/logo.svg");
 export const CURSOR_URL = assetUrl("shared/cursor.png");
 

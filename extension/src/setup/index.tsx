@@ -8,6 +8,7 @@ import "@fontsource/space-grotesk/latin-700.css";
 import "@fontsource/jetbrains-mono/latin-500.css";
 import "@/stylesheets/globals.css";
 import "./setup.css";
+import { PRIVACY_URL, TERMS_URL } from "@/config";
 import { getAppSettings, saveAppSettings } from "@/lib/client";
 import { DEFAULT_FEATURES } from "@/lib/features";
 import {
@@ -128,6 +129,7 @@ const Onboarding = () => {
   const [featureResearch, setFeatureResearch] = useState(DEFAULT_FEATURES.featureResearch);
   const [featureAutomation, setFeatureAutomation] = useState(DEFAULT_FEATURES.featureAutomation);
   const [featureMemory, setFeatureMemory] = useState(DEFAULT_FEATURES.featureMemory);
+  const [analytics, setAnalytics] = useState(true);
   const [browserStatus, setBrowserStatus] = useState<BrowserAIStatus | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloading, setDownloading] = useState(false);
@@ -219,6 +221,7 @@ const Onboarding = () => {
         featureResearch,
         featureAutomation,
         featureMemory,
+        analytics,
         models: assignStages(provider, modelId),
         customApi:
           provider === "custom"
@@ -284,7 +287,9 @@ const Onboarding = () => {
                     Step {step + 1} of {STEPS.length}: {STEPS[step]}
                   </p>
 
-                  {step === 0 ? <WelcomeStep /> : null}
+                  {step === 0 ? (
+                    <WelcomeStep analytics={analytics} onAnalytics={setAnalytics} />
+                  ) : null}
                   {step === 1 ? (
                     <ProviderStep provider={provider} onChoose={chooseProvider} />
                   ) : null}
@@ -365,7 +370,13 @@ const Onboarding = () => {
   );
 };
 
-const WelcomeStep = () => (
+const WelcomeStep = ({
+  analytics,
+  onAnalytics,
+}: {
+  analytics: boolean;
+  onAnalytics: (value: boolean) => void;
+}) => (
   <div>
     <div className="lg:hidden">
       <FeatureStory />
@@ -382,6 +393,39 @@ const WelcomeStep = () => (
         on this device. You can change any of this later.
       </p>
     </div>
+    <label className="mt-8 flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-white/12 bg-white/6 px-4 py-4">
+      <span>
+        <span className="block text-sm leading-snug text-white/70">
+          Help us improve Waffy by sending anonymous usage data.
+        </span>
+        <span className="mt-2 block text-sm text-white/45">
+          <a
+            href={PRIVACY_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#00ff00] hover:text-white"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Privacy
+          </a>
+          <span className="px-1.5 text-white/25">·</span>
+          <a
+            href={TERMS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#00ff00] hover:text-white"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Terms
+          </a>
+        </span>
+      </span>
+      <Switch
+        checked={analytics}
+        onCheckedChange={onAnalytics}
+        className="mt-0.5 data-checked:bg-[#00ff00]"
+      />
+    </label>
   </div>
 );
 

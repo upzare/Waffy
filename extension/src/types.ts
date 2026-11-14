@@ -145,6 +145,7 @@ export interface Settings {
   featureResearch: boolean;
   featureAutomation: boolean;
   featureMemory: boolean;
+  analytics: boolean;
   pinnedPrompts: string[];
   models: Partial<Record<StageId, ModelConfig>>;
   customApi: CustomApiConfig;
