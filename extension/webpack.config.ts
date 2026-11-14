@@ -146,7 +146,8 @@ const config: webpack.Configuration = {
     new webpack.ProgressPlugin(),
     new webpack.EnvironmentPlugin(["NODE_ENV"]),
     new Dotenv({
-      prefix: "import.meta.env."
+      prefix: "import.meta.env.",
+      systemvars: true,
     }),
     new ZipPlugin({
       filename: `${MANIFEST.name}-${MANIFEST.version}.zip`,
