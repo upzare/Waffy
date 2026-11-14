@@ -12,5 +12,6 @@ export const startAnalytics = () => {
       api_host: import.meta.env.POSTHOG_HOST,
       disable_external_dependency_loading: true,
       persistence: "localStorage",
+      autocapture: false,
     });
 };
