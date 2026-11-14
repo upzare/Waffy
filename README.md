@@ -11,7 +11,9 @@ It runs on Chromium browsers (Chrome, Edge, Brave, Opera, and others). You choos
 
 Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/waffy-ai-copilot-for-web/badjijohkpnecfhjkondhcgacchekldm), or [build it from source](#getting-started).
 
-![Waffy side panel](https://waffy.io/ui.gif)
+<div align="center">
+  <img width="auto" height="500" alt="ui" src="https://github.com/user-attachments/assets/6b67d739-8fe0-4d0e-a7dc-66cd9ce8d2a3" />
+</div>
 
 ## Features
 
