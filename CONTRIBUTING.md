@@ -13,7 +13,7 @@ Thank you for your interest in contributing to Waffy. This project is maintained
 
 1. Search existing issues and pull requests to avoid duplicate work.
 2. For large changes, open an issue first to discuss the approach.
-3. Keep pull requests focused — one feature or fix per PR when possible.
+3. Keep pull requests focused. One feature or fix per PR when possible.
 
 ## Development setup
 
