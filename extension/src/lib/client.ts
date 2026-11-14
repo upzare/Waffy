@@ -33,6 +33,7 @@ export const DEFAULT_CUSTOM_API: CustomApiConfig = {
 
 export const DEFAULT_SETTINGS: Settings = {
   ...DEFAULT_FEATURES,
+  analytics: true,
   pinnedPrompts: [...DEFAULT_PINNED_PROMPTS],
   models: { ...DEFAULT_MODELS },
   customApi: { ...DEFAULT_CUSTOM_API },

@@ -20,6 +20,7 @@ import {
   secondaryButton,
 } from "../styles";
 import type { FeatureFlags, Settings } from "@/types";
+import { PRIVACY_URL, TERMS_URL } from "@/config";
 
 interface GeneralSectionProps {
   settings: Settings;
@@ -130,6 +131,39 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
               />
             </label>
           ))}
+        </div>
+      </div>
+
+      <div className={panel}>
+        <div className="mb-4">
+          <h3 className={panelTitle}>Anonymous analytics</h3>
+          <p className={panelSubtitle}>
+            Send anonymous usage data to help improve this product. This will not include any of your personal information, chat or API keys.
+            Please read our{" "}
+            <a href={PRIVACY_URL} target="_blank" rel="noreferrer" className="underline">
+              Privacy Policy
+            </a>
+            {" "}and{" "}
+            <a href={TERMS_URL} target="_blank" rel="noreferrer" className="underline">
+              Terms
+            </a>
+            {" "}for more information.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1 rounded-sm border border-border bg-black/20 px-3.5 py-1">
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-1 py-2.5 transition-colors duration-150 hover:bg-black/20">
+            <span className="text-sm font-medium text-text-primary">
+              Help us improve this product
+            </span>
+            <Switch
+              size="sm"
+              checked={settings.analytics}
+              onCheckedChange={(checked) =>
+                setSettings((prev) => ({ ...prev, analytics: checked }))
+              }
+            />
+          </label>
         </div>
       </div>
 

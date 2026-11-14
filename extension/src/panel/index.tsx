@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { v4 as uuid4 } from "uuid";
 import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
-import { TriangleAlert, WrenchOff } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { AI, createTitle } from "@/lib/agent";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
@@ -59,6 +59,7 @@ import {
 import type { StreamSession } from "@/lib/llm/stream";
 import { errorMessage, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import type { ExtensionMessage } from "@/lib/llm/messages";
+import { startAnalytics } from "@/lib/posthog";
 import HistorySidebar from "./components/history-sidebar";
 import WorkingDialog from "./components/working-dialog";
 import Hero from "./components/hero";
@@ -189,6 +190,10 @@ const App = () => {
 
   useEffect(() => {
     if (!appSettings) return;
+
+    if (appSettings.settings.analytics) {
+      startAnalytics();
+    }
 
     chrome.storage.onChanged.addListener(onStorageChanged);
     void consumePendingAction().then((handled) => {

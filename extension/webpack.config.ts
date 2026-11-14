@@ -7,6 +7,7 @@ import HtmlWebpackPlugin from "html-webpack-plugin";
 import TerserPlugin from "terser-webpack-plugin";
 import { CleanWebpackPlugin } from "clean-webpack-plugin";
 import ReactRefreshWebpackPlugin from "@pmmmwh/react-refresh-webpack-plugin";
+import Dotenv from "dotenv-webpack";
 import ZipPlugin from "zip-webpack-plugin";
 import LicensePlugin from "webpack-license-plugin";
 import ReactRefreshTypeScript from "react-refresh-typescript";
@@ -144,6 +145,10 @@ const config: webpack.Configuration = {
     new CleanWebpackPlugin({ verbose: false }),
     new webpack.ProgressPlugin(),
     new webpack.EnvironmentPlugin(["NODE_ENV"]),
+    new Dotenv({
+      prefix: "import.meta.env.",
+      systemvars: true,
+    }),
     new ZipPlugin({
       filename: `${MANIFEST.name}-${MANIFEST.version}.zip`,
       path: path.join(ROOT_DIR, ".output"),

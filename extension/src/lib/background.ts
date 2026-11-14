@@ -1,6 +1,6 @@
 import Browser from "webextension-polyfill";
 import type { Runtime } from "webextension-polyfill";
-import { X_VERSION_URL } from "@/config";
+import { EXTENSION_VERSION, X_VERSION_URL } from "@/config";
 import {
   disableOverlay,
   enableOverlay,
@@ -26,7 +26,7 @@ const stopGeneration = async () => {
 const releaseNotesAvailable = async () => {
   try {
     const url = new URL(X_VERSION_URL);
-    url.searchParams.set("version", Browser.runtime.getManifest().version);
+    url.searchParams.set("version", EXTENSION_VERSION);
     const response = await fetch(url);
     return response.status === 200;
   } catch {
