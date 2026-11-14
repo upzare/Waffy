@@ -1,6 +1,6 @@
 # Contributing to Waffy
 
-Thank you for your interest in contributing to Waffy. This project is maintained by [Waffy AI](https://waffy.io) and licensed under the [Apache License 2.0](LICENSE).
+Thank you for your interest in contributing to Waffy. This project is maintained by [Waffy.io](https://waffy.io) and licensed under the [Apache License 2.0](LICENSE).
 
 ## Ways to contribute
 
@@ -35,8 +35,6 @@ Load the `build/` directory as an unpacked extension in `chrome://extensions/`, 
    bun run build
    ```
 
-```
-
 3. Write a clear PR description explaining what changed and why.
 4. Link any related issues (e.g. `Fixes #123`).
 5. Ensure you are not committing secrets, API keys, or `.env` files.
@@ -58,7 +56,7 @@ Include as much detail as possible:
 - Expected vs actual behavior
 - Screenshots or console errors if relevant
 
-Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml) when filing issues.
+File the report on [GitHub Issues](https://github.com/upzare/Waffy/issues).
 
 ## Security issues
 
@@ -67,4 +65,3 @@ Please do **not** open public issues for security vulnerabilities. See [SECURITY
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE).
-```
