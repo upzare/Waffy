@@ -206,7 +206,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
 
     return (
       <div
-        className="overflow-hidden rounded-md border border-border bg-surface-2 transition-colors duration-150 hover:border-border-strong"
+        className="overflow-hidden rounded-2xl border border-white/12 bg-white/6 backdrop-blur-[18px] transition-colors duration-150 hover:border-white/25"
         key={id}
       >
         <button
@@ -216,7 +216,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
           aria-expanded={isExpanded}
         >
           <div className="min-w-0 flex-1">
-            <span className="text-sm font-semibold">{label}</span>
+            <span className="text-sm font-bold tracking-[-0.02em]">{label}</span>
             <p className="mt-0.5 text-xs leading-snug text-text-muted">{description}</p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
@@ -232,7 +232,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
         </button>
 
         {isExpanded && (
-          <div className="flex animate-fade-in flex-col gap-4 border-t border-border px-4 py-4 sm:px-5 sm:pb-5">
+          <div className="flex animate-fade-in flex-col gap-4 border-t border-white/10 px-4 py-4 sm:px-5 sm:pb-5">
             {isBrowserAI
               ? renderBrowserAIWarning()
               : keyMissing && (
@@ -380,8 +380,8 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
       {visibleGroups.map((group) => (
         <div className="mb-7" key={group.title}>
           <div className="mb-3">
-            <h3 className="mb-0.5 text-sm font-semibold">{group.title}</h3>
-            <p className="text-sm leading-snug text-text-muted">{group.subtitle}</p>
+            <h3 className="mb-0.5 text-sm font-bold tracking-[-0.02em]">{group.title}</h3>
+            <p className="text-sm leading-relaxed text-white/45">{group.subtitle}</p>
           </div>
           <div className="flex flex-col gap-2.5">
             {group.stages.map((stage) => renderStageCard(stage))}

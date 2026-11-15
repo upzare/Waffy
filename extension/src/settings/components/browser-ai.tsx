@@ -5,6 +5,7 @@ import {
   getBrowserAIStatus,
   type BrowserAIStatus,
 } from "@/lib/llm/browser-ai";
+import { secondaryButton } from "../styles";
 import { BROWSER_AI_PROVIDER } from "../providers";
 
 interface BrowserAISectionProps {
@@ -20,9 +21,10 @@ const STATUS_LABELS: Record<BrowserAIStatus, string> = {
 };
 
 function getStatusBadgeClass(status: BrowserAIStatus): string {
-  const base = "w-fit shrink-0 self-start rounded border px-1.5 py-0.5 text-xs font-medium";
+  const base =
+    "w-fit shrink-0 self-start rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em]";
   if (status === "available") {
-    return `${base} border-green-border bg-green-dim text-green`;
+    return `${base} border-[#00ff00]/40 text-[#00ff00]`;
   }
   if (status === "unsupported" || status === "unavailable") {
     return `${base} border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.08)] text-[#f87171]`;
@@ -72,10 +74,10 @@ const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) =
   const progressPercent = Math.round(downloadProgress * 100);
 
   return (
-    <div className="mb-6 flex flex-col gap-3 rounded-md border border-border bg-surface-2 px-4 py-4.5 sm:px-5">
+    <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-white/12 bg-white/6 px-4 py-4 backdrop-blur-[18px] sm:px-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold leading-tight text-text-primary">
+          <h3 className="text-sm font-bold leading-tight tracking-[-0.02em]">
             {BROWSER_AI_PROVIDER.label}
           </h3>
           <p className="mt-0.5 text-xs leading-snug text-text-muted">
@@ -118,7 +120,7 @@ const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) =
         {(status === "downloadable" || status === "downloading") && (
           <button
             type="button"
-            className="self-start rounded-sm border border-border-strong bg-white/6 px-3.5 py-2 text-sm font-medium text-text-primary transition-colors duration-150 hover:enabled:border-green-border hover:enabled:bg-white/10 disabled:cursor-not-allowed disabled:opacity-55"
+            className={`${secondaryButton} self-start disabled:cursor-not-allowed disabled:opacity-40`}
             onClick={handleDownload}
             disabled={isDownloading}
           >
@@ -134,14 +136,14 @@ const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) =
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label="Model download progress"
-              className="h-1.5 w-full overflow-hidden rounded-full bg-white/6"
+              className="h-1.5 w-full overflow-hidden rounded-full bg-white/10"
             >
               <div
-                className="h-full rounded-full bg-green transition-[width] duration-200"
+                className="h-full rounded-full bg-[#00ff00] transition-[width] duration-200"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-xs leading-tight text-text-muted">{progressPercent}% complete</p>
+            <p className="font-mono text-[11px] text-white/40">{progressPercent}% complete</p>
           </div>
         )}
       </div>

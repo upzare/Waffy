@@ -1,0 +1,12 @@
+:root {
+  --font-sans: "Space Grotesk", Inter, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-green: #00ff00;
+  --color-green-dim: rgba(0, 255, 0, 0.15);
+  --color-green-border: rgba(0, 255, 0, 0.4);
+  --color-surface-1: #070807;
+  --color-surface-2: rgba(255, 255, 255, 0.06);
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1rem;
+}
