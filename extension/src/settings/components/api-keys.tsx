@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ExternalLink, Eye, EyeOff } from "lucide-react";
 import { hasApiKey, PROVIDERS } from "../providers";
 import type { ApiKeys } from "@/types";
-import { monoInput } from "../styles";
+import { badgeOff, badgeOn, monoInput, revealButton } from "../styles";
 
 interface ApiKeysSectionProps {
   apiKeys: ApiKeys;
@@ -26,24 +26,18 @@ const ApiKeysSection: React.FC<ApiKeysSectionProps> = ({ apiKeys, setApiKeys }) 
         return (
           <div
             key={provider.id}
-            className="flex flex-col gap-3.5 rounded-md border border-border bg-surface-2 px-4 py-4.5 transition-colors duration-150 hover:border-border-strong sm:px-5"
+            className="flex flex-col gap-3.5 rounded-2xl border border-white/12 bg-white/6 px-4 py-4 backdrop-blur-[18px] transition-colors duration-150 hover:border-white/25 sm:px-5"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-sm font-semibold leading-tight text-text-primary">
+                <div className="text-sm font-bold leading-tight tracking-[-0.02em]">
                   {provider.label}
                 </div>
-                <div className="mt-0.5 text-xs leading-snug text-text-muted">
+                <div className="mt-1 text-sm leading-snug text-white/45">
                   {provider.description}
                 </div>
               </div>
-              <span
-                className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium ${
-                  isConfigured
-                    ? "border-green-border bg-green-dim text-green"
-                    : "border-border bg-white/4 text-text-muted"
-                }`}
-              >
+              <span className={isConfigured ? badgeOn : badgeOff}>
                 {isConfigured ? "Available" : "N / A"}
               </span>
             </div>
@@ -60,7 +54,7 @@ const ApiKeysSection: React.FC<ApiKeysSectionProps> = ({ apiKeys, setApiKeys }) 
               />
               <button
                 type="button"
-                className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-sm text-text-muted transition-colors duration-150 hover:bg-white/6 hover:text-text-primary"
+                className={revealButton}
                 onClick={() => toggleVisibility(provider.id)}
                 aria-label={isVisible ? "Hide API key" : "Show API key"}
               >
@@ -72,7 +66,7 @@ const ApiKeysSection: React.FC<ApiKeysSectionProps> = ({ apiKeys, setApiKeys }) 
               href={provider.docsUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex w-fit items-center gap-1 text-xs font-medium text-text-secondary no-underline transition-colors duration-150 hover:text-text-primary hover:underline"
+              className="inline-flex w-fit items-center gap-1 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#00ff00] no-underline transition-colors duration-150 hover:text-white"
             >
               Get API key <ExternalLink size={13} />
             </a>

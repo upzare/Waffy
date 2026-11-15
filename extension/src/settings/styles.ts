@@ -1,38 +1,49 @@
-/** Shared Tailwind class strings for the settings UI. */
+export const panel =
+  "mb-4 rounded-2xl border border-white/12 bg-white/6 px-4 py-5 backdrop-blur-[18px] sm:px-5";
 
-export const panel = "mb-4 rounded-md border border-border bg-surface-2 px-4 py-5 sm:px-5";
+export const panelTitle = "mb-1 text-base font-bold tracking-[-0.02em]";
 
-export const panelTitle = "mb-1 text-base font-semibold tracking-tight";
+export const panelSubtitle = "text-sm leading-relaxed text-white/45";
 
-export const panelSubtitle = "text-sm text-text-muted";
+export const fieldLabel = "text-sm font-medium text-white/70";
 
-export const fieldLabel = "text-sm font-medium text-text-secondary";
+export const textInput =
+  "w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-sm text-white outline-none transition-[border-color,box-shadow] placeholder:text-white/30 focus:border-[#00ff00]/70 focus:shadow-[0_0_0_3px_rgba(0,255,0,0.12)]";
 
-export const monoInput =
-  "w-full rounded-sm border border-border-strong bg-black/40 px-3 py-2.5 font-mono text-sm text-text-primary transition-[border-color] duration-150 placeholder:font-sans placeholder:text-text-muted focus:border-green-border focus:shadow-[0_0_0_2px_var(--color-green-dim)] focus:outline-none";
+export const monoInput = `${textInput} font-mono placeholder:font-sans`;
 
-export const selectInput = `${monoInput} cursor-pointer appearance-none pr-9`;
+export const selectInput = `${monoInput} cursor-pointer appearance-none pr-10`;
 
 export const alertError =
-  "flex items-center gap-2 rounded-sm border border-red-border bg-red-dim px-3.5 py-3 text-xs text-red";
+  "flex items-center gap-2 rounded-2xl border border-red-border bg-red-dim px-4 py-3 text-sm text-red";
 
 export const alertInfo =
-  "flex items-start gap-2 rounded-sm border border-[rgba(59,130,246,0.25)] bg-[rgba(59,130,246,0.08)] px-3.5 py-3 text-xs leading-snug text-text-secondary [&_strong]:font-semibold [&_strong]:text-text-primary [&_svg]:mt-0.5 [&_svg]:shrink-0 [&_svg]:text-[#60a5fa]";
+  "flex items-start gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white/60 [&_strong]:font-semibold [&_strong]:text-white [&_svg]:mt-0.5 [&_svg]:shrink-0 [&_svg]:text-[#00ff00]";
 
 export const iconBox =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-white/5 text-text-secondary";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/8 text-white/55";
 
 export const iconButton =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-border text-text-muted transition-[color,border-color,background] duration-150 hover:enabled:border-[rgba(248,113,113,0.35)] hover:enabled:bg-[rgba(248,113,113,0.08)] hover:enabled:text-[#f87171] disabled:cursor-not-allowed disabled:opacity-35";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 text-white/45 transition-colors duration-150 hover:enabled:border-[#ff5c5c]/40 hover:enabled:bg-[#ff5c5c]/10 hover:enabled:text-[#ff5c5c] disabled:cursor-not-allowed disabled:opacity-35";
+
+export const revealButton =
+  "absolute right-2 flex h-8 w-8 items-center justify-center rounded-full text-white/45 transition-colors duration-150 hover:bg-white/10 hover:text-white";
 
 export const primaryButton =
-  "rounded-sm border border-green-border bg-green-dim px-5 py-2 text-sm font-semibold text-green transition-[background,border-color] duration-150 hover:border-[rgba(0,255,128,0.45)] hover:bg-[rgba(0,255,128,0.2)]";
+  "inline-flex items-center justify-center rounded-full border border-[#00ff00] bg-[#00ff00] px-5 py-2 text-sm font-bold text-black transition-colors duration-300 hover:border-white hover:bg-white";
 
 export const secondaryButton =
-  "rounded-sm border border-border-strong px-4 py-2 text-sm font-medium text-text-secondary transition-[background,color] duration-150 hover:bg-white/[0.04] hover:text-text-primary";
+  "inline-flex items-center justify-center rounded-full border border-white/15 bg-white/6 px-4 py-2 text-sm font-bold text-white backdrop-blur-[18px] transition-colors duration-300 hover:bg-white/10";
 
 export const dangerButton =
-  "rounded-sm border border-red-border px-4 py-2 text-sm font-medium text-red transition-colors duration-150 hover:bg-red-dim";
+  "inline-flex items-center justify-center rounded-full border border-red-border px-4 py-2 text-sm font-bold text-red transition-colors duration-150 hover:bg-red-dim";
+
+export const badge =
+  "shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em]";
+
+export const badgeOn = `${badge} border-[#00ff00]/40 text-[#00ff00]`;
+
+export const badgeOff = `${badge} border-white/15 text-white/40`;
 
 export const thinScroll =
-  "[scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.22)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/30";
+  "[scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.22)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/30";

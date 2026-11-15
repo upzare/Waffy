@@ -2,7 +2,17 @@ import React, { useState } from "react";
 import { Eye, EyeOff, Info } from "lucide-react";
 import Browser from "webextension-polyfill";
 import type { ApiKeys, Settings } from "@/types";
-import { alertInfo, fieldLabel, monoInput, panel, panelSubtitle, panelTitle } from "../styles";
+import {
+  alertInfo,
+  badgeOff,
+  badgeOn,
+  fieldLabel,
+  monoInput,
+  panel,
+  panelSubtitle,
+  panelTitle,
+  revealButton,
+} from "../styles";
 
 interface CustomApiSectionProps {
   settings: Settings;
@@ -40,12 +50,7 @@ const CustomApiSection: React.FC<CustomApiSectionProps> = ({
             runtimes like Ollama and LM Studio.
           </p>
         </div>
-        <span
-          className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium ${isConfigured
-            ? "border-green-border bg-green-dim text-green"
-            : "border-border bg-white/4 text-text-muted"
-            }`}
-        >
+        <span className={isConfigured ? badgeOn : badgeOff}>
           {isConfigured ? "Available" : "N / A"}
         </span>
       </div>
@@ -113,7 +118,7 @@ const CustomApiSection: React.FC<CustomApiSectionProps> = ({
             />
             <button
               type="button"
-              className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-sm text-text-muted transition-colors duration-150 hover:bg-white/6 hover:text-text-primary"
+              className={revealButton}
               onClick={() => setKeyVisible((prev) => !prev)}
               aria-label={keyVisible ? "Hide API key" : "Show API key"}
             >
