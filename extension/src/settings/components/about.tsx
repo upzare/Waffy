@@ -37,53 +37,53 @@ const AboutSection: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-md border border-border bg-surface-2">
+      <div className="overflow-hidden rounded-2xl border border-white/12 bg-white/6 backdrop-blur-[18px]">
         <div className="flex flex-col items-center px-5 py-8 text-center sm:px-8 sm:py-10">
-          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-black/25">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/12 bg-black/40">
             <img src={LOGO_URL} alt="Waffy" className="h-9 w-9" />
           </div>
 
-          <h2 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Waffy Extension</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-text-secondary">
+          <h2 className="text-2xl font-bold tracking-[-0.04em] sm:text-3xl">Waffy Extension</h2>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-white/50">
             {manifest.description}
           </p>
 
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-black/35 px-3 py-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-green" />
-            <span className="font-mono text-xs font-medium tracking-wide text-text-muted">
+          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#00ff00]/40 px-3 py-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#00ff00]" />
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-[#00ff00]">
               v{version}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-border bg-surface-2">
-        <div className="divide-y divide-border">
+      <div className="overflow-hidden rounded-2xl border border-white/12 bg-white/6 backdrop-blur-[18px]">
+        <div className="divide-y divide-white/10">
           {LINKS.map(({ href, label, description, icon: Icon }) => (
             <a
               key={href}
               href={href}
               target="_blank"
               rel="noreferrer"
-              className="group flex items-center gap-3.5 px-4 py-3.5 no-underline transition-colors duration-150 hover:bg-white/3 sm:px-5"
+              className="group flex items-center gap-3.5 px-4 py-3.5 no-underline transition-colors duration-150 hover:bg-white/6 sm:px-5"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-border bg-black/25 text-text-secondary transition-colors duration-150 group-hover:border-green-border group-hover:bg-green-dim group-hover:text-green">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-white/55 transition-colors duration-150 group-hover:border-[#00ff00]/40 group-hover:text-[#00ff00]">
                 <Icon size={16} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-text-primary">{label}</span>
-                <span className="mt-0.5 block truncate text-xs text-text-muted">{description}</span>
+                <span className="block text-sm font-bold tracking-[-0.02em]">{label}</span>
+                <span className="mt-0.5 block truncate text-sm text-white/45">{description}</span>
               </span>
               <ArrowUpRight
                 size={16}
-                className="shrink-0 text-text-muted opacity-50 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-green group-hover:opacity-100"
+                className="shrink-0 text-white/35 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[#00ff00]"
               />
             </a>
           ))}
         </div>
       </div>
 
-      <p className="px-1 text-center text-xs text-text-muted uppercase">
+      <p className="px-1 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
         © {year} UPZARE / Waffy. All rights reserved.
       </p>
     </div>

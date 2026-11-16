@@ -18,6 +18,7 @@ import {
   panelSubtitle,
   panelTitle,
   secondaryButton,
+  textInput,
 } from "../styles";
 import type { FeatureFlags, Settings } from "@/types";
 import { PRIVACY_URL, TERMS_URL } from "@/config";
@@ -79,7 +80,7 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
               </div>
               <input
                 type="text"
-                className="min-w-0 flex-1 rounded-sm border border-border bg-black/25 px-3 py-2.5 text-sm text-text-primary transition-colors duration-150 placeholder:text-text-muted focus:border-green-border focus:bg-black/35 focus:outline-none"
+                className={`${textInput} min-w-0 flex-1`}
                 value={prompt}
                 placeholder={`Prompt ${index + 1}`}
                 onChange={(e) => updatePrompt(index, e.target.value)}
@@ -100,7 +101,7 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
 
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-sm border border-dashed border-border-strong bg-white/4 px-3.5 py-2 text-sm font-medium text-text-secondary transition-colors duration-150 hover:enabled:border-green-border hover:enabled:bg-white/6 hover:enabled:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          className={`${secondaryButton} gap-1.5 disabled:cursor-not-allowed disabled:opacity-40`}
           onClick={addPrompt}
           disabled={pinnedPrompts.length >= MAX_PINNED_PROMPTS}
         >
@@ -117,17 +118,18 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-col gap-1 rounded-sm border border-border bg-black/20 px-3.5 py-1">
+        <div className="flex flex-col divide-y divide-white/10 overflow-hidden rounded-xl border border-white/10 bg-black/40">
           {FEATURE_TOGGLES.map(({ key, label }) => (
             <label
               key={key}
-              className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-1 py-2.5 transition-colors duration-150 hover:bg-black/20"
+              className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-150 hover:bg-white/4"
             >
-              <span className="text-sm font-medium text-text-primary">{label}</span>
+              <span className="text-sm font-bold">{label}</span>
               <Switch
                 size="sm"
                 checked={settings[key]}
                 onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, [key]: checked }))}
+                className="data-checked:bg-[#00ff00]"
               />
             </label>
           ))}
@@ -138,30 +140,39 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
         <div className="mb-4">
           <h3 className={panelTitle}>Anonymous analytics</h3>
           <p className={panelSubtitle}>
-            Send anonymous usage data to help improve this product. This will not include any of your personal information, chat or API keys.
-            Please read our{" "}
-            <a href={PRIVACY_URL} target="_blank" rel="noreferrer" className="underline">
+            Send anonymous usage data to help improve this product. This will not include any of
+            your personal information, chat or API keys. Please read our{" "}
+            <a
+              href={PRIVACY_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-3 hover:text-white"
+            >
               Privacy Policy
-            </a>
-            {" "}and{" "}
-            <a href={TERMS_URL} target="_blank" rel="noreferrer" className="underline">
+            </a>{" "}
+            and{" "}
+            <a
+              href={TERMS_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-3 hover:text-white"
+            >
               Terms
-            </a>
-            {" "}for more information.
+            </a>{" "}
+            for more information.
           </p>
         </div>
 
-        <div className="flex flex-col gap-1 rounded-sm border border-border bg-black/20 px-3.5 py-1">
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-1 py-2.5 transition-colors duration-150 hover:bg-black/20">
-            <span className="text-sm font-medium text-text-primary">
-              Help us improve this product
-            </span>
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-black/40">
+          <label className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-150 hover:bg-white/4">
+            <span className="text-sm font-bold">Help us improve this product</span>
             <Switch
               size="sm"
               checked={settings.analytics}
               onCheckedChange={(checked) =>
                 setSettings((prev) => ({ ...prev, analytics: checked }))
               }
+              className="data-checked:bg-[#00ff00]"
             />
           </label>
         </div>
