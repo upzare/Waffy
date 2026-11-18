@@ -59,7 +59,7 @@ import {
 import type { StreamSession } from "@/lib/llm/stream";
 import { errorMessage, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import type { ExtensionMessage } from "@/lib/llm/messages";
-import { startAnalytics } from "@/lib/posthog";
+import { initAnalytics } from "@/lib/posthog";
 import HistorySidebar from "./components/history-sidebar";
 import WorkingDialog from "./components/working-dialog";
 import Hero from "./components/hero";
@@ -189,11 +189,11 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!appSettings) return;
+    void initAnalytics();
+  }, []);
 
-    if (appSettings.settings.analytics) {
-      startAnalytics();
-    }
+  useEffect(() => {
+    if (!appSettings) return;
 
     chrome.storage.onChanged.addListener(onStorageChanged);
     void consumePendingAction().then((handled) => {

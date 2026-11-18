@@ -28,6 +28,7 @@ import SupportSection from "./components/support";
 import AboutSection from "./components/about";
 import { thinScroll } from "./styles";
 import { LOGO_URL } from "@/config";
+import { initAnalytics } from "@/lib/posthog";
 
 const SAVE_DELAY_MS = 400;
 
@@ -165,6 +166,10 @@ const useSettingsForm = () => {
     const next = saveQueueRef.current.then(save, save);
     saveQueueRef.current = next;
     return next;
+  }, []);
+
+  useEffect(() => {
+    void initAnalytics();
   }, []);
 
   useEffect(() => {
