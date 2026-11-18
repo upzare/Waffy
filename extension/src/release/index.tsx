@@ -12,6 +12,7 @@ import "@/stylesheets/globals.css";
 import "@/setup/setup.css";
 import "./release.css";
 import { FOUNDER_URL, GITHUB_URL, LOGO_URL, X_VERSION_URL, WEBSTORE_URL } from "@/config";
+import { initAnalytics } from "@/lib/posthog";
 
 const streamdownPlugins = { code };
 const streamdownControls = {
@@ -33,6 +34,10 @@ const fetchReleaseNotes = async (version: string) => {
 
 const Release = () => {
   const [notes, setNotes] = useState<string | null>(null);
+
+  useEffect(() => {
+    void initAnalytics();
+  }, []);
 
   useEffect(() => {
     fetchReleaseNotes(EXTENSION_VERSION)

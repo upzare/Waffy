@@ -28,6 +28,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { ApiKeys, ModelConfig, ProviderId, Settings, StageId } from "@/types";
 import FeatureStory from "./feature-story";
+import { initAnalytics } from "@/lib/posthog";
 
 const STEPS = ["Welcome", "Provider", "Connect", "Model", "Finish"] as const;
 
@@ -136,6 +137,10 @@ const Onboarding = () => {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void initAnalytics();
+  }, []);
 
   useEffect(() => {
     if (provider !== "browser-ai") return;

@@ -8,6 +8,7 @@ import { DEFAULT_ERROR_MESSAGE, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import { getFeatureFlags } from "@/lib/features";
 import { MEMORY_TOOLS } from "@/lib/llm/tools/memory";
 import type { AppSettings, ToolCall } from "@/types";
+import { aiObservability } from "../posthog";
 
 export type { StreamMode } from "./modes";
 
@@ -164,6 +165,9 @@ export async function* runStream(options: StreamOptions): AsyncGenerator<StreamE
         throw part.error;
       }
     }
+
+    const _model = (await result.finalStep).model;
+    aiObservability({ modelId: _model.modelId, provider: _model.provider, usage: await result.usage });
 
     const completedToolCalls = (await result.toolCalls).filter(
       (toolCall) => !Object.hasOwn(MEMORY_TOOLS, toolCall.toolName)
