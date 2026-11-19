@@ -1,13 +1,13 @@
 import Browser from "webextension-polyfill";
 import type { Tabs } from "webextension-polyfill";
-import { isInaccessiblePage } from "@/helper";
+import { ACTIONS, isInaccessiblePage, stripBase64Prefix } from "@/lib/helper";
 import { errorMessage } from "../errors";
 import { htmlToMarkdown, type HtmlToMarkdownResult } from "../html-to-markdown";
 import { sleep } from "../utils";
 
 const MAX_CONTENT_CHARS = 18000;
 const TAB_FOCUS_SETTLE_MS = 100;
-const SCREENSHOT_QUALITY = 25;
+export const SCREENSHOT_QUALITY = 25;
 
 type ResolvedTab = { ok: true; tabId: number; tab: Tabs.Tab } | { ok: false; message: string };
 
@@ -81,7 +81,7 @@ export const getPageMarkdown = async (tabId: unknown): Promise<PageMarkdownResul
     if (!resolved.ok) return { status: "error", message: resolved.message };
 
     const response = (await Browser.tabs.sendMessage(resolved.tabId, {
-      type: "GET_PAGE_CONTENT",
+      type: ACTIONS.getPageContent,
     })) as ContentScriptResponse;
 
     if (!response || response.status === "error" || !response.html) {
@@ -138,7 +138,7 @@ export const captureVisibleTab = async (tabId: unknown) => {
 
     return {
       status: "success",
-      image: dataUrl.replace(/^data:image\/\w+;base64,/, ""),
+      image: stripBase64Prefix(dataUrl),
       metadata: {
         url: captured.url ?? tab.url ?? "",
         title: captured.title ?? tab.title ?? "",

@@ -1,10 +1,11 @@
 import Browser from "webextension-polyfill";
 import type { Runtime } from "webextension-polyfill";
 import { EXTENSION_VERSION, X_VERSION_URL } from "@/config";
+import { ACTIONS } from "@/lib/helper";
 import {
-  disableOverlay,
-  enableOverlay,
-  getOverlayStatus,
+  disableAutomationOverlay,
+  enableAutomationOverlay,
+  getAutomationOverlayStatus,
   getTab,
   registerAutomationListeners,
   setOpenedTabs,
@@ -15,6 +16,11 @@ import {
 import { createContextMenus, registerContextMenuListeners } from "./background/context-menu";
 import { closeOwnedTabs, fetchWebPage } from "./background/fetch";
 import { captureVisibleTab, getPageContent, getPageInfo } from "./background/page";
+import {
+  capture,
+  getCaptureState,
+  registerCaptureListeners,
+} from "./background/capture";
 import { fetchWebSearch } from "./background/search";
 import { initClient, initSettings } from "./client";
 
@@ -36,36 +42,41 @@ const releaseNotesAvailable = async () => {
 
 registerAutomationListeners();
 registerContextMenuListeners();
+registerCaptureListeners();
 
 Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSender) => {
   switch (request.action) {
-    case "SET_TAB":
+    case ACTIONS.setTab:
       return setTab(request.tabId);
-    case "GET_TAB":
+    case ACTIONS.getTab:
       return getTab();
-    case "SET_OPENED_TABS":
+    case ACTIONS.setOpenedTabs:
       return setOpenedTabs(request.tabs);
-    case "ENABLE_OVERLAY":
-      return enableOverlay(request.tabId);
-    case "DISABLE_OVERLAY":
-      return disableOverlay(request.tabId);
-    case "GET_OVERLAY_STATUS":
-      return getOverlayStatus(sender);
-    case "START_SESSION":
+    case ACTIONS.enableAutomationOverlay:
+      return enableAutomationOverlay(request.tabId);
+    case ACTIONS.disableAutomationOverlay:
+      return disableAutomationOverlay(request.tabId);
+    case ACTIONS.getAutomationOverlayStatus:
+      return getAutomationOverlayStatus(sender);
+    case ACTIONS.startSession:
       return startSession(request.tabId);
-    case "STOP_SESSION":
+    case ACTIONS.stopSession:
       return stopSession();
-    case "STOP_GENERATION":
+    case ACTIONS.stopGeneration:
       return stopGeneration();
-    case "GET_PAGE_INFO":
+    case ACTIONS.getPageInfo:
       return getPageInfo(request.tabId);
-    case "GET_PAGE_CONTENT":
+    case ACTIONS.getPageContent:
       return getPageContent(request.tabId);
-    case "CAPTURE_VISIBLE_TAB":
+    case ACTIONS.captureVisibleTab:
       return captureVisibleTab(request.tabId);
-    case "WEB_SEARCH":
+    case ACTIONS.getCaptureButton:
+      return getCaptureState(sender);
+    case ACTIONS.capture:
+      return capture(sender, request.rect, request.viewport);
+    case ACTIONS.webSearch:
       return fetchWebSearch(request.query);
-    case "WEB_FETCH":
+    case ACTIONS.webFetch:
       return fetchWebPage(request.url);
     default:
       return undefined;

@@ -28,6 +28,7 @@ import SupportSection from "./components/support";
 import AboutSection from "./components/about";
 import { thinScroll } from "./styles";
 import { LOGO_URL } from "@/config";
+import { ACTIONS } from "@/lib/helper";
 import { initAnalytics } from "@/lib/posthog";
 
 const SAVE_DELAY_MS = 400;
@@ -154,7 +155,7 @@ const useSettingsForm = () => {
       try {
         await saveAppSettings(payload.settings, payload.apiKeys);
         lastSavedRef.current = serialized;
-        void Browser.runtime.sendMessage({ action: "RELOAD_PANEL" }).catch(() => { });
+        void Browser.runtime.sendMessage({ action: ACTIONS.reloadPanel }).catch(() => { });
         return true;
       } catch (error) {
         console.error("Error saving settings:", error);

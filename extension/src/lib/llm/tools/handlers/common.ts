@@ -1,5 +1,5 @@
 import Browser from "webextension-polyfill";
-import { getActiveTab } from "@/helper";
+import { ACTIONS, getActiveTab } from "@/lib/helper";
 import { toolError } from "@/lib/errors";
 import type { BaseToolResult } from "../base";
 
@@ -10,7 +10,7 @@ export const getPageInfo = async (): Promise<BaseToolResult> => {
       return { status: "error", message: toolError("No active tab found.") };
     }
     const response = (await Browser.runtime.sendMessage({
-      action: "GET_PAGE_INFO",
+      action: ACTIONS.getPageInfo,
       tabId: tab.id,
     })) as {
       status?: string;
@@ -35,7 +35,7 @@ export const captureScreenshot = async (): Promise<BaseToolResult> => {
       return { status: "error", message: toolError("No active tab found.") };
     }
     const response = (await Browser.runtime.sendMessage({
-      action: "CAPTURE_VISIBLE_TAB",
+      action: ACTIONS.captureVisibleTab,
       tabId: tab.id,
     })) as {
       status?: string;
@@ -70,7 +70,7 @@ export const getPageContent = async (): Promise<BaseToolResult> => {
       return { status: "error", message: toolError("No active tab found.") };
     }
     const response = (await Browser.runtime.sendMessage({
-      action: "GET_PAGE_CONTENT",
+      action: ACTIONS.getPageContent,
       tabId: tab.id,
     })) as {
       status?: string;
@@ -91,7 +91,7 @@ export const getPageContent = async (): Promise<BaseToolResult> => {
 export const webSearch = async ({ query }: { query: string }): Promise<BaseToolResult> => {
   try {
     const response = (await Browser.runtime.sendMessage({
-      action: "WEB_SEARCH",
+      action: ACTIONS.webSearch,
       query: query.trim(),
     })) as { status?: string; message?: string };
 
@@ -111,7 +111,7 @@ export const webSearch = async ({ query }: { query: string }): Promise<BaseToolR
 export const webFetch = async ({ url }: { url: string }): Promise<BaseToolResult> => {
   try {
     const response = (await Browser.runtime.sendMessage({
-      action: "WEB_FETCH",
+      action: ACTIONS.webFetch,
       url: url.trim(),
     })) as { status?: string; message?: string };
 

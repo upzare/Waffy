@@ -1,4 +1,4 @@
-import { isHttpUrl } from "@/helper";
+import { isHttpUrl } from "@/lib/helper";
 import { errorMessage } from "../errors";
 import { closeOwnedTabs, openTab, snapshotPage } from "./fetch";
 
