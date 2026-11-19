@@ -1,6 +1,6 @@
 import type { Tabs } from "webextension-polyfill";
 import Browser from "webextension-polyfill";
-import { isInaccessiblePage } from "@/helper";
+import { ACTIONS, isInaccessiblePage } from "@/lib/helper";
 import type { PageSource } from "@/types";
 import { SLASH_COMMAND_VALUES, stripSlashCommands, type SlashCommand } from "./slash-commands";
 
@@ -8,9 +8,11 @@ export const SLASH_MARKUP = "/[__display__](__id__)";
 export const PAGE_MARKUP = "@[__display__](tab:__id__)";
 export const MUTED_PAGE_MARKUP = "@[__display__](muted:__id__)";
 
-export const MENTION_CHIP_CLASS = "rounded-sm bg-[rgba(0,200,83,0.18)] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
+export const MENTION_CHIP_CLASS =
+  "rounded-sm bg-[rgba(0,200,83,0.18)] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
 export const MENTION_CHIP_COMPOSER_CLASS = `${MENTION_CHIP_CLASS} text-transparent`;
-export const MENTION_CHIP_MUTED_CLASS = "rounded-sm bg-white/12 [box-decoration-break:clone] [-webkit-box-decoration-break:clone] text-transparent";
+export const MENTION_CHIP_MUTED_CLASS =
+  "rounded-sm bg-white/12 [box-decoration-break:clone] [-webkit-box-decoration-break:clone] text-transparent";
 export const MENTION_CHIP_BUBBLE_CLASS = `${MENTION_CHIP_CLASS} text-white`;
 
 const SLASH_MARKUP_PATTERN = /\/\[([^\]]+)\]\((search|research|automate)\)/gi;
@@ -51,8 +53,13 @@ function tabHostname(url?: string): string {
 
 export function toWindowPages(tabs: Tabs.Tab[]): WindowPage[] {
   const readable = tabs
-    .filter((tab): tab is Tabs.Tab & { id: number } => tab.id != null && !isInaccessiblePage(tab.url))
-    .sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)) || (a.index ?? 0) - (b.index ?? 0));
+    .filter(
+      (tab): tab is Tabs.Tab & { id: number } => tab.id != null && !isInaccessiblePage(tab.url)
+    )
+    .sort(
+      (a, b) =>
+        Number(Boolean(b.active)) - Number(Boolean(a.active)) || (a.index ?? 0) - (b.index ?? 0)
+    );
 
   const titleCounts = new Map<string, number>();
   for (const tab of readable) {
@@ -89,7 +96,7 @@ export async function fetchPageContent(
 ): Promise<{ ok: true; content: string } | { ok: false; message: string }> {
   try {
     const response = (await Browser.runtime.sendMessage({
-      action: "GET_PAGE_CONTENT",
+      action: ACTIONS.getPageContent,
       tabId,
     })) as { status?: string; message?: string };
     if (!response || response.status === "error" || !response.message) {
@@ -287,7 +294,9 @@ export function tokenizeTaggedPrompt(prompt: string, pages: PageSource[]): Promp
     }
   }
 
-  const mentions = [...new Set(pages.map((page) => page.mention))].sort((a, b) => b.length - a.length);
+  const mentions = [...new Set(pages.map((page) => page.mention))].sort(
+    (a, b) => b.length - a.length
+  );
   for (const mention of mentions) {
     let from = 0;
     while (from < prompt.length) {

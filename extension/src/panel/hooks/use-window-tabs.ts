@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Browser from "webextension-polyfill";
-import { getCurrentWindowTabs } from "@/helper";
+import { getCurrentWindowTabs } from "@/lib/helper";
 import { toWindowPages, type WindowPage } from "../utils/page-mentions";
 
 export function useWindowTabs(): WindowPage[] {

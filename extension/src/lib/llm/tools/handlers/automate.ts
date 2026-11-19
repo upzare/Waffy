@@ -1,6 +1,6 @@
 import Browser from "webextension-polyfill";
 import type { Tabs } from "webextension-polyfill";
-import { isInaccessiblePage } from "@/helper";
+import { ACTIONS, DOM_ACTIONS, isInaccessiblePage } from "@/lib/helper";
 import { AutomateToolResult } from "../automate";
 import { webFetch, webSearch } from "./common";
 import { toolError } from "@/lib/errors";
@@ -49,7 +49,7 @@ const interpolatePath = (path: Point[]): Point[] => {
 };
 
 const getSessionTab = async () =>
-  (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as Tabs.Tab | undefined;
+  (await Browser.runtime.sendMessage({ action: ACTIONS.getTab })) as Tabs.Tab | undefined;
 
 const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) => {
   chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
@@ -72,7 +72,7 @@ const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) 
 export const updateOpenedTabs = async () => {
   try {
     const tabs = await Browser.tabs.query({});
-    await Browser.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs });
+    await Browser.runtime.sendMessage({ action: ACTIONS.setOpenedTabs, tabs });
   } catch {
     // ignore
   }
@@ -93,7 +93,7 @@ const fetchScreen = async (): Promise<AutomateToolResult> => {
       };
     }
     const devicePixelRatio = await Browser.tabs
-      .sendMessage(tab.id, { type: "GET_DEVICE_PIXEL_RATIO" })
+      .sendMessage(tab.id, { type: ACTIONS.getDevicePixelRatio })
       .then((res) => (res as { value: number }).value)
       .catch(() => window.devicePixelRatio);
     const meta = {
@@ -145,7 +145,7 @@ const getPageContent = async (): Promise<AutomateToolResult> => {
       };
     }
     const response = (await Browser.runtime.sendMessage({
-      action: "GET_PAGE_CONTENT",
+      action: ACTIONS.getPageContent,
       tabId: tab.id,
     })) as { status?: string; message?: string };
     if (!response || response.status === "error") {
@@ -179,8 +179,8 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
     const tabIdsBefore = new Set(tabsBefore.map((t) => t.id));
 
     Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "DISPLAY_POINTER",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.displayPointer,
       args: { x, y },
     });
     await _click({ x, y, tabId: tab.id });
@@ -190,7 +190,7 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
 
     if (newTab?.id) {
       await updateOpenedTabs();
-      await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: newTab.id });
+      await Browser.runtime.sendMessage({ action: ACTIONS.setTab, tabId: newTab.id });
       await Browser.tabs.update(newTab.id, { active: true });
       return {
         status: "success",
@@ -218,8 +218,8 @@ const drag = async ({ path }: { path: Point[] }): Promise<AutomateToolResult> =>
     const end = path[path.length - 1];
 
     Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "ANIMATE_POINTER",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.animatePointer,
       args: {
         path: points,
         duration: DRAG_HOLD_MS + points.length * DRAG_STEP_DELAY_MS,
@@ -306,8 +306,8 @@ const typeText = async ({
       return { status: "error", message: toolError("Tab not found") };
     }
     Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "DISPLAY_POINTER",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.displayPointer,
       args: { x, y, timeout: text.length * 150 + 500 },
     });
     await _click({ x, y, tabId: tab.id });
@@ -342,8 +342,8 @@ const clearValue = async ({ x, y }: { x: number; y: number }): Promise<AutomateT
       return { status: "error", message: toolError("Tab not found") };
     }
     Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "DISPLAY_POINTER",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.displayPointer,
       args: { x, y },
     });
     await _click({ x, y, tabId: tab.id });
@@ -380,14 +380,14 @@ const getOption = async ({ x, y }: { x: number; y: number }): Promise<AutomateTo
       return { status: "error", message: toolError("Tab not found") };
     }
     Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "DISPLAY_POINTER",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.displayPointer,
       args: { x, y },
     });
     await _click({ x, y, tabId: tab.id });
     const res = (await Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "GET_OPTION",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.getOption,
       args: {},
     })) as { status: string; value: string };
     if (res.status === "success") {
@@ -415,14 +415,14 @@ const setOption = async ({
       return { status: "error", message: toolError("Tab not found") };
     }
     Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "DISPLAY_POINTER",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.displayPointer,
       args: { x, y },
     });
     await _click({ x, y, tabId: tab.id });
     const res = (await Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "SET_OPTION",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.setOption,
       args: { value },
     })) as { status: string; value: string };
     if (res.status === "success") {
@@ -451,8 +451,8 @@ const scroll = async ({
       return { status: "error", message: toolError("Tab not found") };
     }
     Browser.tabs.sendMessage(tab.id, {
-      type: "INTERACT_DOM",
-      name: "DISPLAY_POINTER",
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.displayPointer,
       args: { x, y },
     });
     await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.synthesizeScrollGesture", {
@@ -512,7 +512,7 @@ const goto = async ({ url }: { url: string }): Promise<AutomateToolResult> => {
 const getOpenedTabs = async (): Promise<AutomateToolResult> => {
   try {
     const tabs = await Browser.tabs.query({});
-    await Browser.runtime.sendMessage({ action: "SET_OPENED_TABS", tabs });
+    await Browser.runtime.sendMessage({ action: ACTIONS.setOpenedTabs, tabs });
     const result = tabs.map((tab: Tabs.Tab) => ({
       id: tab.id,
       title: tab.title,
@@ -529,7 +529,7 @@ const openTab = async ({ url }: { url: string }): Promise<AutomateToolResult> =>
   try {
     const tab = await Browser.tabs.create({ url });
     await updateOpenedTabs();
-    await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
+    await Browser.runtime.sendMessage({ action: ACTIONS.setTab, tabId: tab?.id });
     return { status: "success", message: "Success: URL opened in new tab successfully" };
   } catch (error) {
     return { status: "error", message: toolError(error) };
@@ -540,7 +540,7 @@ const switchTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResu
   try {
     const tab = await Browser.tabs.update(tabId, { active: true });
     await updateOpenedTabs();
-    await Browser.runtime.sendMessage({ action: "SET_TAB", tabId: tab?.id });
+    await Browser.runtime.sendMessage({ action: ACTIONS.setTab, tabId: tab?.id });
     return { status: "success", message: "Success: Tab switched successfully" };
   } catch (error) {
     return { status: "error", message: toolError(error) };

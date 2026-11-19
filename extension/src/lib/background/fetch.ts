@@ -1,5 +1,5 @@
 import Browser from "webextension-polyfill";
-import { isHttpUrl, isInaccessiblePage } from "@/helper";
+import { isHttpUrl, isInaccessiblePage } from "@/lib/helper";
 import {
   attachTab,
   detachTab,

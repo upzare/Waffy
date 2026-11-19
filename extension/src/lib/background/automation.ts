@@ -1,6 +1,6 @@
 import Browser from "webextension-polyfill";
 import type { Runtime, Tabs } from "webextension-polyfill";
-import { isInaccessiblePage } from "@/helper";
+import { ACTIONS, DOM_ACTIONS, isInaccessiblePage } from "@/lib/helper";
 import { attachTab, detachTab, disableDomains, enableDomains, isAttached } from "../cdp";
 import { errorMessage } from "../errors";
 import { isOwnedTab } from "./fetch";
@@ -16,11 +16,11 @@ let active = false;
 
 const overlayInfo: Record<number, boolean> = {};
 
-const setOverlay = (tabId: number, enabled: boolean) => {
+const setAutomationOverlay = (tabId: number, enabled: boolean) => {
   Browser.tabs
     .sendMessage(tabId, {
-      type: "INTERACT_DOM",
-      name: enabled ? "SHOW_OVERLAY" : "HIDE_OVERLAY",
+      type: ACTIONS.interactDom,
+      name: enabled ? DOM_ACTIONS.showAutomationOverlay : DOM_ACTIONS.hideAutomationOverlay,
     })
     .catch(() => { });
   overlayInfo[tabId] = enabled;
@@ -29,7 +29,7 @@ const setOverlay = (tabId: number, enabled: boolean) => {
 const disableNonActiveOverlays = (activeId: number) => {
   for (const key of Object.keys(overlayInfo)) {
     const tabId = Number(key);
-    if (tabId !== activeId && overlayInfo[tabId]) setOverlay(tabId, false);
+    if (tabId !== activeId && overlayInfo[tabId]) setAutomationOverlay(tabId, false);
   }
 };
 
@@ -37,7 +37,7 @@ const disableNonActiveOverlays = (activeId: number) => {
 const focusTab = (tabId: number) => {
   disableNonActiveOverlays(tabId);
   activeTabId = tabId;
-  setOverlay(tabId, true);
+  setAutomationOverlay(tabId, true);
 };
 
 const addTabToWaffyGroup = async (tabId: number) => {
@@ -88,7 +88,7 @@ const attachDebugger = async (tabId: number) => {
 
 const detachDebugger = async (tabId: number) => {
   if (!(await isAttached(tabId))) return;
-  setOverlay(tabId, false);
+  setAutomationOverlay(tabId, false);
   await disableDomains(tabId, DOMAINS);
   await detachTab(tabId);
 };
@@ -151,17 +151,17 @@ export const setOpenedTabs = (tabs: Tabs.Tab[]) => {
   return Promise.resolve({ status: "success", value: "Tabs updated successfully" });
 };
 
-export const enableOverlay = (tabId: number) => {
+export const enableAutomationOverlay = (tabId: number) => {
   focusTab(tabId);
-  return Promise.resolve({ status: "success", value: "Waffy overlay enabled" });
+  return Promise.resolve({ status: "success", value: "Automation overlay enabled" });
 };
 
-export const disableOverlay = (tabId: number) => {
-  setOverlay(tabId, false);
-  return Promise.resolve({ status: "success", value: "Waffy overlay disabled" });
+export const disableAutomationOverlay = (tabId: number) => {
+  setAutomationOverlay(tabId, false);
+  return Promise.resolve({ status: "success", value: "Automation overlay disabled" });
 };
 
-export const getOverlayStatus = (sender: Runtime.MessageSender) => {
+export const getAutomationOverlayStatus = (sender: Runtime.MessageSender) => {
   const tabId = sender?.tab?.id;
   return Promise.resolve({
     status: tabId != null && overlayInfo[tabId] ? "enabled" : "disabled",

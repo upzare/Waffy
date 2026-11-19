@@ -29,7 +29,14 @@ import {
   availableFunctions as automateFunctions,
   updateOpenedTabs,
 } from "@/lib/llm/tools/handlers/automate";
-import { getActiveTab, getCurrentWindowTabs } from "@/helper";
+import {
+  ACTIONS,
+  base64ToBytes,
+  getActiveTab,
+  getCurrentWindowTabs,
+  type RuntimeMessage,
+  type CapturePayload,
+} from "@/lib/helper";
 import { getAppSettings, DEFAULT_PINNED_PROMPTS } from "@/lib/client";
 import {
   PENDING_PANEL_ACTION_KEY,
@@ -151,13 +158,14 @@ const App = () => {
     return true;
   };
 
-  const onStorageChanged = (
-    changes: Record<string, chrome.storage.StorageChange>,
-    areaName: string
-  ) => {
-    if (areaName === "session" && changes[PENDING_PANEL_ACTION_KEY]?.newValue) {
-      void consumePendingAction();
-    }
+  const attachCapture = (incoming: RuntimeMessage<CapturePayload>) => {
+    const shot = incoming.payload;
+    if (!shot?.content || !shot.mimeType) return;
+
+    const file = new File([base64ToBytes(shot.content)], shot.name || "page-capture.jpg", {
+      type: shot.mimeType,
+    });
+    setFiles((current) => [...current, file]);
   };
 
   useEffect(() => {
@@ -175,9 +183,20 @@ const App = () => {
     init();
 
     const onMessage = (request: unknown) => {
-      const action = (request as { action?: string })?.action;
-      if (action === "RELOAD_PANEL") {
-        window.location.reload();
+      const message = (request ?? {}) as RuntimeMessage<CapturePayload>;
+      switch (message.action) {
+        case ACTIONS.reloadPanel:
+          window.location.reload();
+          return;
+        case ACTIONS.attachCapture:
+          void (async () => {
+            const panelWindow = await Browser.windows.getCurrent();
+            if (message.windowId == null || message.windowId !== panelWindow.id) return;
+            attachCapture(message);
+          })();
+          return;
+        default:
+          return undefined;
       }
     };
     Browser.runtime.onMessage.addListener(onMessage);
@@ -191,6 +210,15 @@ const App = () => {
   useEffect(() => {
     void initAnalytics();
   }, []);
+
+  const onStorageChanged = (
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string
+  ) => {
+    if (areaName === "session" && changes[PENDING_PANEL_ACTION_KEY]?.newValue) {
+      void consumePendingAction();
+    }
+  };
 
   useEffect(() => {
     if (!appSettings) return;
@@ -247,15 +275,15 @@ const App = () => {
   const attachController = async () => {
     const tab = await getActiveTab();
     if (!tab?.id) return;
-    await Browser.runtime.sendMessage({ action: "START_SESSION", tabId: tab.id });
+    await Browser.runtime.sendMessage({ action: ACTIONS.startSession, tabId: tab.id });
   };
 
   const detachController = async () => {
-    await Browser.runtime.sendMessage({ action: "STOP_SESSION" });
+    await Browser.runtime.sendMessage({ action: ACTIONS.stopSession });
   };
 
   const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: "STOP_GENERATION" }).catch(() => { });
+    Browser.runtime.sendMessage({ action: ACTIONS.stopGeneration }).catch(() => { });
   };
 
   const automateHandler = async (
@@ -347,11 +375,14 @@ const App = () => {
     };
 
     await updateOpenedTabs();
-    const overlayTab = (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as {
+    const automationTab = (await Browser.runtime.sendMessage({ action: ACTIONS.getTab })) as {
       id?: number;
     } | null;
-    if (!overlayTab || !overlayTab.id) throw new Error("Tab not found");
-    await Browser.runtime.sendMessage({ action: "ENABLE_OVERLAY", tabId: overlayTab.id });
+    if (!automationTab || !automationTab.id) throw new Error("Tab not found");
+    await Browser.runtime.sendMessage({
+      action: ACTIONS.enableAutomationOverlay,
+      tabId: automationTab.id,
+    });
 
     let responded = true;
     let finish = false;
@@ -470,13 +501,15 @@ const App = () => {
     }
 
     setStreaming((prev) => ({ ...prev, execution: false }));
-    const disableOverlayTab = (await Browser.runtime.sendMessage({ action: "GET_TAB" })) as {
+    const finishedAutomationTab = (await Browser.runtime.sendMessage({
+      action: ACTIONS.getTab,
+    })) as {
       id?: number;
     } | null;
-    if (!disableOverlayTab || !disableOverlayTab.id) throw new Error("Tab not found");
+    if (!finishedAutomationTab || !finishedAutomationTab.id) throw new Error("Tab not found");
     await Browser.runtime.sendMessage({
-      action: "DISABLE_OVERLAY",
-      tabId: disableOverlayTab.id,
+      action: ACTIONS.disableAutomationOverlay,
+      tabId: finishedAutomationTab.id,
     });
 
     return t2Reasoning;
