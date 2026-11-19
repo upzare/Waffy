@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Eye, EyeOff, Info, Pin } from "lucide-react";
 import Browser from "webextension-polyfill";
@@ -181,6 +181,7 @@ const Onboarding = () => {
     setDownloading(true);
     setDownloadError(null);
     setDownloadProgress(0);
+    setBrowserStatus("downloading");
     try {
       await ensureBrowserAIModelReady((progress) => {
         setDownloadProgress(progress);
@@ -195,12 +196,28 @@ const Onboarding = () => {
     }
   };
 
+  const backgroundDownloadStarted = useRef(false);
+
+  useEffect(() => {
+    if (provider !== "browser-ai" || step !== 2) return;
+    if (browserStatus !== "downloadable" && browserStatus !== "downloading") return;
+    if (backgroundDownloadStarted.current) return;
+    backgroundDownloadStarted.current = true;
+    void downloadBrowserModel();
+  }, [provider, step, browserStatus, downloadBrowserModel]);
+
   const canContinue = (() => {
     if (step === 0) return true;
     if (step === 1) return provider !== null;
     if (!provider) return false;
     if (step === 2) {
-      if (provider === "browser-ai") return browserStatus === "available";
+      if (provider === "browser-ai") {
+        return (
+          browserStatus === "available" ||
+          browserStatus === "downloadable" ||
+          browserStatus === "downloading"
+        );
+      }
       if (provider === "custom") return customBaseUrl.trim().length > 0;
       return apiKey.trim().length > 0;
     }
@@ -611,6 +628,29 @@ const ConnectStep = ({
   );
 };
 
+const ModelDownloadProgress = ({ progress }: { progress: number }) => {
+  const percent = Math.round(progress * 100);
+
+  return (
+    <div>
+      <div
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Model download progress"
+        className="h-1.5 overflow-hidden rounded-full bg-white/10"
+      >
+        <div
+          className="h-full rounded-full bg-[#00ff00] transition-[width] duration-200"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <p className="mt-2 font-mono text-[11px] text-white/40">{percent}% complete</p>
+    </div>
+  );
+};
+
 const BrowserAiConnect = ({
   status,
   downloading,
@@ -626,16 +666,27 @@ const BrowserAiConnect = ({
   onDownload: () => void;
   onChooseOther: () => void;
 }) => {
-  const percent = Math.round(progress * 100);
   const label = getBrowserAIModelLabel();
+  const backgroundDownload =
+    !error && (status === "downloadable" || status === "downloading" || downloading);
+  const badge =
+    downloading || status === "downloading"
+      ? BROWSER_AI_STATUS_LABELS.downloading
+      : status === null
+        ? "Checking"
+        : BROWSER_AI_STATUS_LABELS[status];
+  const heading =
+    status === "available"
+      ? `${label} is already on this device.`
+      : status === "unsupported" || status === "unavailable"
+        ? "This device cannot run the built-in model right now."
+        : status === null
+          ? "Checking whether this browser can run a built-in model."
+          : "You can move on. The model will be downloaded in the background.";
 
   return (
     <div>
-      <StepHeading
-        eyebrow="03 · Connect"
-        title="Use the model in this browser."
-        body="Install the built-in model if your browser has not already done so."
-      />
+      <StepHeading eyebrow="03 · Connect" title="Use the model in this browser." body={heading} />
       <div className="mt-8 rounded-2xl border border-white/12 bg-white/6 px-5 py-5 backdrop-blur-[18px]">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -647,7 +698,7 @@ const BrowserAiConnect = ({
             </p>
           </div>
           <span className="rounded-full border border-[#00ff00]/40 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-[#00ff00]">
-            {status === null ? "Checking" : BROWSER_AI_STATUS_LABELS[status]}
+            {badge}
           </span>
         </div>
 
@@ -670,30 +721,15 @@ const BrowserAiConnect = ({
         ) : null}
         {error ? <p className="mt-4 text-sm text-red">{error}</p> : null}
 
-        {status === "downloadable" || status === "downloading" || downloading ? (
-          <button
-            type="button"
-            className={`${pillSecondary} mt-5`}
-            onClick={onDownload}
-            disabled={downloading}
-          >
-            {downloading ? "Downloading…" : "Download model"}
+        {error ? (
+          <button type="button" className={`${pillSecondary} mt-5`} onClick={onDownload}>
+            Try again
           </button>
         ) : null}
 
-        {downloading || status === "downloading" ? (
+        {backgroundDownload ? (
           <div className="mt-4">
-            <div
-              role="progressbar"
-              aria-valuenow={percent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Model download progress"
-              className="h-1.5 overflow-hidden rounded-full bg-white/10"
-            >
-              <div className="h-full rounded-full bg-[#00ff00]" style={{ width: `${percent}%` }} />
-            </div>
-            <p className="mt-2 font-mono text-[11px] text-white/40">{percent}% complete</p>
+            <ModelDownloadProgress progress={progress} />
           </div>
         ) : null}
 
@@ -779,8 +815,8 @@ const ModelStep = ({
               aria-selected={selected}
               onClick={() => onModel(id)}
               className={`rounded-xl border px-4 py-3 text-left font-mono text-sm transition-colors ${selected
-                ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
-                : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
+                  ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
+                  : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
                 }`}
             >
               {id}

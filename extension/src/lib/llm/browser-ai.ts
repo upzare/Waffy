@@ -10,6 +10,13 @@ type RawAvailability = "unavailable" | "downloadable" | "downloading" | "availab
 const SUPPORTED_LANGUAGES = ["de", "en", "es", "fr", "ja"] as const;
 
 let downloadPromise: Promise<LanguageModel> | null = null;
+const downloadProgressListeners = new Set<(progress: number) => void>();
+
+function emitDownloadProgress(progress: number) {
+  for (const listener of downloadProgressListeners) {
+    listener(progress);
+  }
+}
 
 function getBrowserAILanguage(): (typeof SUPPORTED_LANGUAGES)[number] {
   const primary = navigator.language.split("-")[0]?.toLowerCase() ?? "en";
@@ -55,6 +62,26 @@ export async function getBrowserAIStatus(): Promise<BrowserAIStatus> {
   return getAvailability();
 }
 
+async function downloadBrowserAIModel(): Promise<LanguageModel> {
+  const instance = createBrowserAIModel();
+  const status = await getAvailability(instance);
+
+  if (status === "available") {
+    return instance;
+  }
+
+  if (status === "downloadable" || status === "downloading") {
+    await instance.createSessionWithProgress(emitDownloadProgress);
+    return instance;
+  }
+
+  if (status === "unavailable") {
+    throw new Error("Browser AI model is unavailable on this device.");
+  }
+
+  throw new Error("Browser AI is not ready. Download it in extension settings.");
+}
+
 export async function ensureBrowserAIModelReady(
   onProgress?: (progress: number) => void
 ): Promise<LanguageModel> {
@@ -62,31 +89,19 @@ export async function ensureBrowserAIModelReady(
     throw new Error("Browser AI is not supported in this browser.");
   }
 
-  if (downloadPromise) {
-    return downloadPromise;
+  if (onProgress) downloadProgressListeners.add(onProgress);
+
+  try {
+    if (!downloadPromise) {
+      let promise: Promise<LanguageModel>;
+      promise = downloadBrowserAIModel().finally(() => {
+        if (downloadPromise === promise) downloadPromise = null;
+      });
+      downloadPromise = promise;
+    }
+
+    return await downloadPromise;
+  } finally {
+    if (onProgress) downloadProgressListeners.delete(onProgress);
   }
-
-  downloadPromise = (async () => {
-    const instance = createBrowserAIModel();
-    const status = await getAvailability(instance);
-
-    if (status === "available") {
-      return instance;
-    }
-
-    if (status === "downloadable" || status === "downloading") {
-      await instance.createSessionWithProgress(onProgress);
-      return instance;
-    }
-
-    if (status === "unavailable") {
-      throw new Error("Browser AI model is unavailable on this device.");
-    }
-
-    throw new Error("Browser AI is not ready. Download it in extension settings.");
-  })().finally(() => {
-    downloadPromise = null;
-  });
-
-  return downloadPromise;
 }
