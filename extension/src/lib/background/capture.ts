@@ -12,7 +12,21 @@ import {
 } from "@/lib/capture";
 import { SCREENSHOT_QUALITY, captureVisibleTab } from "./page";
 
-const openWindows = new Set<number>();
+const CAPTURE_OPEN_WINDOW_KEY = "captureOpenWindow";
+
+const openWindowStorageKey = (windowId: number) => `${CAPTURE_OPEN_WINDOW_KEY}:${windowId}`;
+
+const hasOpenWindow = async (windowId: number) => {
+  const key = openWindowStorageKey(windowId);
+  const stored = await chrome.storage.session.get(key);
+  return stored[key] === true;
+};
+
+const addOpenWindow = (windowId: number) =>
+  chrome.storage.session.set({ [openWindowStorageKey(windowId)]: true });
+
+const removeOpenWindow = (windowId: number) =>
+  chrome.storage.session.remove(openWindowStorageKey(windowId));
 
 const getPanelSide = async () => (await chrome.sidePanel.getLayout()).side;
 
@@ -23,28 +37,31 @@ const hideCaptureOverlay = (tabId: number) =>
   Browser.tabs.sendMessage(tabId, { type: ACTIONS.hideCaptureOverlay });
 
 const syncCapture = async (windowId: number) => {
-  if (!openWindows.has(windowId)) return;
+  if (!(await hasOpenWindow(windowId))) return;
   const [tab] = await Browser.tabs.query({ active: true, windowId });
   if (tab?.id == null) return;
   await showCaptureOverlay(tab.id, await getPanelSide());
 };
 
 const markPanelOpen = async (windowId: number) => {
-  openWindows.add(windowId);
+  await addOpenWindow(windowId);
   await syncCapture(windowId);
 };
 
 const markPanelClosed = async (windowId: number) => {
-  openWindows.delete(windowId);
-  const tabs = await Browser.tabs.query({ windowId });
-  await Promise.all(tabs.flatMap((tab) => (tab.id == null ? [] : [hideCaptureOverlay(tab.id)])));
+  try {
+    await removeOpenWindow(windowId);
+  } finally {
+    const tabs = await Browser.tabs.query({ windowId });
+    await Promise.all(tabs.flatMap((tab) => (tab.id == null ? [] : [hideCaptureOverlay(tab.id)])));
+  }
 };
 
 export const getCaptureState = async (
   sender: Runtime.MessageSender
 ): Promise<CaptureState> => {
   const windowId = sender.tab?.windowId;
-  const visible = windowId != null && openWindows.has(windowId);
+  const visible = windowId != null && (await hasOpenWindow(windowId));
   return { visible, side: await getPanelSide() };
 };
 
@@ -71,9 +88,10 @@ const cropCapture = async (image: string, rect: CaptureRect, viewport: CaptureVi
   }
 };
 
-const notifyPanel = (payload: CapturePayload) =>
+const notifyPanel = (windowId: number, payload: CapturePayload) =>
   Browser.runtime.sendMessage({
     action: ACTIONS.attachCapture,
+    windowId,
     payload,
   });
 
@@ -83,7 +101,8 @@ export const capture = async (
   viewport: unknown
 ) => {
   const tabId = sender.tab?.id;
-  if (tabId == null) return { status: "error", message: "No tab found." };
+  const windowId = sender.tab?.windowId;
+  if (tabId == null || windowId == null) return { status: "error", message: "No tab/window found." };
 
   if (
     !isCaptureRect(rect) ||
@@ -101,7 +120,7 @@ export const capture = async (
 
   try {
     const content = await cropCapture(captured.image, rect, viewport);
-    await notifyPanel({ name: "page-capture.jpg", mimeType: "image/jpeg", content });
+    await notifyPanel(windowId, { name: "page-capture.jpg", mimeType: "image/jpeg", content });
     return { status: "success" };
   } catch {
     return { status: "error", message: "Couldn't capture that area." };
@@ -126,6 +145,6 @@ export const registerCaptureListeners = () => {
   });
 
   Browser.windows.onRemoved.addListener((windowId) => {
-    openWindows.delete(windowId);
+    void removeOpenWindow(windowId);
   });
 };

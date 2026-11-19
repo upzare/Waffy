@@ -37,6 +37,7 @@ export const DOM_ACTIONS = {
 
 export type RuntimeMessage<T = undefined> = {
   action: string;
+  windowId: number;
   payload?: T;
 };
 

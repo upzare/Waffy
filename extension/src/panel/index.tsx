@@ -189,7 +189,11 @@ const App = () => {
           window.location.reload();
           return;
         case ACTIONS.attachCapture:
-          attachCapture(message);
+          void (async () => {
+            const panelWindow = await Browser.windows.getCurrent();
+            if (message.windowId == null || message.windowId !== panelWindow.id) return;
+            attachCapture(message);
+          })();
           return;
         default:
           return undefined;
