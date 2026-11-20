@@ -4,6 +4,7 @@ import type {
   OAuthTokens,
 } from "@ai-sdk/mcp";
 import { restrictLocalStorageAccess } from "@/lib/helper";
+import { equalJson } from "@/lib/utils";
 
 export type McpAuth = "none" | "bearer" | "oauth";
 
@@ -29,6 +30,20 @@ export type McpServerInput = Pick<McpServer, "name" | "url" | "auth" | "clientId
   bearer?: string;
 };
 
+export interface McpServerConfig {
+  server: McpServer;
+  bearer?: string;
+}
+
+export interface McpServerDraft extends McpServerConfig {
+  oauth?: { saved?: McpCredentials; value: McpCredentials };
+}
+
+export interface McpServerChange {
+  original?: McpServerConfig;
+  draft?: McpServerDraft;
+}
+
 const SERVER_PREFIX = "mcp.server.";
 export const isMcpServerKey = (key: string) => key.startsWith(SERVER_PREFIX);
 const serverKey = (id: string) => SERVER_PREFIX + id;
@@ -42,14 +57,35 @@ export function withMcpServerLock<T>(
   return navigator.locks.request(serverKey(id), { signal }, operation);
 }
 
+function serversFromRecords(records: Record<string, unknown>): McpServer[] {
+  return Object.keys(records)
+    .filter(isMcpServerKey)
+    .flatMap((key) => {
+      const server = records[key] as McpServer | undefined;
+      return typeof server?.id === "string" &&
+        typeof server.name === "string" &&
+        typeof server.url === "string"
+        ? [server]
+        : [];
+    });
+}
+
 export async function listMcpServers(): Promise<McpServer[]> {
   const storage = chrome.storage.local;
   const keys = storage.getKeys ? (await storage.getKeys()).filter(isMcpServerKey) : null;
-  const records = await storage.get<Record<string, McpServer>>(keys);
-  return Object.keys(records)
-    .filter(isMcpServerKey)
-    .map((key) => records[key])
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return serversFromRecords(await storage.get(keys)).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function parseMcpServerConfigs(records: Record<string, unknown>) {
+  return new Map<string, McpServerConfig>(
+    serversFromRecords(records).map((server) => {
+      const credentials = records[credentialKey(server.id)] as McpCredentials | undefined;
+      return [
+        server.id,
+        { server, bearer: server.auth === "bearer" ? credentials?.bearer : undefined },
+      ];
+    })
+  );
 }
 
 export async function readMcpServer(id: string): Promise<McpServer | undefined> {
@@ -62,18 +98,6 @@ export async function readMcpCredentials(id: string): Promise<McpCredentials> {
       credentialKey(id)
     ] ?? {}
   );
-}
-
-export async function readMcpServerForEdit(id: string) {
-  // Save writes the server and credentials together. Read both from the same snapshot.
-  const serverStorageKey = serverKey(id);
-  const credentialStorageKey = credentialKey(id);
-  const snapshot = await chrome.storage.local.get([serverStorageKey, credentialStorageKey]);
-  const server = snapshot[serverStorageKey] as McpServer | undefined;
-  if (!server) throw new Error("This server has been removed.");
-
-  const credentials = snapshot[credentialStorageKey] as McpCredentials | undefined;
-  return { server, bearer: server.auth === "bearer" ? credentials?.bearer : undefined };
 }
 
 export async function writeMcpCredentials(id: string, credentials: McpCredentials) {
@@ -98,7 +122,19 @@ function validatedUrl(value: string, allowLoopback = false): URL {
   return url;
 }
 
-export async function saveMcpServer(input: McpServerInput, original?: McpServer) {
+export function sameMcpConnection(a: McpServer, b: McpServer) {
+  return a.url === b.url && a.auth === b.auth && a.clientId === b.clientId && a.issuer === b.issuer;
+}
+
+export function mergeMcpServerMetadata(original: McpServer, draft: McpServer, latest: McpServer) {
+  return {
+    ...draft,
+    name: draft.name === original.name ? latest.name : draft.name,
+    enabled: draft.enabled === original.enabled ? latest.enabled : draft.enabled,
+  };
+}
+
+export function prepareMcpServer(input: McpServerInput, previous?: McpServerDraft): McpServerDraft {
   const name = input.name.trim();
   if (!name) throw new Error("Enter a name for the server.");
   const url = validatedUrl(input.url.trim(), input.auth !== "oauth").href;
@@ -108,67 +144,80 @@ export async function saveMcpServer(input: McpServerInput, original?: McpServer)
   if (issuer && validatedUrl(issuer).search)
     throw new Error("The OAuth issuer URL cannot contain a query.");
   // A root issuer can be advertised with or without its trailing slash. Keep the entered form.
-  const id = original?.id ?? crypto.randomUUID();
+  const server: McpServer = {
+    id: previous?.server.id ?? crypto.randomUUID(),
+    revision: previous?.server.revision ?? crypto.randomUUID(),
+    name,
+    url,
+    auth: input.auth,
+    ...(clientId && { clientId, issuer }),
+    enabled: previous?.server.enabled ?? true,
+  };
+  const sameConnection = previous && sameMcpConnection(previous.server, server);
+  const bearer =
+    input.auth === "bearer"
+      ? (input.bearer?.trim() ?? (sameConnection ? previous.bearer : undefined))
+      : undefined;
+  if (input.auth === "bearer" && (!bearer || /[\s\x00-\x1f\x7f]/.test(bearer))) {
+    throw new Error("Enter a valid bearer token without spaces.");
+  }
+  if (previous && (!sameConnection || bearer !== previous.bearer)) {
+    server.revision = crypto.randomUUID();
+  }
+  return { server, bearer, oauth: sameConnection ? previous.oauth : undefined };
+}
 
+export async function applyMcpServerChange(
+  id: string,
+  { original, draft }: McpServerChange
+): Promise<McpServerConfig | undefined> {
   return withMcpServerLock(id, async () => {
-    const current = await readMcpServer(id);
-    if (
-      original &&
-      (!current || current.revision !== original.revision || current.name !== original.name)
-    ) {
-      throw new Error("This server changed in another window. Reopen it and try again.");
-    }
-    const sameConnection =
-      current &&
-      current.url === url &&
-      current.auth === input.auth &&
-      current.clientId === clientId &&
-      current.issuer === issuer;
-    const existing = sameConnection ? await readMcpCredentials(id) : {};
-    const bearer = input.auth === "bearer" ? (input.bearer?.trim() ?? existing.bearer) : undefined;
-    if (input.auth === "bearer" && (!bearer || /[\s\x00-\x1f\x7f]/.test(bearer))) {
-      throw new Error("Enter a valid bearer token without spaces.");
+    const configKey = serverKey(id);
+    const authKey = credentialKey(id);
+    const records = await chrome.storage.local.get([configKey, authKey]);
+    const current = records[configKey] as McpServer | undefined;
+    const conflict = () =>
+      new Error(
+        `“${original?.server.name ?? draft?.server.name}” changed in another window. Cancel the pending changes and try again.`
+      );
+
+    if (!draft && !current) return undefined;
+    if (current?.revision !== original?.server.revision) throw conflict();
+    if (!draft) {
+      await chrome.storage.local.remove([configKey, authKey]);
+      return undefined;
     }
 
-    const changed = !sameConnection || bearer !== existing.bearer;
-    const server: McpServer = {
-      id,
-      revision: changed ? crypto.randomUUID() : current.revision,
-      name,
-      url,
-      auth: input.auth,
-      ...(clientId && { clientId, issuer }),
-      enabled: current?.enabled ?? true,
+    const existing = (records[authKey] as McpCredentials | undefined) ?? {};
+    const connectionChanged =
+      !current || !sameMcpConnection(current, draft.server) || draft.bearer !== existing.bearer;
+    const { oauth } = draft;
+    if (oauth && !connectionChanged && !equalJson(oauth.saved ?? {}, existing)) {
+      throw conflict();
+    }
+    const nextServer = {
+      ...draft.server,
+      revision: connectionChanged || oauth ? draft.server.revision : current.revision,
     };
-    await restrictLocalStorageAccess();
-    await chrome.storage.local.set({
-      [serverKey(id)]: server,
-      ...(changed && { [credentialKey(id)]: bearer ? { bearer } : {} }),
-    });
-    return server;
-  });
-}
-
-export async function markMcpIdentityChanged(server: McpServer) {
-  // Called under the server lock when interactive OAuth changes the credentials.
-  await chrome.storage.local.set({
-    [serverKey(server.id)]: { ...server, revision: crypto.randomUUID() },
-  });
-}
-
-export async function setMcpServerEnabled(server: McpServer, enabled: boolean) {
-  await withMcpServerLock(server.id, async () => {
-    const current = await readMcpServer(server.id);
-    if (current?.revision !== server.revision) throw new Error("This server has changed.");
-    await chrome.storage.local.set({ [serverKey(server.id)]: { ...current, enabled } });
-  });
-}
-
-export async function removeMcpServer(server: McpServer) {
-  await withMcpServerLock(server.id, async () => {
-    if ((await readMcpServer(server.id))?.revision !== server.revision) {
-      throw new Error("This server has changed.");
+    if (
+      current &&
+      original &&
+      nextServer.name !== original.server.name &&
+      current.name !== original.server.name &&
+      current.name !== nextServer.name
+    ) {
+      throw conflict();
     }
-    await chrome.storage.local.remove([serverKey(server.id), credentialKey(server.id)]);
+    const server =
+      current && original
+        ? mergeMcpServerMetadata(original.server, nextServer, current)
+        : nextServer;
+    const updates: Record<string, McpServer | McpCredentials> = { [configKey]: server };
+    if (connectionChanged || oauth) {
+      await restrictLocalStorageAccess();
+      updates[authKey] = oauth?.value ?? (draft.bearer ? { bearer: draft.bearer } : {});
+    }
+    await chrome.storage.local.set(updates);
+    return { server, bearer: draft.bearer };
   });
 }

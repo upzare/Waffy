@@ -7,14 +7,16 @@ import {
   type MCPClient,
   type OAuthClientProvider,
 } from "@ai-sdk/mcp";
+import { equalJson } from "@/lib/utils";
 import {
-  markMcpIdentityChanged,
   readMcpCredentials,
   readMcpServer,
+  sameMcpConnection,
   withMcpServerLock,
   writeMcpCredentials,
   type McpCredentials,
   type McpServer,
+  type McpServerDraft,
 } from "./storage";
 
 const DISCOVERY_TIMEOUT = 8_000;
@@ -40,14 +42,19 @@ export function mcpErrorMessage(error: unknown) {
   return "The MCP server could not complete the request.";
 }
 
-function createOAuthProvider(server: McpServer, credentials: McpCredentials, interactive: boolean) {
+function createOAuthProvider(
+  server: McpServer,
+  credentials: McpCredentials,
+  interactive: boolean,
+  saveCredentials?: (value: McpCredentials) => Promise<void>
+) {
   let expectedState = "";
   let verifier = "";
   let authorizationUrl: URL | undefined;
 
   const update = async (patch: Partial<McpCredentials>) => {
     credentials = { ...credentials, ...patch };
-    await writeMcpCredentials(server.id, credentials);
+    await saveCredentials?.(credentials);
   };
   const provider: OAuthClientProvider = {
     redirectUrl: mcpRedirectUrl(),
@@ -86,19 +93,23 @@ function createOAuthProvider(server: McpServer, credentials: McpCredentials, int
     invalidateCredentials: async (scope) => {
       if (scope === "all" || scope === "verifier") verifier = "";
       if (scope === "verifier") return;
-      if (scope === "all") credentials = {};
+      credentials = scope === "all" ? {} : { ...credentials };
       if (scope === "tokens") delete credentials.tokens;
       if (scope === "client") {
         delete credentials.client;
         delete credentials.authorizationServer;
       }
-      await writeMcpCredentials(server.id, credentials);
+      await saveCredentials?.(credentials);
     },
     redirectToAuthorization: (url) => {
       authorizationUrl = url;
     },
   };
-  return { provider, getAuthorizationUrl: () => authorizationUrl };
+  return {
+    provider,
+    getAuthorizationUrl: () => authorizationUrl,
+    getCredentials: () => credentials,
+  };
 }
 
 type Fetcher = typeof globalThis.fetch;
@@ -148,14 +159,28 @@ async function completeSignIn(
 // token refreshes and config edits from racing across extension windows.
 export async function discoverMcpServer(
   server: McpServer,
-  { interactive = false, signal }: { interactive?: boolean; signal?: AbortSignal } = {}
+  {
+    signal,
+    draft,
+  }: {
+    signal?: AbortSignal;
+    draft?: { credentials: McpCredentials; interactive: boolean };
+  } = {}
 ) {
-  const credentials = await readMcpCredentials(server.id);
+  const interactive = draft?.interactive ?? false;
+  const credentials = draft?.credentials ?? (await readMcpCredentials(server.id));
   if (server.auth === "oauth" && !interactive && !credentials.tokens) {
     throw new McpConnectionError("Sign in to use this server.");
   }
   const oauth =
-    server.auth === "oauth" ? createOAuthProvider(server, credentials, interactive) : undefined;
+    server.auth === "oauth"
+      ? createOAuthProvider(
+          server,
+          credentials,
+          interactive,
+          draft ? undefined : (value) => writeMcpCredentials(server.id, value)
+        )
+      : undefined;
   let setupSignal: AbortSignal | undefined;
   let resourceMetadataUrl: URL | undefined;
   const fetchFn: Fetcher = async (input, init) => {
@@ -218,8 +243,10 @@ export async function discoverMcpServer(
     }
   };
 
+  let connection;
+  let signedIn = false;
   try {
-    return await open();
+    connection = await open();
   } catch (error) {
     const url = oauth?.getAuthorizationUrl();
     if (!oauth || !url) throw error;
@@ -231,9 +258,10 @@ export async function discoverMcpServer(
         signal: timeoutSignal(AUTH_TIMEOUT, init?.signal ?? signal),
       });
     await completeSignIn(server, oauth.provider, url, exchangeFetch, resourceMetadataUrl);
-    await markMcpIdentityChanged(server);
-    return open();
+    connection = await open();
+    signedIn = true;
   }
+  return { ...connection, signedIn, credentials: oauth?.getCredentials() ?? credentials };
 }
 
 async function listMcpTools(client: MCPClient, signal: AbortSignal) {
@@ -249,18 +277,26 @@ async function listMcpTools(client: MCPClient, signal: AbortSignal) {
   return tools;
 }
 
-export async function testMcpServer(server: McpServer, interactive = false) {
+export async function testMcpServer(
+  { server, bearer, oauth }: McpServerDraft,
+  interactive = false
+) {
   return withMcpServerLock(server.id, async () => {
-    const current = await readMcpServer(server.id);
-    if (current?.revision !== server.revision) {
-      throw new McpConnectionError("This server has changed. Try again.");
-    }
-    const { client, definitions } = await discoverMcpServer(current, { interactive });
+    const current = server.auth === "oauth" ? await readMcpServer(server.id) : undefined;
+    const saved =
+      current && sameMcpConnection(current, server)
+        ? await readMcpCredentials(server.id)
+        : undefined;
+    const initial = oauth?.value ?? saved ?? (bearer ? { bearer } : {});
+    const { client, definitions, credentials, signedIn } = await discoverMcpServer(server, {
+      draft: { credentials: initial, interactive },
+    });
     try {
-      const updated = await readMcpServer(server.id);
+      const changed = signedIn || !equalJson(credentials, initial);
       return {
-        revision: updated?.revision ?? current.revision,
+        revision: signedIn ? crypto.randomUUID() : server.revision,
         tools: definitions.map((tool) => tool.name),
+        oauth: changed ? { saved: oauth ? oauth.saved : saved, value: credentials } : undefined,
       };
     } finally {
       await closeMcpClient(client);

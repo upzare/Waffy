@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { Eye, EyeOff, Plus } from "lucide-react";
 import {
   Dialog,
@@ -13,14 +13,10 @@ import { Switch } from "@/components/ui/switch";
 import { errorMessage } from "@/lib/errors";
 import { mcpErrorMessage, mcpRedirectUrl, testMcpServer } from "@/lib/mcp/client";
 import {
-  isMcpServerKey,
-  listMcpServers,
-  readMcpServerForEdit,
-  removeMcpServer,
-  saveMcpServer,
-  setMcpServerEnabled,
+  prepareMcpServer,
   type McpAuth,
   type McpServer,
+  type McpServerDraft,
   type McpServerInput,
 } from "@/lib/mcp/storage";
 import {
@@ -38,10 +34,9 @@ import {
 } from "../styles";
 
 type ServerDialog =
-  | { view: "form"; server?: McpServer; bearer?: string }
-  | { view: "manage" | "remove"; serverId: string };
+  { view: "form"; config?: McpServerDraft } | { view: "manage" | "remove"; serverId: string };
 
-type TestReport = Awaited<ReturnType<typeof testMcpServer>>;
+type TestReport = Pick<Awaited<ReturnType<typeof testMcpServer>>, "revision" | "tools">;
 
 const authLabels: Record<McpAuth, string> = {
   none: "None",
@@ -59,22 +54,19 @@ const toolCount = (count: number) => `${count} ${count === 1 ? "tool" : "tools"}
 const normalizeEndpoint = (url: string) => (URL.canParse(url) ? new URL(url).href : undefined);
 
 function ServerForm({
-  server,
-  savedBearer,
-  busy,
-  onSave,
+  config,
+  onUpdate,
   onCancel,
 }: {
-  server?: McpServer;
-  savedBearer?: string;
-  busy: boolean;
-  onSave: (input: McpServerInput) => void;
+  config?: McpServerDraft;
+  onUpdate: (input: McpServerInput) => void;
   onCancel: () => void;
 }) {
+  const server = config?.server;
   const [draft, setDraft] = useState<McpServerInput>(server ?? { name: "", url: "", auth: "none" });
   const [bearerVisible, setBearerVisible] = useState(false);
   const endpoint = normalizeEndpoint(draft.url.trim());
-  const bearer = draft.bearer ?? (endpoint === server?.url ? savedBearer : undefined) ?? "";
+  const bearer = draft.bearer ?? (endpoint === server?.url ? config?.bearer : undefined) ?? "";
 
   const updateDraft = (changes: Partial<McpServerInput>) =>
     setDraft((current) => ({ ...current, ...changes }));
@@ -93,10 +85,10 @@ function ServerForm({
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
-        onSave(draft);
+        onUpdate(draft);
       }}
     >
-      <fieldset disabled={busy} className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-4">
         <label className={formField}>
           <span>Server name</span>
           <input
@@ -198,56 +190,33 @@ function ServerForm({
             </label>
           </>
         )}
-      </fieldset>
+      </div>
       <DialogFooter>
-        <button type="button" className={secondaryAction} disabled={busy} onClick={onCancel}>
+        <button type="button" className={secondaryAction} onClick={onCancel}>
           Cancel
         </button>
-        <button type="submit" className={primaryAction} disabled={busy}>
-          {server ? "Save changes" : "Add server"}
+        <button type="submit" className={primaryAction}>
+          {server ? "Update" : "Add server"}
         </button>
       </DialogFooter>
     </form>
   );
 }
 
-export default function McpServersSection() {
-  const [servers, setServers] = useState<McpServer[] | null>(null);
+interface McpServersSectionProps {
+  servers: McpServerDraft[];
+  saving: boolean;
+  onStage: (previous?: McpServerDraft, draft?: McpServerDraft) => void;
+}
+
+export default function McpServersSection({ servers, saving, onStage }: McpServersSectionProps) {
   const [dialog, setDialog] = useState<ServerDialog | null>(null);
   const [tests, setTests] = useState<Partial<Record<string, TestReport>>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState("");
   const [dialogError, setDialogError] = useState("");
   const operationPending = useRef(false);
-  const refreshQueue = useRef(Promise.resolve(true));
   const trigger = useRef<HTMLButtonElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
-
-  const refreshServers = useCallback(() => {
-    const refresh = refreshQueue.current.then(async () => {
-      try {
-        setServers(await listMcpServers());
-        setLoadError("");
-        return true;
-      } catch {
-        setLoadError("Could not load MCP servers.");
-        return false;
-      }
-    });
-    refreshQueue.current = refresh;
-    return refresh;
-  }, []);
-
-  useEffect(() => {
-    const onChange = (changes: Record<string, chrome.storage.StorageChange>) => {
-      if (Object.keys(changes).some(isMcpServerKey)) void refreshServers();
-    };
-    chrome.storage.local.onChanged.addListener(onChange);
-    void refreshServers();
-    return () => {
-      chrome.storage.local.onChanged.removeListener(onChange);
-    };
-  }, [refreshServers]);
 
   const show = (next: ServerDialog | null) => {
     setDialogError("");
@@ -259,67 +228,43 @@ export default function McpServersSection() {
     show(next);
   };
 
-  const perform = async (
-    pending: string,
-    operation: () => Promise<void>,
-    describeError: (error: unknown) => string = errorMessage
-  ) => {
+  const manage = (serverId: string) => show({ view: "manage", serverId });
+
+  const update = (input: McpServerInput, previous?: McpServerDraft) => {
+    try {
+      const draft = prepareMcpServer(input, previous);
+      onStage(previous, draft);
+      show(null);
+    } catch (error) {
+      setDialogError(errorMessage(error));
+    }
+  };
+
+  const test = async (config: McpServerDraft, signIn = false) => {
     if (operationPending.current) return;
+    const { server } = config;
     operationPending.current = true;
     setDialogError("");
-    setBusy(pending);
+    setBusy(signIn ? "Waiting for OAuth sign-in…" : "Testing connection…");
+    setTests((previous) => ({ ...previous, [server.id]: undefined }));
     try {
-      await operation();
+      const { oauth, ...report } = await testMcpServer(config, signIn);
+      if (oauth)
+        onStage(config, { ...config, server: { ...server, revision: report.revision }, oauth });
+      setTests((previous) => ({ ...previous, [server.id]: report }));
     } catch (error) {
-      setDialogError(describeError(error));
+      setDialogError(mcpErrorMessage(error));
     } finally {
       operationPending.current = false;
       setBusy(null);
     }
   };
 
-  const manage = (serverId: string) => show({ view: "manage", serverId });
-
-  const edit = (serverId: string) =>
-    perform("Loading server…", async () => {
-      const saved = await readMcpServerForEdit(serverId);
-      show({ view: "form", ...saved });
-    });
-
-  const save = (input: McpServerInput, original?: McpServer) =>
-    perform("Saving server…", async () => {
-      const saved = await saveMcpServer(input, original);
-      if (await refreshServers()) manage(saved.id);
-      else show(null);
-    });
-
-  const test = (server: McpServer, signIn = false) =>
-    perform(
-      signIn ? "Waiting for OAuth sign-in…" : "Testing connection…",
-      async () => {
-        setTests((previous) => ({ ...previous, [server.id]: undefined }));
-        const results = await testMcpServer(server, signIn);
-        if (results.revision !== server.revision) await refreshServers();
-        setTests((previous) => ({ ...previous, [server.id]: results }));
-      },
-      mcpErrorMessage
-    );
-
-  const remove = (server: McpServer) =>
-    perform("Removing server…", async () => {
-      await removeMcpServer(server);
-      await refreshServers();
-      show(null);
-    });
-
-  const toggleEnabled = (server: McpServer, enabled: boolean) =>
-    perform("Updating server…", async () => {
-      await setMcpServerEnabled(server, enabled);
-      await refreshServers();
-    });
-
-  const server =
-    dialog?.view === "form" ? dialog.server : servers?.find(({ id }) => id === dialog?.serverId);
+  const config =
+    dialog?.view === "form"
+      ? dialog.config
+      : servers.find(({ server }) => server.id === dialog?.serverId);
+  const server = config?.server;
   const lastTest =
     server && tests[server.id]?.revision === server.revision ? tests[server.id] : null;
 
@@ -353,6 +298,7 @@ export default function McpServersSection() {
             type="button"
             aria-haspopup="dialog"
             className={`${primaryAction} gap-2`}
+            disabled={saving}
             onClick={(event) => open(event, { view: "form" })}
           >
             <Plus size={16} aria-hidden />
@@ -360,24 +306,13 @@ export default function McpServersSection() {
           </button>
         </div>
 
-        {loadError && (
-          <p role="alert" className={alertError}>
-            {loadError}
-          </p>
-        )}
-        {!servers && !loadError && (
-          <p role="status" className={panelSubtitle}>
-            Loading servers…
-          </p>
-        )}
-        {servers?.length === 0 && (
+        {servers.length === 0 ? (
           <p className={`rounded-xl border border-border px-4 py-6 text-center ${panelSubtitle}`}>
             No MCP servers added.
           </p>
-        )}
-        {!!servers?.length && (
+        ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-white/5">
-            {servers.map((item) => (
+            {servers.map(({ server: item }) => (
               <li key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold" title={item.name}>
@@ -399,6 +334,7 @@ export default function McpServersSection() {
                     aria-haspopup="dialog"
                     aria-label={`Manage ${item.name}`}
                     className={secondaryAction}
+                    disabled={saving}
                     onClick={(event) => open(event, { view: "manage", serverId: item.id })}
                   >
                     Manage
@@ -419,7 +355,7 @@ export default function McpServersSection() {
             <DialogTitle className="wrap-anywhere">{dialogTitle}</DialogTitle>
             {dialog.view === "remove" && server ? (
               <DialogDescription className="wrap-anywhere">
-                Remove {server.name} and its saved credentials?
+                Remove {server.name} and its credentials when you save changes?
               </DialogDescription>
             ) : (
               dialog.view !== "form" && (
@@ -445,14 +381,12 @@ export default function McpServersSection() {
 
           {dialog.view === "form" ? (
             <ServerForm
-              key={dialog.server?.id ?? "new-server"}
-              server={dialog.server}
-              savedBearer={dialog.bearer}
-              busy={!!busy}
-              onSave={(input) => void save(input, dialog.server)}
-              onCancel={() => (dialog.server ? manage(dialog.server.id) : show(null))}
+              key={server?.id ?? "new-server"}
+              config={dialog.config}
+              onUpdate={(input) => update(input, config)}
+              onCancel={() => (server ? manage(server.id) : show(null))}
             />
-          ) : !server ? (
+          ) : !config || !server ? (
             <DialogFooter>
               <DialogClose className={secondaryAction}>Close</DialogClose>
             </DialogFooter>
@@ -464,14 +398,16 @@ export default function McpServersSection() {
                   checked={server.enabled}
                   disabled={!!busy}
                   aria-label="Enable this MCP server"
-                  onCheckedChange={(enabled) => void toggleEnabled(server, enabled)}
+                  onCheckedChange={(enabled) =>
+                    onStage(config, { ...config, server: { ...server, enabled } })
+                  }
                 />
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   className={secondaryAction}
-                  onClick={() => void edit(server.id)}
+                  onClick={() => show({ view: "form", config })}
                   disabled={!!busy}
                 >
                   Edit
@@ -479,7 +415,7 @@ export default function McpServersSection() {
                 <button
                   type="button"
                   className={secondaryAction}
-                  onClick={() => void test(server)}
+                  onClick={() => void test(config)}
                   disabled={!!busy}
                 >
                   Test
@@ -488,7 +424,7 @@ export default function McpServersSection() {
                   <button
                     type="button"
                     className={secondaryAction}
-                    onClick={() => void test(server, true)}
+                    onClick={() => void test(config, true)}
                     disabled={!!busy}
                   >
                     Sign in or Reconnect
@@ -496,7 +432,7 @@ export default function McpServersSection() {
                 )}
                 <button
                   type="button"
-                  className={dangerAction}
+                  className={`${dangerAction} ml-auto`}
                   onClick={() => show({ view: "remove", serverId: server.id })}
                   disabled={!!busy}
                 >
@@ -538,7 +474,10 @@ export default function McpServersSection() {
               <button
                 type="button"
                 className={dangerAction}
-                onClick={() => void remove(server)}
+                onClick={() => {
+                  onStage(config);
+                  show(null);
+                }}
                 disabled={!!busy}
               >
                 Remove server

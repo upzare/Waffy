@@ -26,6 +26,7 @@ import {
 interface MemorySectionProps {
   settings: Settings;
   setSettings: React.Dispatch<React.SetStateAction<Settings>>;
+  memoryEnabled: boolean;
 }
 
 interface SavedFact {
@@ -34,15 +35,16 @@ interface SavedFact {
   createdAt: Date;
 }
 
-const MemorySection: React.FC<MemorySectionProps> = ({ settings, setSettings }) => {
+const MemorySection: React.FC<MemorySectionProps> = ({ settings, setSettings, memoryEnabled }) => {
   const [facts, setFacts] = useState<SavedFact[]>([]);
   const [loading, setLoading] = useState(true);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summary, setSummary] = useState("");
   const [summarizing, setSummarizing] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
-  const [resetting, setResetting] = useState(false);
+  const [confirmation, setConfirmation] = useState<SavedFact | "reset" | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const summaryRequest = useRef(0);
+  const isReset = confirmation === "reset";
 
   useEffect(() => {
     let active = true;
@@ -71,39 +73,33 @@ const MemorySection: React.FC<MemorySectionProps> = ({ settings, setSettings }) 
     };
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!settings.featureMemory) return;
-    try {
-      await deleteMemory(id);
-    } catch (error) {
-      console.error("Failed to delete memory", error);
-      toast.error("Couldn't delete that fact");
-    }
-  };
-
   const closeSummary = () => {
     summaryRequest.current += 1;
     setSummaryOpen(false);
     setSummarizing(false);
   };
 
-  const handleReset = async () => {
-    if (!settings.featureMemory) return;
-    setResetting(true);
+  const handleConfirm = async () => {
+    if (!memoryEnabled || !confirmation || confirming) return;
+    setConfirming(true);
     try {
-      await resetMemories();
-      setResetOpen(false);
-      toast.success("Memory reset");
+      if (confirmation === "reset") {
+        await resetMemories();
+        toast.success("Memory reset");
+      } else {
+        await deleteMemory(confirmation.id);
+      }
+      setConfirmation(null);
     } catch (error) {
-      console.error("Failed to reset memory", error);
-      toast.error("Couldn't reset memory");
+      console.error(isReset ? "Failed to reset memory" : "Failed to delete memory", error);
+      toast.error(isReset ? "Couldn't reset memory" : "Couldn't delete that fact");
     } finally {
-      setResetting(false);
+      setConfirming(false);
     }
   };
 
   const handleSummarize = async () => {
-    if (!settings.featureMemory) return;
+    if (!memoryEnabled) return;
     const request = ++summaryRequest.current;
     setSummaryOpen(true);
     setSummarizing(true);
@@ -162,15 +158,16 @@ const MemorySection: React.FC<MemorySectionProps> = ({ settings, setSettings }) 
               type="button"
               className={`${secondaryButton} disabled:cursor-not-allowed disabled:opacity-40`}
               onClick={() => void handleSummarize()}
-              disabled={!settings.featureMemory || summarizing || loading || facts.length === 0}
+              disabled={!memoryEnabled || summarizing || loading || facts.length === 0}
             >
               Summarize
             </button>
             <button
               type="button"
               className={`${dangerButton} disabled:cursor-not-allowed disabled:opacity-40`}
-              onClick={() => setResetOpen(true)}
-              disabled={!settings.featureMemory || loading || resetting || facts.length === 0}
+              aria-haspopup="dialog"
+              onClick={() => setConfirmation("reset")}
+              disabled={!memoryEnabled || loading || confirming || facts.length === 0}
             >
               Reset memory
             </button>
@@ -204,8 +201,9 @@ const MemorySection: React.FC<MemorySectionProps> = ({ settings, setSettings }) 
                   type="button"
                   className={`${iconButton} disabled:cursor-not-allowed disabled:opacity-40`}
                   title="Delete fact"
-                  onClick={() => void handleDelete(fact.id)}
-                  disabled={!settings.featureMemory}
+                  aria-haspopup="dialog"
+                  onClick={() => setConfirmation(fact)}
+                  disabled={!memoryEnabled || confirming}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -242,35 +240,46 @@ const MemorySection: React.FC<MemorySectionProps> = ({ settings, setSettings }) 
       </Dialog>
 
       <Dialog
-        open={resetOpen}
-        onOpenChange={(open) => {
-          if (!open && !resetting) setResetOpen(false);
+        open={confirmation !== null}
+        onOpenChange={(open, details) => {
+          if (open) return;
+          if (confirming) details.cancel();
+          else setConfirmation(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset memory</DialogTitle>
-            <DialogDescription>
-              This deletes every saved fact. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose
-              className={`${secondaryButton} disabled:cursor-not-allowed disabled:opacity-40`}
-              disabled={resetting}
-            >
-              No
-            </DialogClose>
-            <button
-              type="button"
-              className={`${dangerButton} disabled:cursor-not-allowed disabled:opacity-40`}
-              onClick={() => void handleReset()}
-              disabled={resetting}
-            >
-              {resetting ? "Resetting…" : "Yes"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
+        {confirmation && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{isReset ? "Reset memory" : "Delete fact"}</DialogTitle>
+              <DialogDescription>
+                {isReset
+                  ? "This deletes every saved fact. This cannot be undone."
+                  : "Delete this saved fact? This cannot be undone."}
+              </DialogDescription>
+            </DialogHeader>
+            {confirmation !== "reset" && (
+              <blockquote className="max-h-[min(12rem,30vh)] overflow-y-auto rounded-xl border border-border bg-black/40 px-4 py-3 text-sm leading-relaxed wrap-anywhere whitespace-pre-wrap text-text-secondary">
+                {confirmation.content}
+              </blockquote>
+            )}
+            <DialogFooter>
+              <DialogClose
+                className={`${secondaryButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                disabled={confirming}
+              >
+                No
+              </DialogClose>
+              <button
+                type="button"
+                className={`${dangerButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                onClick={() => void handleConfirm()}
+                disabled={confirming || !memoryEnabled}
+              >
+                {confirming ? (isReset ? "Resetting…" : "Deleting…") : "Yes"}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        )}
       </Dialog>
     </>
   );

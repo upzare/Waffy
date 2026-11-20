@@ -55,32 +55,21 @@ export const initSettings = async () => {
   }
 };
 
-const parseStoredJson = <T>(value: unknown, fallback: T): T => {
-  if (typeof value !== "string" || value === "" || value === "undefined") {
-    return fallback;
-  }
+const parseStoredJson = <T>(value: unknown): T | undefined => {
+  if (typeof value !== "string") return undefined;
   try {
     return JSON.parse(value) as T;
   } catch {
-    return fallback;
+    return undefined;
   }
 };
 
-export const getLocalStorage = async () => {
-  const localStorage = await Browser.storage.local.get(["client", "settings", "apiKeys"]);
-  localStorage.client = parseStoredJson(localStorage.client, null);
-  localStorage.settings = parseStoredJson(localStorage.settings, {});
-  localStorage.apiKeys = parseStoredJson(localStorage.apiKeys, {});
-  return localStorage;
-};
-
-export const getAppSettings = async (): Promise<AppSettings> => {
-  const localStorage = await getLocalStorage();
-  const storedSettings = (localStorage.settings ?? {}) as Partial<Settings>;
+export function parseAppSettings(storage: Record<string, unknown>): AppSettings {
+  const storedSettings = parseStoredJson<Partial<Settings>>(storage.settings) ?? {};
   const settings: Settings = {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
-    pinnedPrompts: storedSettings.pinnedPrompts?.length
+    pinnedPrompts: Array.isArray(storedSettings.pinnedPrompts)
       ? storedSettings.pinnedPrompts
       : DEFAULT_SETTINGS.pinnedPrompts,
     models: {
@@ -94,13 +83,22 @@ export const getAppSettings = async (): Promise<AppSettings> => {
   };
   return {
     settings,
-    apiKeys: (localStorage.apiKeys ?? {}) as ApiKeys,
+    apiKeys: parseStoredJson<ApiKeys>(storage.apiKeys) ?? {},
   };
-};
+}
 
-export const saveAppSettings = async (settings: Settings, apiKeys: ApiKeys) => {
-  await Browser.storage.local.set({
-    settings: JSON.stringify(settings),
-    apiKeys: JSON.stringify(apiKeys),
+export const getAppSettings = async () =>
+  parseAppSettings(await Browser.storage.local.get(["settings", "apiKeys"]));
+
+export const updateAppSettings = async (update: (current: AppSettings) => Partial<AppSettings>) =>
+  navigator.locks.request("app-settings", async () => {
+    const current = await getAppSettings();
+    const updates = update(current);
+    const entries = Object.entries(updates);
+    if (entries.length > 0) {
+      await Browser.storage.local.set(
+        Object.fromEntries(entries.map(([key, value]) => [key, JSON.stringify(value)]))
+      );
+    }
+    return { ...current, ...updates };
   });
-};

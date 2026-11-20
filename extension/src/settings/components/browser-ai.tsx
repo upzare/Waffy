@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ensureBrowserAIModelReady,
   getBrowserAIModelLabel,
@@ -9,7 +9,8 @@ import { secondaryButton } from "../styles";
 import { BROWSER_AI_PROVIDER } from "../providers";
 
 interface BrowserAISectionProps {
-  onStatusChange?: (status: BrowserAIStatus) => void;
+  status: BrowserAIStatus;
+  setStatus: (status: BrowserAIStatus) => void;
 }
 
 const STATUS_LABELS: Record<BrowserAIStatus, string> = {
@@ -32,22 +33,20 @@ function getStatusBadgeClass(status: BrowserAIStatus): string {
   return `${base} border-[rgba(245,166,35,0.35)] bg-[rgba(245,166,35,0.08)] text-[#f5a623]`;
 }
 
-const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) => {
-  const [status, setStatus] = useState<BrowserAIStatus>("unavailable");
+const BrowserAISection: React.FC<BrowserAISectionProps> = ({ status, setStatus }) => {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshStatus = useCallback(async () => {
-    const nextStatus = await getBrowserAIStatus();
-    setStatus(nextStatus);
-    onStatusChange?.(nextStatus);
-    return nextStatus;
-  }, [onStatusChange]);
-
   useEffect(() => {
-    refreshStatus();
-  }, [refreshStatus]);
+    let mounted = true;
+    void getBrowserAIStatus().then((next) => {
+      if (mounted) setStatus(next);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [setStatus]);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -59,15 +58,14 @@ const BrowserAISection: React.FC<BrowserAISectionProps> = ({ onStatusChange }) =
         setDownloadProgress(progress);
         setStatus("downloading");
       });
-      await refreshStatus();
     } catch (downloadError) {
       const message =
         downloadError instanceof Error ? downloadError.message : "Failed to download Browser AI.";
       setError(message);
-      await refreshStatus();
-    } finally {
-      setIsDownloading(false);
     }
+    await getBrowserAIStatus()
+      .then(setStatus)
+      .finally(() => setIsDownloading(false));
   };
 
   const showProgress = isDownloading || status === "downloading";

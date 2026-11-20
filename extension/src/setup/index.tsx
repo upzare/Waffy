@@ -9,7 +9,7 @@ import "@fontsource/jetbrains-mono/latin-500.css";
 import "@/stylesheets/globals.css";
 import "./setup.css";
 import { PRIVACY_URL, TERMS_URL } from "@/config";
-import { getAppSettings, saveAppSettings } from "@/lib/client";
+import { updateAppSettings } from "@/lib/client";
 import { DEFAULT_FEATURES } from "@/lib/features";
 import {
   ensureBrowserAIModelReady,
@@ -234,30 +234,31 @@ const Onboarding = () => {
     setSaving(true);
     setSaveError(null);
     try {
-      const { settings, apiKeys } = await getAppSettings();
       const modelId =
         provider === "browser-ai" ? "default" : provider === "custom" ? customModel.trim() : model;
-      const nextSettings: Settings = {
-        ...settings,
-        featureSearch,
-        featureResearch,
-        featureAutomation,
-        featureMemory,
-        analytics,
-        models: assignStages(provider, modelId),
-        customApi:
-          provider === "custom"
-            ? { baseUrl: customBaseUrl.trim(), model: customModel.trim() }
-            : settings.customApi,
-      };
-      const nextKeys: ApiKeys = { ...apiKeys };
-      if (provider === "custom") {
-        const key = customKey.trim();
-        if (key) nextKeys.custom = key;
-      } else if (isCloudProvider(provider)) {
-        nextKeys[provider] = apiKey.trim();
-      }
-      await saveAppSettings(nextSettings, nextKeys);
+      await updateAppSettings(({ settings, apiKeys }) => {
+        const nextSettings: Settings = {
+          ...settings,
+          featureSearch,
+          featureResearch,
+          featureAutomation,
+          featureMemory,
+          analytics,
+          models: assignStages(provider, modelId),
+          customApi:
+            provider === "custom"
+              ? { baseUrl: customBaseUrl.trim(), model: customModel.trim() }
+              : settings.customApi,
+        };
+        const nextKeys: ApiKeys = { ...apiKeys };
+        if (provider === "custom") {
+          const key = customKey.trim();
+          if (key) nextKeys.custom = key;
+        } else if (isCloudProvider(provider)) {
+          nextKeys[provider] = apiKey.trim();
+        }
+        return { settings: nextSettings, apiKeys: nextKeys };
+      });
       setDone(true);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Could not save setup.");
@@ -815,8 +816,8 @@ const ModelStep = ({
               aria-selected={selected}
               onClick={() => onModel(id)}
               className={`rounded-xl border px-4 py-3 text-left font-mono text-sm transition-colors ${selected
-                  ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
-                  : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
+                ? "border-[#00ff00] bg-[#00ff00]/15 text-white"
+                : "border-white/10 bg-white/4 text-white/70 hover:border-white/25 hover:text-white"
                 }`}
             >
               {id}
