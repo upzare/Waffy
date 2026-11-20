@@ -23,6 +23,7 @@ import GeneralSection from "./components/general";
 import MemorySection from "./components/memory";
 import ApiKeysSection from "./components/api-keys";
 import CustomApiSection from "./components/custom-api";
+import McpServersSection from "./components/mcp-servers";
 import ModelsSection from "./components/models";
 import SupportSection from "./components/support";
 import AboutSection from "./components/about";
@@ -45,6 +46,12 @@ const SECTIONS = [
     label: "Memory",
     description: "Turn personalized memory on or off, and review what has been saved.",
     icon: Brain,
+  },
+  {
+    id: "mcp-servers",
+    label: "MCP Servers",
+    description: "Connect third-party MCP servers to use their tools in Waffy.",
+    icon: Server,
   },
   {
     id: "api-keys",
@@ -342,6 +349,8 @@ const Settings = () => {
             setApiKeys={setApiKeys}
           />
         );
+      case "mcp-servers":
+        return <McpServersSection />;
       case "support":
         return <SupportSection />;
       case "about":

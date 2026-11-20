@@ -4,7 +4,7 @@ import { DEFAULT_FEATURES } from "./features";
 import type { ApiKeys, AppSettings, CustomApiConfig, Settings } from "@/types";
 
 export const initClient = async () => {
-  const localStorage = await Browser.storage.local.get();
+  const localStorage = await Browser.storage.local.get("client");
   if (!localStorage.client) {
     const manifest = Browser.runtime.getManifest() as { version: string; version_name?: string };
     Browser.storage.local.set({
@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
 const defaultApiKeys: ApiKeys = {};
 
 export const initSettings = async () => {
-  const localStorage = await Browser.storage.local.get();
+  const localStorage = await Browser.storage.local.get(["settings", "apiKeys"]);
   const updates: Record<string, string> = {};
   if (!localStorage.settings || localStorage.settings === "undefined") {
     updates.settings = JSON.stringify(DEFAULT_SETTINGS);
@@ -67,7 +67,7 @@ const parseStoredJson = <T>(value: unknown, fallback: T): T => {
 };
 
 export const getLocalStorage = async () => {
-  const localStorage = await Browser.storage.local.get();
+  const localStorage = await Browser.storage.local.get(["client", "settings", "apiKeys"]);
   localStorage.client = parseStoredJson(localStorage.client, null);
   localStorage.settings = parseStoredJson(localStorage.settings, {});
   localStorage.apiKeys = parseStoredJson(localStorage.apiKeys, {});

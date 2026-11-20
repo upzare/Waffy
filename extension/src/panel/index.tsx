@@ -5,6 +5,7 @@ import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
 import { TriangleAlert } from "lucide-react";
 import { AI, createTitle } from "@/lib/agent";
+import { openMcpTurn } from "@/lib/mcp/turn";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
@@ -62,10 +63,10 @@ import {
   buildT3Messages,
   buildT4Messages,
   keepLatestScreenshotOnly,
+  type ExtensionMessage,
 } from "@/lib/llm/messages";
 import type { StreamSession } from "@/lib/llm/stream";
 import { errorMessage, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
-import type { ExtensionMessage } from "@/lib/llm/messages";
 import { initAnalytics } from "@/lib/posthog";
 import HistorySidebar from "./components/history-sidebar";
 import WorkingDialog from "./components/working-dialog";
@@ -120,6 +121,7 @@ const App = () => {
   const conversationIdRef = useRef<string>(null);
   const messageIdRef = useRef<string>(null);
   const lastPanelActionRef = useRef<number>(null);
+
   const t2SessionRef = useRef<StreamSession>({
     screenshot: null,
     screenshotMetadata: null,
@@ -202,6 +204,7 @@ const App = () => {
     Browser.runtime.onMessage.addListener(onMessage);
 
     return () => {
+      abortControllerRef.current?.abort();
       sub.unsubscribe();
       Browser.runtime.onMessage.removeListener(onMessage);
     };
@@ -291,6 +294,10 @@ const App = () => {
     prompt_files: FileFormat[],
     conversationMessages: Message[]
   ) => {
+    assertNotAborted();
+    setStatusText("GENERATING");
+    setStreaming((prev) => ({ ...prev, response: true }));
+
     await attachController();
     try {
       const task = await t1Handler(prompt_text, prompt_files, conversationMessages);
@@ -316,47 +323,67 @@ const App = () => {
     conversationMessages: Message[]
   ) => {
     assertNotAborted();
-    setStatusText("GENERATING");
-    setStreaming((prev) => ({ ...prev, response: true }));
-    const t1Messages = buildT1Messages(prompt_text, prompt_files, conversationMessages);
-    console.log("t1Messages:", t1Messages);
-    const responseStream = AI(t1Messages, "t1", abortControllerRef?.current);
-    const toolCalls: Record<string, ToolCall> = {};
-    let textResponse = "";
-    for await (const res of responseStream) {
-      if (res.type === "action.call") {
-        for (const [key, value] of Object.entries(res.action)) {
-          toolCalls[key] = value;
+    const controller = abortControllerRef.current!;
+    const mcp = await openMcpTurn(controller.signal, {
+      onUnavailable: (error) => toast.error(error),
+      onToolStart: setToolActivityText,
+    });
+    try {
+      const t1Messages = buildT1Messages(prompt_text, prompt_files, conversationMessages);
+      let textResponse = "";
+      while (true) {
+        assertNotAborted();
+        const calls: ToolCall[] = [];
+        let iterationText = "";
+        for await (const res of AI(t1Messages, "t1", controller, mcp.tools)) {
+          if (res.type === "action.call") {
+            calls.push(...Object.values(res.action));
+          }
+          if (res.type === "text.stream") {
+            if (!iterationText) setToolActivityText(null);
+            iterationText += res.text;
+            textResponse += res.text;
+            updateAssistantMessage((msg) => ({
+              ...msg,
+              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+            }));
+          }
+          if (res.type === "response.completed") {
+            updateAssistantMessage((msg) => msg, true);
+          }
+          if (res.type === "response.error") {
+            updateAssistantMessage((msg) => msg, true);
+            throw res.error;
+          }
+        }
+
+        assertNotAborted();
+        if (!calls.some((call) => mcp.hasTool(call.name))) {
+          setStreaming((prev) => ({ ...prev, response: false }));
+          const proceed = calls.find((call) => call.name === "proceed");
+          if (!proceed) return false;
+          const { task } = JSON.parse(proceed.arguments) as { task: string };
+          updateAssistantMessage((msg) => ({ ...msg, content: { ...msg.content, task } }), true);
+          return task;
+        }
+
+        if (iterationText) {
+          t1Messages.push({ type: "response", content: [{ type: "text", text: iterationText }] });
+        }
+        for (const { id, name, arguments: args } of calls) {
+          t1Messages.push({ type: "action.init", id, name, arguments: args });
+        }
+        for (const call of calls) {
+          const output = call.name === "proceed"
+            ? "Review the MCP tool results before calling this tool again."
+            : await mcp.call(call);
+          t1Messages.push({ type: "action.result", id: call.id, name: call.name, output });
         }
       }
-      if (res.type === "text.stream") {
-        textResponse += res.text;
-        updateAssistantMessage((msg) => ({
-          ...msg,
-          content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
-        }));
-      }
-      if (res.type === "response.completed") {
-        updateAssistantMessage((msg) => msg, true);
-      }
-      if (res.type === "response.error") {
-        updateAssistantMessage((msg) => msg, true);
-        throw res.error;
-      }
+    } finally {
+      setToolActivityText(null);
+      await mcp.close();
     }
-    setStreaming((prev) => ({ ...prev, response: false }));
-    for (const toolCall of Object.values(toolCalls)) {
-      const toolArgs = JSON.parse(toolCall.arguments);
-      console.log("t1 toolArgs:", toolArgs);
-      if (toolCall.name === "proceed") {
-        updateAssistantMessage(
-          (msg) => ({ ...msg, content: { ...msg.content, task: toolArgs.task } }),
-          true
-        );
-        return toolArgs.task;
-      }
-    }
-    return false;
   };
 
   const t2Handler = async (
@@ -368,151 +395,175 @@ const App = () => {
     setStatusText("EXECUTING");
     setStreaming((prev) => ({ ...prev, execution: true }));
 
-    t2SessionRef.current = {
-      screenshot: null,
-      screenshotMetadata: null,
-      previousReasoning: "",
-    };
-
-    await updateOpenedTabs();
-    const automationTab = (await Browser.runtime.sendMessage({ action: ACTIONS.getTab })) as {
-      id?: number;
-    } | null;
-    if (!automationTab || !automationTab.id) throw new Error("Tab not found");
-    await Browser.runtime.sendMessage({
-      action: ACTIONS.enableAutomationOverlay,
-      tabId: automationTab.id,
+    const controller = abortControllerRef.current!;
+    const mcp = await openMcpTurn(controller.signal, {
+      onUnavailable: (error) => toast.error(error),
+      onToolStart: setToolActivityText,
     });
-
-    let responded = true;
-    let finish = false;
-    let functionExecState = false;
-    updateAssistantMessage(
-      (msg) => ({
-        ...msg,
-        content: {
-          ...msg.content,
-          text: { ...msg.content.text, execution: ["Initializing"] },
-        },
-      }),
-      true
-    );
-
-    const t2Messages = buildT2Messages(task, prompt_files, conversationMessages);
-    console.log("t2History:", t2Messages);
-    let t2Reasoning = "";
-
-    while (!finish || functionExecState) {
+    try {
       assertNotAborted();
-      if (!responded) return false;
-      responded = false;
 
-      let reasoning = "";
-      const executionToolCalls: Record<string, ToolCall> = {};
-      keepLatestScreenshotOnly(t2Messages);
-      const executionModelStream = AI(
-        t2Messages,
-        "t2",
-        abortControllerRef?.current,
-        t2SessionRef.current
+      t2SessionRef.current = {
+        screenshot: null,
+        screenshotMetadata: null,
+        previousReasoning: "",
+      };
+
+      await updateOpenedTabs();
+      const automationTab = (await Browser.runtime.sendMessage({ action: ACTIONS.getTab })) as {
+        id?: number;
+      } | null;
+      if (!automationTab || !automationTab.id) throw new Error("Tab not found");
+      await Browser.runtime.sendMessage({
+        action: ACTIONS.enableAutomationOverlay,
+        tabId: automationTab.id,
+      });
+
+      let responded = true;
+      let finish = false;
+      let functionExecState = false;
+      updateAssistantMessage(
+        (msg) => ({
+          ...msg,
+          content: {
+            ...msg.content,
+            text: { ...msg.content.text, execution: ["Initializing"] },
+          },
+        }),
+        true
       );
 
-      for await (const res of executionModelStream) {
-        responded = true;
-        if (res.type === "reasoning.delta") {
-          const delta = res.text;
-          reasoning += delta;
-        }
-        if (res.type === "action.call") {
-          for (const [key, value] of Object.entries(res.action)) {
-            executionToolCalls[key] = value;
-          }
-          if (res.step) {
-            const step = res.step;
-            updateAssistantMessage((msg) => {
-              const execution = [...(msg.content.text?.execution ?? []), step];
-              return {
-                ...msg,
-                content: { ...msg.content, text: { ...msg.content.text, execution } },
-              };
-            });
-          }
-        }
-        if (res.type === "response.completed") {
-          if (!functionExecState) finish = true;
-          updateAssistantMessage((msg) => msg, true);
-        }
-        if (res.type === "response.error") {
-          updateAssistantMessage((msg) => msg, true);
-          throw res.error;
-        }
-      }
+      const t2Messages = buildT2Messages(task, prompt_files, conversationMessages);
+      let t2Reasoning = "";
 
-      const iterationMessages: ExtensionMessage[] = [];
-      if (reasoning) {
-        iterationMessages.push({
-          type: "response",
-          content: [{ type: "text", text: reasoning }],
-        });
-      }
-
-      functionExecState = false;
-
-      for (const toolCall of Object.values(executionToolCalls)) {
-        await updateOpenedTabs();
-        const toolName = toolCall.name;
-        const toolArgs = JSON.parse(toolCall.arguments);
-        iterationMessages.push({
-          type: "action.init",
-          id: toolCall.id,
-          name: toolName,
-          arguments: toolCall.arguments,
-        });
-
-        console.log("toolName:", toolName);
-        console.log("toolArgs:", toolArgs);
-        const toolCallResult = await automateFunctions[toolName](toolArgs);
-        console.log("toolCallResult:", toolCallResult);
+      while (!finish || functionExecState) {
         assertNotAborted();
+        if (!responded) return false;
+        responded = false;
 
-        const screenshotData =
-          toolCallResult.data?.type === "screenshot"
-            ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
-            : {};
+        let reasoning = "";
+        const executionToolCalls: Record<string, ToolCall> = {};
+        keepLatestScreenshotOnly(t2Messages);
+        const executionModelStream = AI(
+          t2Messages,
+          "t2",
+          controller,
+          mcp.tools,
+          t2SessionRef.current
+        );
 
-        iterationMessages.push({
-          type: "action.result",
-          id: toolCall.id,
-          name: toolName,
-          output: toolCallResult.message,
-          ...screenshotData,
-        });
-
-        if (screenshotData.data?.image) {
-          t2SessionRef.current.screenshot = screenshotData.data.image;
-          t2SessionRef.current.screenshotMetadata = screenshotData.data.metadata ?? null;
+        for await (const res of executionModelStream) {
+          responded = true;
+          if (res.type === "reasoning.delta") {
+            const delta = res.text;
+            reasoning += delta;
+          }
+          if (res.type === "action.call") {
+            for (const [key, value] of Object.entries(res.action)) {
+              executionToolCalls[key] = value;
+            }
+            if (res.step) {
+              const step = res.step;
+              updateAssistantMessage((msg) => {
+                const execution = [...(msg.content.text?.execution ?? []), step];
+                return {
+                  ...msg,
+                  content: { ...msg.content, text: { ...msg.content.text, execution } },
+                };
+              });
+            }
+          }
+          if (res.type === "response.completed") {
+            if (!functionExecState) finish = true;
+            updateAssistantMessage((msg) => msg, true);
+          }
+          if (res.type === "response.error") {
+            updateAssistantMessage((msg) => msg, true);
+            throw res.error;
+          }
         }
-        functionExecState = true;
+
+        const iterationMessages: ExtensionMessage[] = [];
+        if (reasoning) {
+          iterationMessages.push({
+            type: "response",
+            content: [{ type: "text", text: reasoning }],
+          });
+        }
+
+        functionExecState = false;
+
+        for (const toolCall of Object.values(executionToolCalls)) {
+          const toolName = toolCall.name;
+          iterationMessages.push({
+            type: "action.init",
+            id: toolCall.id,
+            name: toolName,
+            arguments: toolCall.arguments,
+          });
+        }
+
+        for (const toolCall of Object.values(executionToolCalls)) {
+          const toolName = toolCall.name;
+          const mcpOutput = await mcp.call(toolCall);
+          if (mcpOutput !== undefined) {
+            setToolActivityText(null);
+            iterationMessages.push({
+              type: "action.result",
+              id: toolCall.id,
+              name: toolName,
+              output: mcpOutput,
+            });
+            functionExecState = true;
+            continue;
+          }
+          await updateOpenedTabs();
+          const toolArgs = JSON.parse(toolCall.arguments);
+
+          const toolCallResult = await automateFunctions[toolName](toolArgs);
+          assertNotAborted();
+
+          const screenshotData =
+            toolCallResult.data?.type === "screenshot"
+              ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
+              : {};
+
+          iterationMessages.push({
+            type: "action.result",
+            id: toolCall.id,
+            name: toolName,
+            output: toolCallResult.message,
+            ...screenshotData,
+          });
+
+          if (screenshotData.data?.image) {
+            t2SessionRef.current.screenshot = screenshotData.data.image;
+            t2SessionRef.current.screenshotMetadata = screenshotData.data.metadata ?? null;
+          }
+          functionExecState = true;
+        }
+
+        t2Reasoning += reasoning;
+        t2Messages.push(...iterationMessages);
       }
 
-      t2Reasoning += reasoning;
-      console.log("t2Reasoning:", t2Reasoning);
-      t2Messages.push(...iterationMessages);
+      setStreaming((prev) => ({ ...prev, execution: false }));
+      const finishedAutomationTab = (await Browser.runtime.sendMessage({
+        action: ACTIONS.getTab,
+      })) as {
+        id?: number;
+      } | null;
+      if (!finishedAutomationTab || !finishedAutomationTab.id) throw new Error("Tab not found");
+      await Browser.runtime.sendMessage({
+        action: ACTIONS.disableAutomationOverlay,
+        tabId: finishedAutomationTab.id,
+      });
+
+      return t2Reasoning;
+    } finally {
+      setToolActivityText(null);
+      await mcp.close();
     }
-
-    setStreaming((prev) => ({ ...prev, execution: false }));
-    const finishedAutomationTab = (await Browser.runtime.sendMessage({
-      action: ACTIONS.getTab,
-    })) as {
-      id?: number;
-    } | null;
-    if (!finishedAutomationTab || !finishedAutomationTab.id) throw new Error("Tab not found");
-    await Browser.runtime.sendMessage({
-      action: ACTIONS.disableAutomationOverlay,
-      tabId: finishedAutomationTab.id,
-    });
-
-    return t2Reasoning;
   };
 
   const t3Handler = async (task: string, t2Reasoning: string) => {
@@ -596,123 +647,153 @@ const App = () => {
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
-    const baseMessages = buildBaseMessages(prompt_text, prompt_files, conversationMessages);
-    let finish = false;
-    let functionExecState = false;
-    let textResponse = "";
+    const controller = abortControllerRef.current!;
+    const mcp = await openMcpTurn(controller.signal, {
+      onUnavailable: (error) => toast.error(error),
+      onToolStart: setToolActivityText,
+    });
+    console.log("mcp", mcp);
+    let automationTask: string | undefined;
+    try {
+      const baseMessages = buildBaseMessages(prompt_text, prompt_files, conversationMessages);
+      let finish = false;
+      let functionExecState = false;
+      let textResponse = "";
 
-    while (!finish || functionExecState) {
-      assertNotAborted();
-      const iterationStart = textResponse.length;
-      const baseToolCalls: Record<string, ToolCall> = {};
-      const baseStream = AI(baseMessages, "base", abortControllerRef?.current);
+      while (!finish || functionExecState) {
+        assertNotAborted();
+        const iterationStart = textResponse.length;
+        const baseToolCalls: Record<string, ToolCall> = {};
+        const baseStream = AI(baseMessages, "base", controller, mcp.tools);
 
-      for await (const res of baseStream) {
-        if (res.type === "text.stream") {
-          if (textResponse.length === iterationStart) setToolActivityText(null);
-          textResponse += res.text;
-          updateAssistantMessage((msg) => ({
-            ...msg,
-            content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
-          }));
-        }
-        if (res.type === "action.call") {
-          for (const [key, value] of Object.entries(res.action)) {
-            baseToolCalls[key] = value;
+        for await (const res of baseStream) {
+          if (res.type === "text.stream") {
+            if (textResponse.length === iterationStart) setToolActivityText(null);
+            textResponse += res.text;
+            updateAssistantMessage((msg) => ({
+              ...msg,
+              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+            }));
+          }
+          if (res.type === "action.call") {
+            for (const [key, value] of Object.entries(res.action)) {
+              baseToolCalls[key] = value;
+            }
+          }
+          if (res.type === "response.completed") {
+            if (!functionExecState) finish = true;
+            updateAssistantMessage((msg) => msg, true);
+          }
+          if (res.type === "response.error") {
+            updateAssistantMessage((msg) => msg, true);
+            throw res.error;
           }
         }
-        if (res.type === "response.completed") {
-          if (!functionExecState) finish = true;
-          updateAssistantMessage((msg) => msg, true);
-        }
-        if (res.type === "response.error") {
-          updateAssistantMessage((msg) => msg, true);
-          throw res.error;
-        }
-      }
 
-      const iterationText = textResponse.slice(iterationStart);
-      const iterationMessages: ExtensionMessage[] = [];
-      if (iterationText) {
-        iterationMessages.push({
-          type: "response",
-          content: [{ type: "text", text: iterationText }],
-        });
-      }
-
-      functionExecState = false;
-
-      const automateCall = Object.values(baseToolCalls).find(
-        (toolCall) => toolCall.name === "automate"
-      );
-
-      if (automateCall) {
-        if (!features.featureAutomation) {
-          toast.error("Enable Automation in extension settings.");
-          return;
+        const iterationText = textResponse.slice(iterationStart);
+        const iterationMessages: ExtensionMessage[] = [];
+        if (iterationText) {
+          iterationMessages.push({
+            type: "response",
+            content: [{ type: "text", text: iterationText }],
+          });
         }
 
-        let task = prompt_text;
-        try {
-          const args = JSON.parse(automateCall.arguments) as { task?: string };
-          if (args.task?.trim()) task = args.task.trim();
-        } catch {
-          // fall back to original prompt
-        }
+        functionExecState = false;
 
-        updateAssistantMessage(
-          (msg) => ({
-            ...msg,
-            mode: "automate" as MessageMode,
-          }),
-          true
+        const automateCall = Object.values(baseToolCalls).find(
+          (toolCall) => toolCall.name === "automate"
         );
 
-        setToolActivityText(null);
-        setStreaming((prev) => ({ ...prev, response: false }));
-        await automateHandler(task, prompt_files, conversationMessages);
-        return;
+        if (automateCall && !Object.values(baseToolCalls).some((call) => mcp.hasTool(call.name))) {
+          if (!features.featureAutomation) {
+            toast.error("Enable Automation in extension settings.");
+            return;
+          }
+
+          let task = prompt_text;
+          try {
+            const args = JSON.parse(automateCall.arguments) as { task?: string };
+            if (args.task?.trim()) task = args.task.trim();
+          } catch {
+            // fall back to original prompt
+          }
+
+          updateAssistantMessage(
+            (msg) => ({
+              ...msg,
+              mode: "automate" as MessageMode,
+            }),
+            true
+          );
+
+          setToolActivityText(null);
+          setStreaming((prev) => ({ ...prev, response: false }));
+          automationTask = task;
+          break;
+        }
+
+        for (const toolCall of Object.values(baseToolCalls)) {
+          const toolName = toolCall.name;
+
+          iterationMessages.push({
+            type: "action.init",
+            id: toolCall.id,
+            name: toolName,
+            arguments: toolCall.arguments,
+          });
+        }
+
+        for (const toolCall of Object.values(baseToolCalls)) {
+          const toolName = toolCall.name;
+          const mcpOutput = toolName === "automate"
+            ? "Review the MCP tool results before calling this tool again."
+            : await mcp.call(toolCall);
+          if (mcpOutput !== undefined) {
+            iterationMessages.push({
+              type: "action.result",
+              id: toolCall.id,
+              name: toolName,
+              output: mcpOutput,
+            });
+            functionExecState = true;
+            continue;
+          }
+
+          const toolArgs = JSON.parse(toolCall.arguments);
+          setToolActivityText(getToolActivityLabel(toolName, toolArgs));
+          const toolCallResult = await baseFunctions[toolName](toolArgs);
+          assertNotAborted();
+
+          const screenshotData =
+            toolCallResult.data?.type === "screenshot"
+              ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
+              : {};
+
+          iterationMessages.push({
+            type: "action.result",
+            id: toolCall.id,
+            name: toolName,
+            output: toolCallResult.message,
+            ...screenshotData,
+          });
+
+          functionExecState = true;
+        }
+
+        baseMessages.push(...iterationMessages);
       }
 
-      for (const toolCall of Object.values(baseToolCalls)) {
-        const toolName = toolCall.name;
-        console.log("toolCall:", toolCall);
-
-        iterationMessages.push({
-          type: "action.init",
-          id: toolCall.id,
-          name: toolName,
-          arguments: toolCall.arguments,
-        });
-
-        const toolArgs = JSON.parse(toolCall.arguments);
-        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
-        const toolCallResult = await baseFunctions[toolName](toolArgs);
-        console.log("toolCallResult:", toolCallResult);
-        assertNotAborted();
-
-        const screenshotData =
-          toolCallResult.data?.type === "screenshot"
-            ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
-            : {};
-
-        iterationMessages.push({
-          type: "action.result",
-          id: toolCall.id,
-          name: toolName,
-          output: toolCallResult.message,
-          ...screenshotData,
-        });
-
-        functionExecState = true;
-      }
-
-      baseMessages.push(...iterationMessages);
+      setToolActivityText(null);
+      setStreaming((prev) => ({ ...prev, response: false }));
+    } finally {
+      setToolActivityText(null);
+      await mcp.close();
     }
-
-    console.log("textResponse:", textResponse);
-    setToolActivityText(null);
-    setStreaming((prev) => ({ ...prev, response: false }));
+    if (automationTask) {
+      assertNotAborted();
+      await automateHandler(automationTask, prompt_files, conversationMessages);
+    }
   };
 
   const searchHandler = async (
@@ -724,85 +805,107 @@ const App = () => {
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
-    const searchMessages = buildSearchMessages(prompt_text, prompt_files, conversationMessages);
-    let finish = false;
-    let functionExecState = false;
-    let textResponse = "";
+    const controller = abortControllerRef.current!;
+    const mcp = await openMcpTurn(controller.signal, {
+      onUnavailable: (error) => toast.error(error),
+      onToolStart: setToolActivityText,
+    });
+    try {
+      const searchMessages = buildSearchMessages(prompt_text, prompt_files, conversationMessages);
+      let finish = false;
+      let functionExecState = false;
+      let textResponse = "";
 
-    while (!finish || functionExecState) {
-      assertNotAborted();
-      const iterationStart = textResponse.length;
-      const searchToolCalls: Record<string, ToolCall> = {};
-      const searchStream = AI(searchMessages, "search", abortControllerRef?.current);
+      while (!finish || functionExecState) {
+        assertNotAborted();
+        const iterationStart = textResponse.length;
+        const searchToolCalls: Record<string, ToolCall> = {};
+        const searchStream = AI(searchMessages, "search", controller, mcp.tools);
 
-      for await (const res of searchStream) {
-        if (res.type === "text.stream") {
-          if (textResponse.length === iterationStart) setToolActivityText(null);
-          textResponse += res.text;
-          updateAssistantMessage((msg) => ({
-            ...msg,
-            content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
-          }));
-        }
-        if (res.type === "action.call") {
-          for (const [key, value] of Object.entries(res.action)) {
-            searchToolCalls[key] = value;
+        for await (const res of searchStream) {
+          if (res.type === "text.stream") {
+            if (textResponse.length === iterationStart) setToolActivityText(null);
+            textResponse += res.text;
+            updateAssistantMessage((msg) => ({
+              ...msg,
+              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+            }));
+          }
+          if (res.type === "action.call") {
+            for (const [key, value] of Object.entries(res.action)) {
+              searchToolCalls[key] = value;
+            }
+          }
+          if (res.type === "response.completed") {
+            if (!functionExecState) finish = true;
+            updateAssistantMessage((msg) => msg, true);
+          }
+          if (res.type === "response.error") {
+            updateAssistantMessage((msg) => msg, true);
+            throw res.error;
           }
         }
-        if (res.type === "response.completed") {
-          if (!functionExecState) finish = true;
-          updateAssistantMessage((msg) => msg, true);
+
+        const iterationText = textResponse.slice(iterationStart);
+        const iterationMessages: ExtensionMessage[] = [];
+        if (iterationText) {
+          iterationMessages.push({
+            type: "response",
+            content: [{ type: "text", text: iterationText }],
+          });
         }
-        if (res.type === "response.error") {
-          updateAssistantMessage((msg) => msg, true);
-          throw res.error;
+
+        functionExecState = false;
+
+        for (const toolCall of Object.values(searchToolCalls)) {
+          const toolName = toolCall.name;
+
+          iterationMessages.push({
+            type: "action.init",
+            id: toolCall.id,
+            name: toolName,
+            arguments: toolCall.arguments,
+          });
         }
+
+        for (const toolCall of Object.values(searchToolCalls)) {
+          const toolName = toolCall.name;
+          const mcpOutput = await mcp.call(toolCall);
+          if (mcpOutput !== undefined) {
+            iterationMessages.push({
+              type: "action.result",
+              id: toolCall.id,
+              name: toolName,
+              output: mcpOutput,
+            });
+            functionExecState = true;
+            continue;
+          }
+
+          const toolArgs = JSON.parse(toolCall.arguments);
+          setToolActivityText(getToolActivityLabel(toolName, toolArgs));
+          const toolCallResult = await searchFunctions[toolName](toolArgs);
+          assertNotAborted();
+
+          iterationMessages.push({
+            type: "action.result",
+            id: toolCall.id,
+            name: toolName,
+            output: toolCallResult.message,
+          });
+
+          functionExecState = true;
+        }
+
+        searchMessages.push(...iterationMessages);
       }
 
-      const iterationText = textResponse.slice(iterationStart);
-      const iterationMessages: ExtensionMessage[] = [];
-      if (iterationText) {
-        iterationMessages.push({
-          type: "response",
-          content: [{ type: "text", text: iterationText }],
-        });
-      }
-
-      functionExecState = false;
-
-      for (const toolCall of Object.values(searchToolCalls)) {
-        const toolName = toolCall.name;
-        console.log("toolCall:", toolCall);
-
-        iterationMessages.push({
-          type: "action.init",
-          id: toolCall.id,
-          name: toolName,
-          arguments: toolCall.arguments,
-        });
-
-        const toolArgs = JSON.parse(toolCall.arguments);
-        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
-        const toolCallResult = await searchFunctions[toolName](toolArgs);
-        console.log("toolCallResult:", toolCallResult);
-        assertNotAborted();
-
-        iterationMessages.push({
-          type: "action.result",
-          id: toolCall.id,
-          name: toolName,
-          output: toolCallResult.message,
-        });
-
-        functionExecState = true;
-      }
-
-      searchMessages.push(...iterationMessages);
+      setToolActivityText(null);
+      setStreaming((prev) => ({ ...prev, response: false }));
+    } finally {
+      setToolActivityText(null);
+      await mcp.close();
     }
-
-    console.log("textResponse:", textResponse);
-    setToolActivityText(null);
-    setStreaming((prev) => ({ ...prev, response: false }));
   };
 
   const researchHandler = async (
@@ -814,91 +917,113 @@ const App = () => {
     setStatusText("GENERATING");
     setStreaming((prev) => ({ ...prev, response: true }));
 
-    const researchMessages = buildResearchMessages(prompt_text, prompt_files, conversationMessages);
-    let finish = false;
-    let functionExecState = false;
-    let textResponse = "";
+    const controller = abortControllerRef.current!;
+    const mcp = await openMcpTurn(controller.signal, {
+      onUnavailable: (error) => toast.error(error),
+      onToolStart: setToolActivityText,
+    });
+    try {
+      const researchMessages = buildResearchMessages(prompt_text, prompt_files, conversationMessages);
+      let finish = false;
+      let functionExecState = false;
+      let textResponse = "";
 
-    while (!finish || functionExecState) {
-      assertNotAborted();
-      const iterationStart = textResponse.length;
-      const researchToolCalls: Record<string, ToolCall> = {};
-      const researchStream = AI(researchMessages, "research", abortControllerRef?.current);
+      while (!finish || functionExecState) {
+        assertNotAborted();
+        const iterationStart = textResponse.length;
+        const researchToolCalls: Record<string, ToolCall> = {};
+        const researchStream = AI(researchMessages, "research", controller, mcp.tools);
 
-      for await (const res of researchStream) {
-        if (res.type === "text.stream") {
-          if (textResponse.length === iterationStart) setToolActivityText(null);
-          textResponse += res.text;
-          updateAssistantMessage((msg) => ({
-            ...msg,
-            content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
-          }));
-        }
-        if (res.type === "action.call") {
-          for (const [key, value] of Object.entries(res.action)) {
-            researchToolCalls[key] = value;
+        for await (const res of researchStream) {
+          if (res.type === "text.stream") {
+            if (textResponse.length === iterationStart) setToolActivityText(null);
+            textResponse += res.text;
+            updateAssistantMessage((msg) => ({
+              ...msg,
+              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+            }));
+          }
+          if (res.type === "action.call") {
+            for (const [key, value] of Object.entries(res.action)) {
+              researchToolCalls[key] = value;
+            }
+          }
+          if (res.type === "response.completed") {
+            if (!functionExecState) finish = true;
+            updateAssistantMessage((msg) => msg, true);
+          }
+          if (res.type === "response.error") {
+            updateAssistantMessage((msg) => msg, true);
+            throw res.error;
           }
         }
-        if (res.type === "response.completed") {
-          if (!functionExecState) finish = true;
-          updateAssistantMessage((msg) => msg, true);
+
+        const iterationText = textResponse.slice(iterationStart);
+        const iterationMessages: ExtensionMessage[] = [];
+        if (iterationText) {
+          iterationMessages.push({
+            type: "response",
+            content: [{ type: "text", text: iterationText }],
+          });
         }
-        if (res.type === "response.error") {
-          updateAssistantMessage((msg) => msg, true);
-          throw res.error;
+
+        functionExecState = false;
+
+        for (const toolCall of Object.values(researchToolCalls)) {
+          const toolName = toolCall.name;
+
+          iterationMessages.push({
+            type: "action.init",
+            id: toolCall.id,
+            name: toolName,
+            arguments: toolCall.arguments,
+          });
         }
+
+        for (const toolCall of Object.values(researchToolCalls)) {
+          const toolName = toolCall.name;
+          const mcpOutput = await mcp.call(toolCall);
+          if (mcpOutput !== undefined) {
+            iterationMessages.push({
+              type: "action.result",
+              id: toolCall.id,
+              name: toolName,
+              output: mcpOutput,
+            });
+            functionExecState = true;
+            continue;
+          }
+
+          const toolArgs = JSON.parse(toolCall.arguments);
+          setToolActivityText(getToolActivityLabel(toolName, toolArgs));
+          const toolCallResult = await researchFunctions[toolName](toolArgs);
+          assertNotAborted();
+
+          const screenshotData =
+            toolCallResult.data?.type === "screenshot"
+              ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
+              : {};
+
+          iterationMessages.push({
+            type: "action.result",
+            id: toolCall.id,
+            name: toolName,
+            output: toolCallResult.message,
+            ...screenshotData,
+          });
+
+          functionExecState = true;
+        }
+
+        researchMessages.push(...iterationMessages);
       }
 
-      const iterationText = textResponse.slice(iterationStart);
-      const iterationMessages: ExtensionMessage[] = [];
-      if (iterationText) {
-        iterationMessages.push({
-          type: "response",
-          content: [{ type: "text", text: iterationText }],
-        });
-      }
-
-      functionExecState = false;
-
-      for (const toolCall of Object.values(researchToolCalls)) {
-        const toolName = toolCall.name;
-        console.log("toolCall:", toolCall);
-
-        iterationMessages.push({
-          type: "action.init",
-          id: toolCall.id,
-          name: toolName,
-          arguments: toolCall.arguments,
-        });
-
-        const toolArgs = JSON.parse(toolCall.arguments);
-        setToolActivityText(getToolActivityLabel(toolName, toolArgs));
-        const toolCallResult = await researchFunctions[toolName](toolArgs);
-        console.log("toolCallResult:", toolCallResult);
-        assertNotAborted();
-
-        const screenshotData =
-          toolCallResult.data?.type === "screenshot"
-            ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
-            : {};
-
-        iterationMessages.push({
-          type: "action.result",
-          id: toolCall.id,
-          name: toolName,
-          output: toolCallResult.message,
-          ...screenshotData,
-        });
-
-        functionExecState = true;
-      }
-
-      researchMessages.push(...iterationMessages);
+      setToolActivityText(null);
+      setStreaming((prev) => ({ ...prev, response: false }));
+    } finally {
+      setToolActivityText(null);
+      await mcp.close();
     }
-
-    console.log("textResponse:", textResponse);
-    setToolActivityText(null);
-    setStreaming((prev) => ({ ...prev, response: false }));
   };
 
   const ensureProvidersConfigured = async () => {
@@ -991,7 +1116,7 @@ const App = () => {
         await prepareMessages();
         await runModeHandler(mode, promptText, promptFiles, conversationContext);
       } catch (error: unknown) {
-        showError(error);
+        showError(isAborted() ? USER_INTERRUPTED_MESSAGE : error);
       } finally {
         setStreaming({ response: false, execution: false, validation: false, output: false });
         setStreamingMessageId(null);

@@ -9,14 +9,13 @@ export type SearchToolResult = {
 export const SEARCH_TOOLS = {
   webSearch: tool({
     description:
-      "Search the web. Returns titles, URLs, and snippets. Always call this first, then webFetch the most relevant URL before answering.",
+      "Search the web. Returns titles, URLs, and snippets. For public web lookups, use this before webFetch and read the most relevant URL before answering.",
     inputSchema: z.object({
       query: z.string().describe("Short keyword search query"),
     }),
   }),
   webFetch: tool({
-    description:
-      "Fetch the contents of a URL. Use after webSearch to read a chosen result.",
+    description: "Fetch the contents of a URL. Use after webSearch to read a chosen result.",
     inputSchema: z.object({
       url: z.string().describe("The URL to fetch"),
     }),

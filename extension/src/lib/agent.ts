@@ -1,3 +1,4 @@
+import type { ToolSet } from "ai";
 import { getAppSettings } from "./client";
 import { runStream, StreamEvent, StreamMode, StreamSession } from "./llm/stream";
 import { generateTitle } from "./llm/generate";
@@ -16,6 +17,7 @@ export async function* AI(
   messages: ExtensionMessage[],
   mode: StreamMode,
   abortController: AbortController | null,
+  externalTools?: ToolSet,
   session?: StreamSession
 ): AsyncGenerator<StreamEvent> {
   const { settings, apiKeys } = await getAppSettings();
@@ -25,6 +27,7 @@ export async function* AI(
     messages,
     settings: { settings, apiKeys },
     abortSignal: abortController?.signal,
+    externalTools,
     session,
   });
 }

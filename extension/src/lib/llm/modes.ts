@@ -73,8 +73,8 @@ export const MODES: Record<StreamMode, ModeConfig> = {
   },
 };
 
-export function resolvePrompt(mode: StreamMode, flags: FeatureFlags): string {
-  return MODES[mode].prompt(flags);
+export function resolvePrompt(mode: StreamMode, flags: FeatureFlags, hasMcpTools = false): string {
+  return MODES[mode].prompt(flags, hasMcpTools);
 }
 
 export function resolveTools(mode: StreamMode, flags: FeatureFlags): ToolSet {

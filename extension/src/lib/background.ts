@@ -23,6 +23,7 @@ import {
 } from "./background/capture";
 import { fetchWebSearch } from "./background/search";
 import { initClient, initSettings } from "./client";
+import { protectMcpStorage } from "./mcp/storage";
 
 const stopGeneration = async () => {
   await Promise.all([closeOwnedTabs(), stopSession()]);
@@ -40,6 +41,7 @@ const releaseNotesAvailable = async () => {
   }
 };
 
+void protectMcpStorage().catch(() => console.error("Could not restrict extension storage access."));
 registerAutomationListeners();
 registerContextMenuListeners();
 registerCaptureListeners();

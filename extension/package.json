@@ -16,6 +16,7 @@
     "@ai-sdk/anthropic": "^4.0.105",
     "@ai-sdk/google": "^4.0.121",
     "@ai-sdk/groq": "^4.0.84",
+    "@ai-sdk/mcp": "^2.0.101",
     "@ai-sdk/openai": "^4.0.118",
     "@ai-sdk/xai": "^5.0.46",
     "@base-ui/react": "^1.9.0",
