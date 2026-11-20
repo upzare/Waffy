@@ -47,6 +47,11 @@ export type CapturePayload = {
   content: string;
 };
 
+export const restrictLocalStorageAccess = () =>
+  chrome.storage.local.setAccessLevel({
+    accessLevel: "TRUSTED_CONTEXTS",
+  });
+
 /** Internal / extension pages that content scripts and automation cannot access. */
 const INACCESSIBLE_URL_PREFIXES = [
   "chrome://",

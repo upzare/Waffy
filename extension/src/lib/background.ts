@@ -1,7 +1,7 @@
 import Browser from "webextension-polyfill";
 import type { Runtime } from "webextension-polyfill";
 import { EXTENSION_VERSION, X_VERSION_URL } from "@/config";
-import { ACTIONS } from "@/lib/helper";
+import { ACTIONS, restrictLocalStorageAccess } from "@/lib/helper";
 import {
   disableAutomationOverlay,
   enableAutomationOverlay,
@@ -23,7 +23,6 @@ import {
 } from "./background/capture";
 import { fetchWebSearch } from "./background/search";
 import { initClient, initSettings } from "./client";
-import { protectMcpStorage } from "./mcp/storage";
 
 const stopGeneration = async () => {
   await Promise.all([closeOwnedTabs(), stopSession()]);
@@ -41,7 +40,9 @@ const releaseNotesAvailable = async () => {
   }
 };
 
-void protectMcpStorage().catch(() => console.error("Could not restrict extension storage access."));
+void restrictLocalStorageAccess().catch(() =>
+  console.error("Could not restrict extension storage access.")
+);
 registerAutomationListeners();
 registerContextMenuListeners();
 registerCaptureListeners();

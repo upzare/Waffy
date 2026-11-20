@@ -3,6 +3,7 @@ import type {
   OAuthClientInformation,
   OAuthTokens,
 } from "@ai-sdk/mcp";
+import { restrictLocalStorageAccess } from "@/lib/helper";
 
 export type McpAuth = "none" | "bearer" | "oauth";
 
@@ -32,11 +33,6 @@ const SERVER_PREFIX = "mcp.server.";
 export const isMcpServerKey = (key: string) => key.startsWith(SERVER_PREFIX);
 const serverKey = (id: string) => SERVER_PREFIX + id;
 const credentialKey = (id: string) => "mcp.credentials." + id;
-
-export const protectMcpStorage = () =>
-  chrome.storage.local.setAccessLevel({
-    accessLevel: "TRUSTED_CONTEXTS",
-  });
 
 export function withMcpServerLock<T>(
   id: string,
@@ -81,7 +77,7 @@ export async function readMcpServerForEdit(id: string) {
 }
 
 export async function writeMcpCredentials(id: string, credentials: McpCredentials) {
-  await protectMcpStorage();
+  await restrictLocalStorageAccess();
   await chrome.storage.local.set({ [credentialKey(id)]: credentials });
 }
 
@@ -144,7 +140,7 @@ export async function saveMcpServer(input: McpServerInput, original?: McpServer)
       ...(clientId && { clientId, issuer }),
       enabled: current?.enabled ?? true,
     };
-    await protectMcpStorage();
+    await restrictLocalStorageAccess();
     await chrome.storage.local.set({
       [serverKey(id)]: server,
       ...(changed && { [credentialKey(id)]: bearer ? { bearer } : {} }),
