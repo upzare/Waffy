@@ -23,8 +23,6 @@ interface McpTurnOptions {
   onToolStart?: (label: string) => void;
 }
 
-const MAX_CALLS_PER_SESSION = 10;
-
 export const getMcpProviders = tool({
   description:
     "List the names and endpoint URLs of enabled MCP servers in Waffy settings. Use this when asked which MCP servers or tools are available, or to find the provider for a service-specific task.",
@@ -65,7 +63,6 @@ export async function openMcpTurn(
   const targets = new Map<string, McpToolTarget>();
   const clients: MCPClient[] = [];
   const close = () => Promise.all(clients.map(closeMcpClient));
-  let callCount = 0;
 
   async function discoverTools(server: McpServer) {
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(8_000)]);
@@ -116,11 +113,8 @@ export async function openMcpTurn(
     throw error;
   }
 
-  const tools = targets.size ? { search_mcp_tools: searchMcpTools, ...catalog } : undefined;
   return {
-    get tools() {
-      return callCount < MAX_CALLS_PER_SESSION ? tools : undefined;
-    },
+    tools: targets.size ? { search_mcp_tools: searchMcpTools, ...catalog } : undefined,
     rememberDiscoveredTools(results: TypedToolResult<ToolSet>[]) {
       // The SDK remembers discoveries for one streamText call. Browser and MCP tool calls can start another.
       for (const result of results) {
@@ -135,9 +129,6 @@ export async function openMcpTurn(
       signal.throwIfAborted();
       const target = targets.get(name);
       if (!target) return undefined;
-      if (callCount >= MAX_CALLS_PER_SESSION)
-        return "The MCP call limit was reached for this stage.";
-      callCount += 1;
       if (args === null || typeof args !== "object" || Array.isArray(args)) {
         return "MCP tool arguments must be a JSON object.";
       }

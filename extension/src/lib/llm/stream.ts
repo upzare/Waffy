@@ -58,19 +58,16 @@ export async function* streamResponse({
     : undefined;
 
   try {
-    const defaultTools: ToolSet = {
-      ...builtInTools,
-      ...(memoryEnabled && MEMORY_TOOLS),
-      ...(mcp && { get_mcp_providers: getMcpProviders }),
-    };
-    const toolsWithMcpSearch: ToolSet = mcp?.tools
-      ? { ...defaultTools, ...mcp.tools }
-      : defaultTools;
     const instructions = [
       config.prompt(flags, Boolean(mcp)),
       ...(mcp ? [MCP_INSTRUCTIONS] : []),
       ...(memoryEnabled ? [MEMORY_INSTRUCTIONS] : []),
     ].join("\n\n");
+    const tools: ToolSet = {
+      ...builtInTools,
+      ...(memoryEnabled && MEMORY_TOOLS),
+      ...(mcp && { get_mcp_providers: getMcpProviders, ...mcp.tools }),
+    };
     const toolStepLimit = mcp || memoryEnabled ? MAX_SDK_TOOL_STEPS : 1;
     const stepLimit = stepCountIs(toolStepLimit + 1);
     const executeTools = createToolExecutor({
@@ -87,7 +84,6 @@ export async function* streamResponse({
 
     while (true) {
       abortSignal.throwIfAborted();
-      const tools = mcp?.tools ? toolsWithMcpSearch : defaultTools;
       const result = streamText({
         model,
         instructions,
