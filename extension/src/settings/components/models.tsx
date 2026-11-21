@@ -100,13 +100,8 @@ const STAGE_GROUPS: StageGroup[] = [
       },
       {
         id: "t3",
-        label: "Validation Model",
-        description: "Validates that the task completed or not",
-      },
-      {
-        id: "t4",
         label: "Output Model",
-        description: "Generates a summary of the task completion",
+        description: "Determines whether the task completed and summarizes the result.",
       },
     ],
   },

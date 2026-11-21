@@ -3,82 +3,71 @@ import { PROMPTS, type PromptBuilder } from "./prompts";
 import { BASE_TOOLS } from "@/lib/llm/tools/base";
 import { SEARCH_TOOLS } from "@/lib/llm/tools/search";
 import { RESEARCH_TOOLS } from "@/lib/llm/tools/research";
-import { T1_TOOLS, T2_TOOLS, T3_TOOLS } from "@/lib/llm/tools/automate";
-import type { FeatureFlags } from "@/types";
+import { reportStatus, T2_TOOLS } from "@/lib/llm/tools/automate";
+import { automationToolHandlers } from "./tools/handlers/automate";
+import { browserToolHandlers, type ToolHandlers } from "./tools/handlers/common";
+import type { FeatureFlags, StageId } from "@/types";
 
-export type StreamMode = "base" | "search" | "research" | "t1" | "t2" | "t3" | "t4";
+export type StreamMode = "base" | "search" | "research" | "t1" | "t2" | "t3";
 
-/**
- * Per-mode streaming rules.
- */
-export interface ModeConfig {
-  /** Tools always considered for this mode (before feature gating). */
+export const STAGE_TOOL_ACCESS = {
+  base: { mcp: true, memory: true },
+  search: { mcp: true, memory: true },
+  research: { mcp: true, memory: true },
+  t1: { mcp: true, memory: true },
+  t2: { mcp: true, memory: false },
+  t3: { mcp: false, memory: false },
+  title: { mcp: false, memory: false },
+  step: { mcp: false, memory: false },
+  memory: { mcp: false, memory: false },
+} satisfies Record<StageId, { mcp: boolean; memory: boolean }>;
+
+interface ModeConfig {
   tools: ToolSet;
-  /** Dynamic system prompt builder. */
+  handlers?: ToolHandlers;
   prompt: PromptBuilder;
-  /**
-   * Optional tools gated by a feature flag.
-   * Tool is included only when `flags[flag]` is true.
-   */
   toolFeatures?: Partial<Record<string, keyof FeatureFlags>>;
-  /** Mode-specific stream behavior. */
-  extra?: {
-    /** Emit text deltas as reasoning instead of response text. */
-    streamAsReasoning?: boolean;
-    /** Convert screenshot-relative tool coordinates to viewport pixels. */
-    convertCoordinates?: boolean;
-    /** Generate a short UI step label for each tool call. */
-    generateSteps?: boolean;
-  };
 }
 
 export const MODES: Record<StreamMode, ModeConfig> = {
   base: {
     tools: BASE_TOOLS,
+    handlers: browserToolHandlers,
     prompt: PROMPTS.base,
     toolFeatures: {
       webSearch: "featureSearch",
       webFetch: "featureSearch",
-      automate: "featureAutomation",
     },
   },
   search: {
     tools: SEARCH_TOOLS,
+    handlers: browserToolHandlers,
     prompt: PROMPTS.search,
   },
   research: {
     tools: RESEARCH_TOOLS,
+    handlers: browserToolHandlers,
     prompt: PROMPTS.research,
   },
   t1: {
-    tools: T1_TOOLS,
+    tools: {},
     prompt: PROMPTS.t1,
   },
   t2: {
     tools: T2_TOOLS,
+    handlers: automationToolHandlers,
     prompt: PROMPTS.t2,
-    extra: {
-      streamAsReasoning: true,
-      convertCoordinates: true,
-      generateSteps: true,
-    },
   },
   t3: {
-    tools: T3_TOOLS,
+    tools: { reportStatus },
     prompt: PROMPTS.t3,
-  },
-  t4: {
-    tools: {},
-    prompt: PROMPTS.t4,
   },
 };
 
-export function resolvePrompt(mode: StreamMode, flags: FeatureFlags, hasMcpTools = false): string {
-  return MODES[mode].prompt(flags, hasMcpTools);
-}
-
-export function resolveTools(mode: StreamMode, flags: FeatureFlags): ToolSet {
-  const { tools, toolFeatures } = MODES[mode];
+export function resolveBuiltInTools(
+  { tools, toolFeatures }: ModeConfig,
+  flags: FeatureFlags
+): ToolSet {
   if (!toolFeatures) return tools;
 
   return Object.fromEntries(

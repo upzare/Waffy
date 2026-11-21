@@ -1,6 +1,10 @@
-export async function getImageDimensions(
-  base64: string
-): Promise<{ width: number; height: number }> {
+export interface Screenshot {
+  image: string;
+  pixelRatio: number;
+  dimensions?: Promise<{ width: number; height: number }>;
+}
+
+function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve({ width: img.width, height: img.height });
@@ -11,36 +15,31 @@ export async function getImageDimensions(
 
 export async function convertToolCoordinates(
   toolArgs: Record<string, unknown>,
-  screenshot: string | null,
-  devicePixelRatio = 1
+  screenshot?: Screenshot
 ): Promise<Record<string, unknown>> {
   const hasPoint = toolArgs.x !== undefined && toolArgs.y !== undefined;
   const hasPath = Array.isArray(toolArgs.path);
-  if (!screenshot || (!hasPoint && !hasPath)) {
-    return toolArgs;
+  if (!hasPoint && !hasPath) return toolArgs;
+  if (!screenshot) throw new Error("Call fetchScreen before targeting coordinates.");
+
+  screenshot.dimensions ??= getImageDimensions(screenshot.image);
+  const { width, height } = await screenshot.dimensions;
+  const viewportWidth = width / screenshot.pixelRatio;
+  const viewportHeight = height / screenshot.pixelRatio;
+  const toPixel = (value: number, size: number) =>
+    Math.min(Math.round((value * size) / 1000), Math.ceil(size) - 1);
+  const converted = { ...toolArgs };
+
+  if (hasPoint) {
+    converted.x = toPixel(toolArgs.x as number, viewportWidth);
+    converted.y = toPixel(toolArgs.y as number, viewportHeight);
   }
 
-  try {
-    const { width, height } = await getImageDimensions(screenshot);
-    const scaleX = width / devicePixelRatio / 1000;
-    const scaleY = height / devicePixelRatio / 1000;
-    const converted = { ...toolArgs };
-
-    if (hasPoint) {
-      converted.x = Math.round((toolArgs.x as number) * scaleX);
-      converted.y = Math.round((toolArgs.y as number) * scaleY);
-    }
-
-    if (hasPath) {
-      converted.path = (toolArgs.path as Array<{ x: number; y: number }>).map((point) => ({
-        ...point,
-        x: Math.round(point.x * scaleX),
-        y: Math.round(point.y * scaleY),
-      }));
-    }
-
-    return converted;
-  } catch {
-    return toolArgs;
+  if (hasPath) {
+    converted.path = (toolArgs.path as Array<{ x: number; y: number }>).map((point) => ({
+      x: toPixel(point.x, viewportWidth),
+      y: toPixel(point.y, viewportHeight),
+    }));
   }
+  return converted;
 }

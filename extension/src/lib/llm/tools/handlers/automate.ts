@@ -1,8 +1,7 @@
 import Browser from "webextension-polyfill";
 import type { Tabs } from "webextension-polyfill";
 import { ACTIONS, DOM_ACTIONS, isInaccessiblePage } from "@/lib/helper";
-import { AutomateToolResult } from "../automate";
-import { webFetch, webSearch } from "./common";
+import { webFetch, webSearch, type BrowserToolResult, type ToolHandlers } from "./common";
 import { toolError } from "@/lib/errors";
 import { sleep } from "@/lib/utils";
 
@@ -21,7 +20,7 @@ const KEY_CODES = {
   PageDown: 34,
 };
 
-type KEY_TYPES = keyof typeof KEY_CODES;
+type KeyName = keyof typeof KEY_CODES;
 
 type Point = { x: number; y: number };
 
@@ -51,8 +50,9 @@ const interpolatePath = (path: Point[]): Point[] => {
 const getSessionTab = async () =>
   (await Browser.runtime.sendMessage({ action: ACTIONS.getTab })) as Tabs.Tab | undefined;
 
-const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) => {
-  chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+const clickAt = async (tabId: number, { x, y }: Point, signal?: AbortSignal) => {
+  signal?.throwIfAborted();
+  await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
     type: "mousePressed",
     x,
     y,
@@ -60,7 +60,7 @@ const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) 
     clickCount: 1,
   });
   await sleep(50);
-  chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+  await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
     type: "mouseReleased",
     x,
     y,
@@ -69,16 +69,25 @@ const _click = async ({ x, y, tabId }: { x: number; y: number; tabId: number }) 
   });
 };
 
-export const updateOpenedTabs = async () => {
-  try {
-    const tabs = await Browser.tabs.query({});
-    await Browser.runtime.sendMessage({ action: ACTIONS.setOpenedTabs, tabs });
-  } catch {
-    // ignore
-  }
-};
+function displayPointer(tabId: number, point: Point, timeout?: number) {
+  void Browser.tabs
+    .sendMessage(tabId, {
+      type: ACTIONS.interactDom,
+      name: DOM_ACTIONS.displayPointer,
+      args: { ...point, timeout },
+    })
+    .catch(() => {});
+}
 
-const fetchScreen = async (): Promise<AutomateToolResult> => {
+async function selectAutomationTab(tabId: number) {
+  const result = (await Browser.runtime.sendMessage({ action: ACTIONS.setTab, tabId })) as {
+    status: string;
+    value?: string;
+  };
+  if (result?.status !== "success") throw new Error(result?.value ?? "Could not select the tab.");
+}
+
+const fetchScreen = async (): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
@@ -130,7 +139,7 @@ const fetchScreen = async (): Promise<AutomateToolResult> => {
   }
 };
 
-const getPageContent = async (): Promise<AutomateToolResult> => {
+const getPageContent = async (): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab?.id) {
@@ -167,8 +176,7 @@ const findNewTabFromClick = async (sourceTabId: number, tabIdsBefore: Set<number
   return newTabs.find((t) => t.openerTabId === sourceTabId);
 };
 
-const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolResult> => {
-  console.log("CLICK: ", x, y);
+const click = async (point: Point, signal?: AbortSignal): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
@@ -178,19 +186,14 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
     const tabsBefore = await Browser.tabs.query({});
     const tabIdsBefore = new Set(tabsBefore.map((t) => t.id));
 
-    Browser.tabs.sendMessage(tab.id, {
-      type: ACTIONS.interactDom,
-      name: DOM_ACTIONS.displayPointer,
-      args: { x, y },
-    });
-    await _click({ x, y, tabId: tab.id });
+    displayPointer(tab.id, point);
+    await clickAt(tab.id, point, signal);
 
-    await sleep(500);
+    await sleep(500, signal);
     const newTab = await findNewTabFromClick(sourceTabId, tabIdsBefore);
 
     if (newTab?.id) {
-      await updateOpenedTabs();
-      await Browser.runtime.sendMessage({ action: ACTIONS.setTab, tabId: newTab.id });
+      await selectAutomationTab(newTab.id);
       await Browser.tabs.update(newTab.id, { active: true });
       return {
         status: "success",
@@ -203,8 +206,10 @@ const click = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolRe
   }
 };
 
-const drag = async ({ path }: { path: Point[] }): Promise<AutomateToolResult> => {
-  console.log("DRAG: ", path);
+const drag = async (
+  { path }: { path: Point[] },
+  signal?: AbortSignal
+): Promise<BrowserToolResult> => {
   try {
     if (!Array.isArray(path) || path.length < 2) {
       return { status: "error", message: toolError("Drag requires at least 2 points") };
@@ -215,17 +220,20 @@ const drag = async ({ path }: { path: Point[] }): Promise<AutomateToolResult> =>
     }
     const points = interpolatePath(path);
     const start = path[0];
-    const end = path[path.length - 1];
+    let position = start;
 
-    Browser.tabs.sendMessage(tab.id, {
-      type: ACTIONS.interactDom,
-      name: DOM_ACTIONS.animatePointer,
-      args: {
-        path: points,
-        duration: DRAG_HOLD_MS + points.length * DRAG_STEP_DELAY_MS,
-      },
-    });
+    Browser.tabs
+      .sendMessage(tab.id, {
+        type: ACTIONS.interactDom,
+        name: DOM_ACTIONS.animatePointer,
+        args: {
+          path: points,
+          duration: DRAG_HOLD_MS + points.length * DRAG_STEP_DELAY_MS,
+        },
+      })
+      .catch(() => {});
 
+    signal?.throwIfAborted();
     await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchMouseEvent", {
       type: "mousePressed",
       x: start.x,
@@ -234,99 +242,98 @@ const drag = async ({ path }: { path: Point[] }): Promise<AutomateToolResult> =>
       buttons: 1,
       clickCount: 1,
     });
-    // Let the page register a dragstart before the pointer starts moving.
-    await sleep(DRAG_HOLD_MS);
-
-    for (const point of points) {
+    try {
+      await sleep(DRAG_HOLD_MS, signal);
+      for (const point of points) {
+        await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchMouseEvent", {
+          type: "mouseMoved",
+          ...point,
+          button: "left",
+          buttons: 1,
+        });
+        position = point;
+        await sleep(DRAG_STEP_DELAY_MS, signal);
+      }
+    } finally {
       await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchMouseEvent", {
-        type: "mouseMoved",
-        x: point.x,
-        y: point.y,
+        type: "mouseReleased",
+        ...position,
         button: "left",
-        buttons: 1,
+        buttons: 0,
+        clickCount: 1,
       });
-      await sleep(DRAG_STEP_DELAY_MS);
     }
-
-    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchMouseEvent", {
-      type: "mouseReleased",
-      x: end.x,
-      y: end.y,
-      button: "left",
-      buttons: 0,
-      clickCount: 1,
-    });
     return { status: "success", message: "Success: Drag initiated" };
   } catch (error) {
     return { status: "error", message: toolError(error) };
   }
 };
 
-const keyPress = async ({ key }: { key: KEY_TYPES }): Promise<AutomateToolResult> => {
-  console.log("KEYPRESS: ", key);
+async function dispatchKey(tabId: number, key: KeyName, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  const event = {
+    key: key === "Space" ? " " : key,
+    code: key,
+    windowsVirtualKeyCode: KEY_CODES[key],
+  };
+  const text = key === "Enter" ? "\r" : key === "Space" ? " " : undefined;
+  await chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+    ...event,
+    type: text ? "keyDown" : "rawKeyDown",
+    text,
+  });
+  await sleep(50);
+  await chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+    ...event,
+    type: "keyUp",
+  });
+}
+
+const keyPress = async (
+  { key }: { key: KeyName },
+  signal?: AbortSignal
+): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-      type: "keyDown",
-      windowsVirtualKeyCode: KEY_CODES[key],
-      key: key,
-      code: key,
-      text: "\r",
-    });
-    await sleep(50);
-    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-      type: "keyUp",
-      windowsVirtualKeyCode: KEY_CODES[key],
-      key: key,
-      code: key,
-      text: "\r",
-    });
+    await dispatchKey(tab.id, key, signal);
     return { status: "success", message: "Success: Key pressed" };
   } catch (error) {
     return { status: "error", message: toolError(error) };
   }
 };
 
-const typeText = async ({
-  x,
-  y,
-  text,
-}: {
-  x: number;
-  y: number;
-  text: string;
-}): Promise<AutomateToolResult> => {
-  console.log("TYPETEXT: ", x, y, text);
+const typeText = async (
+  { text, ...point }: Point & { text: string },
+  signal?: AbortSignal
+): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    Browser.tabs.sendMessage(tab.id, {
-      type: ACTIONS.interactDom,
-      name: DOM_ACTIONS.displayPointer,
-      args: { x, y, timeout: text.length * 150 + 500 },
-    });
-    await _click({ x, y, tabId: tab.id });
-    await sleep(100);
-    for await (const char of text) {
+    displayPointer(tab.id, point, text.length * 150 + 500);
+    await clickAt(tab.id, point, signal);
+    await sleep(100, signal);
+    for (const char of text) {
+      signal?.throwIfAborted();
       if (char === "\n") {
-        await keyPress({ key: "Enter" });
+        await dispatchKey(tab.id, "Enter", signal);
         continue;
       }
       await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
         type: "keyDown",
+        key: char,
         text: char,
       });
       await sleep(25);
       await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
         type: "keyUp",
-        text: char,
+        key: char,
       });
-      await sleep(10);
+      await sleep(10, signal);
     }
     return { status: "success", message: "Success: Text typed successfully" };
   } catch (error) {
@@ -334,57 +341,36 @@ const typeText = async ({
   }
 };
 
-const clearValue = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolResult> => {
-  console.log("CLEARVALUE: ", x, y);
+const clearValue = async (point: Point, signal?: AbortSignal): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    Browser.tabs.sendMessage(tab.id, {
-      type: ACTIONS.interactDom,
-      name: DOM_ACTIONS.displayPointer,
-      args: { x, y },
-    });
-    await _click({ x, y, tabId: tab.id });
-    await sleep(100);
+    displayPointer(tab.id, point);
+    await clickAt(tab.id, point, signal);
+    await sleep(100, signal);
     await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
       type: "char",
       commands: ["SelectAll"],
     });
-    await sleep(100);
-    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-      type: "keyDown",
-      key: "Backspace",
-      code: "Backspace",
-      windowsVirtualKeyCode: 8,
-    });
-    await sleep(50);
-    await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.dispatchKeyEvent", {
-      type: "keyUp",
-      key: "Backspace",
-      code: "Backspace",
-      windowsVirtualKeyCode: 8,
-    });
+    await sleep(100, signal);
+    await dispatchKey(tab.id, "Backspace", signal);
     return { status: "success", message: "Success: Value cleared successfully" };
   } catch (error) {
     return { status: "error", message: toolError(error) };
   }
 };
 
-const getOption = async ({ x, y }: { x: number; y: number }): Promise<AutomateToolResult> => {
-  console.log("GETOPTION: ", x, y);
+const getOption = async (point: Point, signal?: AbortSignal): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    Browser.tabs.sendMessage(tab.id, {
-      type: ACTIONS.interactDom,
-      name: DOM_ACTIONS.displayPointer,
-      args: { x, y },
-    });
-    await _click({ x, y, tabId: tab.id });
+    displayPointer(tab.id, point);
+    await clickAt(tab.id, point, signal);
+    signal?.throwIfAborted();
     const res = (await Browser.tabs.sendMessage(tab.id, {
       type: ACTIONS.interactDom,
       name: DOM_ACTIONS.getOption,
@@ -399,27 +385,18 @@ const getOption = async ({ x, y }: { x: number; y: number }): Promise<AutomateTo
   }
 };
 
-const setOption = async ({
-  x,
-  y,
-  value,
-}: {
-  x: number;
-  y: number;
-  value: string;
-}): Promise<AutomateToolResult> => {
-  console.log("SETOPTION: ", x, y, value);
+const setOption = async (
+  { value, ...point }: Point & { value: string },
+  signal?: AbortSignal
+): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    Browser.tabs.sendMessage(tab.id, {
-      type: ACTIONS.interactDom,
-      name: DOM_ACTIONS.displayPointer,
-      args: { x, y },
-    });
-    await _click({ x, y, tabId: tab.id });
+    displayPointer(tab.id, point);
+    await clickAt(tab.id, point, signal);
+    signal?.throwIfAborted();
     const res = (await Browser.tabs.sendMessage(tab.id, {
       type: ACTIONS.interactDom,
       name: DOM_ACTIONS.setOption,
@@ -444,17 +421,13 @@ const scroll = async ({
   y: number;
   xDistance: number;
   yDistance: number;
-}): Promise<AutomateToolResult> => {
+}): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
       return { status: "error", message: toolError("Tab not found") };
     }
-    Browser.tabs.sendMessage(tab.id, {
-      type: ACTIONS.interactDom,
-      name: DOM_ACTIONS.displayPointer,
-      args: { x, y },
-    });
+    displayPointer(tab.id, { x, y });
     await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.synthesizeScrollGesture", {
       x,
       y,
@@ -467,7 +440,7 @@ const scroll = async ({
   }
 };
 
-const loadingState = async (): Promise<AutomateToolResult> => {
+const loadingState = async (): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
@@ -496,7 +469,7 @@ const loadingState = async (): Promise<AutomateToolResult> => {
   }
 };
 
-const goto = async ({ url }: { url: string }): Promise<AutomateToolResult> => {
+const goto = async ({ url }: { url: string }): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
@@ -509,10 +482,9 @@ const goto = async ({ url }: { url: string }): Promise<AutomateToolResult> => {
   }
 };
 
-const getOpenedTabs = async (): Promise<AutomateToolResult> => {
+const getOpenedTabs = async (): Promise<BrowserToolResult> => {
   try {
     const tabs = await Browser.tabs.query({});
-    await Browser.runtime.sendMessage({ action: ACTIONS.setOpenedTabs, tabs });
     const result = tabs.map((tab: Tabs.Tab) => ({
       id: tab.id,
       title: tab.title,
@@ -525,29 +497,28 @@ const getOpenedTabs = async (): Promise<AutomateToolResult> => {
   }
 };
 
-const openTab = async ({ url }: { url: string }): Promise<AutomateToolResult> => {
+const openTab = async ({ url }: { url: string }): Promise<BrowserToolResult> => {
   try {
     const tab = await Browser.tabs.create({ url });
-    await updateOpenedTabs();
-    await Browser.runtime.sendMessage({ action: ACTIONS.setTab, tabId: tab?.id });
+    if (tab.id == null) throw new Error("Tab not found");
+    await selectAutomationTab(tab.id);
     return { status: "success", message: "Success: URL opened in new tab successfully" };
   } catch (error) {
     return { status: "error", message: toolError(error) };
   }
 };
 
-const switchTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResult> => {
+const switchTab = async ({ tabId }: { tabId: number }): Promise<BrowserToolResult> => {
   try {
-    const tab = await Browser.tabs.update(tabId, { active: true });
-    await updateOpenedTabs();
-    await Browser.runtime.sendMessage({ action: ACTIONS.setTab, tabId: tab?.id });
+    await Browser.tabs.update(tabId, { active: true });
+    await selectAutomationTab(tabId);
     return { status: "success", message: "Success: Tab switched successfully" };
   } catch (error) {
     return { status: "error", message: toolError(error) };
   }
 };
 
-const closeTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResult> => {
+const closeTab = async ({ tabId }: { tabId: number }): Promise<BrowserToolResult> => {
   try {
     await Browser.tabs.remove(tabId);
     return { status: "success", message: "Success: Tab closed successfully" };
@@ -556,7 +527,7 @@ const closeTab = async ({ tabId }: { tabId: number }): Promise<AutomateToolResul
   }
 };
 
-const reload = async (): Promise<AutomateToolResult> => {
+const reload = async (): Promise<BrowserToolResult> => {
   try {
     const tab = await getSessionTab();
     if (!tab || !tab.id) {
@@ -569,34 +540,34 @@ const reload = async (): Promise<AutomateToolResult> => {
   }
 };
 
-const wait = async ({ ms }: { ms: number }): Promise<AutomateToolResult> => {
+const wait = async ({ ms }: { ms: number }, signal?: AbortSignal): Promise<BrowserToolResult> => {
   try {
-    await sleep(ms);
+    await sleep(ms, signal);
     return { status: "success", message: `Success: Waited for ${ms} milliseconds` };
   } catch (error) {
     return { status: "error", message: toolError(error) };
   }
 };
 
-export const availableFunctions: { [key: string]: (args: any) => Promise<AutomateToolResult> } = {
-  fetchScreen: fetchScreen,
-  getPageContent: getPageContent,
-  click: click,
-  drag: drag,
-  typeText: typeText,
-  clearValue: clearValue,
-  keyPress: keyPress,
-  getOption: getOption,
-  setOption: setOption,
-  scroll: scroll,
-  loadingState: loadingState,
-  goto: goto,
-  getOpenedTabs: getOpenedTabs,
-  openTab: openTab,
-  switchTab: switchTab,
-  closeTab: closeTab,
-  reload: reload,
-  wait: wait,
-  webSearch: webSearch,
-  webFetch: webFetch,
+export const automationToolHandlers: ToolHandlers = {
+  fetchScreen,
+  getPageContent,
+  click,
+  drag,
+  typeText,
+  clearValue,
+  keyPress,
+  getOption,
+  setOption,
+  scroll,
+  loadingState,
+  goto,
+  getOpenedTabs,
+  openTab,
+  switchTab,
+  closeTab,
+  reload,
+  wait,
+  webSearch,
+  webFetch,
 };

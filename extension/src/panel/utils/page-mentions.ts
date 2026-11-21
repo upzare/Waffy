@@ -2,7 +2,7 @@ import type { Tabs } from "webextension-polyfill";
 import Browser from "webextension-polyfill";
 import { ACTIONS, isInaccessiblePage } from "@/lib/helper";
 import type { PageSource } from "@/types";
-import { SLASH_COMMAND_VALUES, stripSlashCommands, type SlashCommand } from "./slash-commands";
+import { findSlashCommand, stripSlashCommand } from "./slash-commands";
 
 export const SLASH_MARKUP = "/[__display__](__id__)";
 export const PAGE_MARKUP = "@[__display__](tab:__id__)";
@@ -87,10 +87,6 @@ export function toWindowPages(tabs: Tabs.Tab[]): WindowPage[] {
   });
 }
 
-export function isMutedMentionId(id: string): boolean {
-  return id.startsWith("muted:");
-}
-
 export async function fetchPageContent(
   tabId: number
 ): Promise<{ ok: true; content: string } | { ok: false; message: string }> {
@@ -108,14 +104,9 @@ export async function fetchPageContent(
   }
 }
 
-export function parseSlashCommandsFromMarkup(markup: string): SlashCommand[] {
-  const commands: SlashCommand[] = [];
-  const pattern = new RegExp(SLASH_MARKUP_PATTERN.source, "gi");
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(markup))) {
-    commands.push(match[1].toLowerCase() as SlashCommand);
-  }
-  return commands;
+export function selectedCommandOffset(markup: string): number | undefined {
+  const selected = markup.matchAll(SLASH_MARKUP_PATTERN).next().value;
+  return selected && markupToDisplay(markup.slice(0, selected.index)).length;
 }
 
 export function parsePageMentionsFromMarkup(markup: string): ComposerPageMention[] {
@@ -154,29 +145,17 @@ export function markupToDisplay(markup: string): string {
 
 type MarkupSpan = { start: number; end: number; markup: string };
 
-function collectSlashSpans(display: string): MarkupSpan[] {
-  const spans: MarkupSpan[] = [];
-  for (const command of SLASH_COMMAND_VALUES) {
-    const pattern = new RegExp(`/${command}\\b`, "gi");
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(display))) {
-      const value = match[0].slice(1).toLowerCase();
-      spans.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        markup: `/[${value}](${value})`,
-      });
-    }
-  }
-  return spans;
-}
-
-function overlaps(start: number, end: number, spans: MarkupSpan[]): boolean {
-  return spans.some((span) => start < span.end && end > span.start);
-}
-
-export function displayToMarkup(display: string, pages: ComposerPageMention[]): string {
-  const spans = collectSlashSpans(display);
+function formatPromptMentions<T extends { mention: string }>(
+  display: string,
+  pages: T[],
+  commandOffset: number | undefined,
+  formatCommand: (text: string) => string,
+  formatPage: (page: T) => string
+): string {
+  const command = findSlashCommand(display, commandOffset);
+  const spans: MarkupSpan[] = command
+    ? [{ ...command, markup: formatCommand(display.slice(command.start, command.end)) }]
+    : [];
   const byLength = [...pages].sort((a, b) => b.mention.length - a.mention.length);
 
   for (const page of byLength) {
@@ -186,29 +165,41 @@ export function displayToMarkup(display: string, pages: ComposerPageMention[]): 
       if (start === -1) break;
       const end = start + page.mention.length;
       from = start + 1;
-      if (overlaps(start, end, spans)) continue;
-      const label = page.label || page.mention.slice(1);
-      const markup =
-        page.muted || page.tabId == null
-          ? `@[${label}](muted:${encodeURIComponent(label)})`
-          : `@[${label}](tab:${page.tabId})`;
-      spans.push({ start, end, markup });
+      if (spans.some((span) => start < span.end && end > span.start)) continue;
+      spans.push({ start, end, markup: formatPage(page) });
     }
   }
 
   spans.sort((a, b) => a.start - b.start);
-  const kept: MarkupSpan[] = [];
-  for (const span of spans) {
-    if (!overlaps(span.start, span.end, kept)) kept.push(span);
-  }
-
   let result = "";
   let cursor = 0;
-  for (const span of kept) {
+  for (const span of spans) {
     result += display.slice(cursor, span.start) + span.markup;
     cursor = span.end;
   }
   return result + display.slice(cursor);
+}
+
+export function displayToMarkup(
+  display: string,
+  pages: ComposerPageMention[],
+  commandOffset?: number
+): string {
+  return formatPromptMentions(
+    display,
+    pages,
+    commandOffset,
+    (text) => {
+      const name = text.slice(1);
+      return `/[${name}](${name.toLowerCase()})`;
+    },
+    (page) => {
+      const label = page.label || page.mention.slice(1);
+      return page.muted || page.tabId == null
+        ? `@[${label}](muted:${encodeURIComponent(label)})`
+        : `@[${label}](tab:${page.tabId})`;
+    }
+  );
 }
 
 export function rebindStoredPages(pages: PageSource[], open: WindowPage[]): ComposerPageMention[] {
@@ -254,8 +245,12 @@ function escapeXml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function buildPageTaggedPrompt(prompt: string, pages: PageSource[]): string {
-  const userMessage = stripSlashCommands(prompt) || prompt.trim();
+export function buildPageTaggedPrompt(
+  prompt: string,
+  pages: PageSource[],
+  commandOffset?: number
+): string {
+  const userMessage = stripSlashCommand(prompt, commandOffset);
   if (pages.length === 0) return userMessage;
 
   const seen = new Set<number>();
@@ -269,75 +264,24 @@ export function buildPageTaggedPrompt(prompt: string, pages: PageSource[]): stri
   const sources = uniquePages
     .map(
       (page) =>
-        `<page mention="${escapeXml(page.mention)}" title="${escapeXml(page.title)}" url="${escapeXml(page.url)}">\n${page.content}\n</page>`
+        `<page mention="${escapeXml(page.mention)}" title="${escapeXml(page.title)}" url="${escapeXml(page.url)}">\n${escapeXml(page.content)}\n</page>`
     )
     .join("\n");
 
   return `<user_message>
-${userMessage}
+${escapeXml(userMessage)}
 </user_message>
 <page_sources>
 ${sources}
 </page_sources>`;
 }
 
-export type PromptToken = { type: "text" | "mention"; value: string };
-
-export function tokenizeTaggedPrompt(prompt: string, pages: PageSource[]): PromptToken[] {
-  const spans: { start: number; end: number }[] = [];
-
-  for (const command of SLASH_COMMAND_VALUES) {
-    const pattern = new RegExp(`/${command}\\b`, "gi");
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(prompt))) {
-      spans.push({ start: match.index, end: match.index + match[0].length });
-    }
-  }
-
-  const mentions = [...new Set(pages.map((page) => page.mention))].sort(
-    (a, b) => b.length - a.length
-  );
-  for (const mention of mentions) {
-    let from = 0;
-    while (from < prompt.length) {
-      const start = prompt.indexOf(mention, from);
-      if (start === -1) break;
-      const end = start + mention.length;
-      from = start + 1;
-      if (!spans.some((span) => start < span.end && end > span.start)) {
-        spans.push({ start, end });
-      }
-    }
-  }
-
-  spans.sort((a, b) => a.start - b.start);
-  const kept: { start: number; end: number }[] = [];
-  for (const span of spans) {
-    if (!kept.some((existing) => span.start < existing.end && span.end > existing.start)) {
-      kept.push(span);
-    }
-  }
-
-  const tokens: PromptToken[] = [];
-  let cursor = 0;
-  for (const span of kept) {
-    if (span.start > cursor) {
-      tokens.push({ type: "text", value: prompt.slice(cursor, span.start) });
-    }
-    tokens.push({ type: "mention", value: prompt.slice(span.start, span.end) });
-    cursor = span.end;
-  }
-  if (cursor < prompt.length) {
-    tokens.push({ type: "text", value: prompt.slice(cursor) });
-  }
-  return tokens.length > 0 ? tokens : [{ type: "text", value: prompt }];
-}
-
 /** Wrap / and @ chips as Streamdown mention tags so the rest of the prompt still renders as Markdown. */
-export function wrapPromptMentions(prompt: string, pages: PageSource[]): string {
-  return tokenizeTaggedPrompt(prompt, pages)
-    .map((token) =>
-      token.type === "mention" ? `<mention>${escapeXml(token.value)}</mention>` : token.value
-    )
-    .join("");
+export function wrapPromptMentions(
+  prompt: string,
+  pages: PageSource[],
+  commandOffset?: number
+): string {
+  const wrap = (text: string) => `<mention>${escapeXml(text)}</mention>`;
+  return formatPromptMentions(prompt, pages, commandOffset, wrap, (page) => wrap(page.mention));
 }

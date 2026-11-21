@@ -1,15 +1,13 @@
 import { browserAI, doesBrowserSupportBrowserAI } from "@browser-ai/core";
 import type { BrowserAIChatSettings } from "@browser-ai/core";
-import type { LanguageModel } from "ai";
+import { wrapLanguageModel } from "ai";
 
 export type BrowserAIStatus =
   "unsupported" | "unavailable" | "downloadable" | "downloading" | "available";
 
-type RawAvailability = "unavailable" | "downloadable" | "downloading" | "available";
-
 const SUPPORTED_LANGUAGES = ["de", "en", "es", "fr", "ja"] as const;
 
-let downloadPromise: Promise<LanguageModel> | null = null;
+let downloadPromise: Promise<void> | undefined;
 const downloadProgressListeners = new Set<(progress: number) => void>();
 
 function emitDownloadProgress(progress: number) {
@@ -33,8 +31,41 @@ function getBrowserAIModelSettings(): BrowserAIChatSettings {
   };
 }
 
-function createBrowserAIModel() {
-  return browserAI("text", getBrowserAIModelSettings());
+export function createBrowserAIModel(signal?: AbortSignal) {
+  return browserAI("text", { ...getBrowserAIModelSettings(), signal });
+}
+
+// One AI SDK stream can discover tools between model calls.
+// The Browser AI adapter keeps the tool list from the start of each session.
+export function createBrowserAISessionHooks() {
+  let lifetime: AbortController | undefined;
+  const close = () => {
+    lifetime?.abort();
+    lifetime = undefined;
+  };
+
+  return {
+    prepareStep() {
+      close();
+      const controller = new AbortController();
+      lifetime = controller;
+      return {
+        model: wrapLanguageModel({
+          model: createBrowserAIModel(),
+          middleware: {
+            specificationVersion: "v4",
+            transformParams: async ({ params }) => ({
+              ...params,
+              abortSignal: params.abortSignal
+                ? AbortSignal.any([params.abortSignal, controller.signal])
+                : controller.signal,
+            }),
+          },
+        }),
+      };
+    },
+    close,
+  };
 }
 
 export function getBrowserAIModelLabel(): string {
@@ -44,7 +75,7 @@ export function getBrowserAIModelLabel(): string {
   return "Built-in model";
 }
 
-async function getAvailability(
+export async function getBrowserAIStatus(
   model: ReturnType<typeof createBrowserAIModel> = createBrowserAIModel()
 ): Promise<BrowserAIStatus> {
   if (!doesBrowserSupportBrowserAI()) {
@@ -52,27 +83,26 @@ async function getAvailability(
   }
 
   try {
-    return (await model.availability()) as RawAvailability;
+    return await model.availability();
   } catch {
     return "unavailable";
   }
 }
 
-export async function getBrowserAIStatus(): Promise<BrowserAIStatus> {
-  return getAvailability();
-}
+async function downloadBrowserAIModel(): Promise<void> {
+  const controller = new AbortController();
+  const instance = createBrowserAIModel(controller.signal);
+  const status = await getBrowserAIStatus(instance);
 
-async function downloadBrowserAIModel(): Promise<LanguageModel> {
-  const instance = createBrowserAIModel();
-  const status = await getAvailability(instance);
-
-  if (status === "available") {
-    return instance;
-  }
+  if (status === "available") return;
 
   if (status === "downloadable" || status === "downloading") {
-    await instance.createSessionWithProgress(emitDownloadProgress);
-    return instance;
+    try {
+      await instance.createSessionWithProgress(emitDownloadProgress);
+    } finally {
+      controller.abort();
+    }
+    return;
   }
 
   if (status === "unavailable") {
@@ -84,7 +114,7 @@ async function downloadBrowserAIModel(): Promise<LanguageModel> {
 
 export async function ensureBrowserAIModelReady(
   onProgress?: (progress: number) => void
-): Promise<LanguageModel> {
+): Promise<void> {
   if (!doesBrowserSupportBrowserAI()) {
     throw new Error("Browser AI is not supported in this browser.");
   }
@@ -92,15 +122,10 @@ export async function ensureBrowserAIModelReady(
   if (onProgress) downloadProgressListeners.add(onProgress);
 
   try {
-    if (!downloadPromise) {
-      let promise: Promise<LanguageModel>;
-      promise = downloadBrowserAIModel().finally(() => {
-        if (downloadPromise === promise) downloadPromise = null;
-      });
-      downloadPromise = promise;
-    }
-
-    return await downloadPromise;
+    downloadPromise ??= downloadBrowserAIModel().finally(() => {
+      downloadPromise = undefined;
+    });
+    await downloadPromise;
   } finally {
     if (onProgress) downloadProgressListeners.delete(onProgress);
   }

@@ -1,13 +1,16 @@
 import Browser from "webextension-polyfill";
 import { DEFAULT_MODELS } from "./llm/model";
 import { DEFAULT_FEATURES } from "./features";
-import type { ApiKeys, AppSettings, CustomApiConfig, Settings } from "@/types";
+import { applySettingsMigrations, type StoredSettings } from "./migrations";
+import type { ApiKeys, AppSettings, CustomApiConfig, Settings, StageId } from "@/types";
+
+const SETTINGS_LOCK = "app-settings";
 
 export const initClient = async () => {
   const localStorage = await Browser.storage.local.get("client");
   if (!localStorage.client) {
     const manifest = Browser.runtime.getManifest() as { version: string; version_name?: string };
-    Browser.storage.local.set({
+    await Browser.storage.local.set({
       client: JSON.stringify({
         client_id: crypto.randomUUID(),
         package: manifest.version_name ?? manifest.version,
@@ -65,17 +68,20 @@ const parseStoredJson = <T>(value: unknown): T | undefined => {
 };
 
 export function parseAppSettings(storage: Record<string, unknown>): AppSettings {
-  const storedSettings = parseStoredJson<Partial<Settings>>(storage.settings) ?? {};
+  const storedSettings = applySettingsMigrations(
+    parseStoredJson<StoredSettings>(storage.settings) ?? {}
+  );
+  const models = { ...DEFAULT_MODELS };
+  for (const stage of Object.keys(models) as StageId[]) {
+    models[stage] = storedSettings.models?.[stage] ?? models[stage];
+  }
   const settings: Settings = {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
     pinnedPrompts: Array.isArray(storedSettings.pinnedPrompts)
       ? storedSettings.pinnedPrompts
       : DEFAULT_SETTINGS.pinnedPrompts,
-    models: {
-      ...DEFAULT_MODELS,
-      ...(storedSettings.models ?? {}),
-    },
+    models,
     customApi: {
       ...DEFAULT_CUSTOM_API,
       ...(storedSettings.customApi ?? {}),
@@ -90,8 +96,20 @@ export function parseAppSettings(storage: Record<string, unknown>): AppSettings 
 export const getAppSettings = async () =>
   parseAppSettings(await Browser.storage.local.get(["settings", "apiKeys"]));
 
+export const migrateAppSettings = () =>
+  navigator.locks.request(SETTINGS_LOCK, async () => {
+    const { settings } = await Browser.storage.local.get("settings");
+    const storedSettings = parseStoredJson<StoredSettings>(settings);
+    if (!storedSettings) return;
+
+    const migrated = applySettingsMigrations(storedSettings);
+    if (migrated !== storedSettings) {
+      await Browser.storage.local.set({ settings: JSON.stringify(migrated) });
+    }
+  });
+
 export const updateAppSettings = async (update: (current: AppSettings) => Partial<AppSettings>) =>
-  navigator.locks.request("app-settings", async () => {
+  navigator.locks.request(SETTINGS_LOCK, async () => {
     const current = await getAppSettings();
     const updates = update(current);
     const entries = Object.entries(updates);

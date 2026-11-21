@@ -4,12 +4,11 @@ import { v4 as uuid4 } from "uuid";
 import toast, { Toaster } from "react-hot-toast";
 import Browser from "webextension-polyfill";
 import { TriangleAlert } from "lucide-react";
-import { AI, createTitle } from "@/lib/agent";
-import { openMcpTurn } from "@/lib/mcp/turn";
+import type { ModelMessage } from "ai";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
-import { parseSlashCommand, resolveMode, stripSlashCommands } from "./utils/slash-commands";
+import { findSlashCommand, storedCommandOffset } from "./utils/slash-commands";
 import {
   buildPageTaggedPrompt,
   displayToMarkup,
@@ -17,19 +16,11 @@ import {
   markupToDisplay,
   parsePageMentionsFromMarkup,
   parsePageSources,
-  parseSlashCommandsFromMarkup,
+  selectedCommandOffset,
   rebindStoredPages,
   toWindowPages,
 } from "./utils/page-mentions";
-import { getToolActivityLabel } from "./utils/tool-activity";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
-import { availableFunctions as baseFunctions } from "@/lib/llm/tools/handlers/base";
-import { availableFunctions as searchFunctions } from "@/lib/llm/tools/handlers/search";
-import { availableFunctions as researchFunctions } from "@/lib/llm/tools/handlers/research";
-import {
-  availableFunctions as automateFunctions,
-  updateOpenedTabs,
-} from "@/lib/llm/tools/handlers/automate";
 import {
   ACTIONS,
   base64ToBytes,
@@ -54,18 +45,16 @@ import {
   deleteConversation,
 } from "@/lib/db";
 import { findMissingProvider, getStageConfig } from "@/lib/llm/model";
+import { generateTitle } from "@/lib/llm/generate";
 import {
-  buildBaseMessages,
-  buildSearchMessages,
-  buildResearchMessages,
-  buildT1Messages,
-  buildT2Messages,
-  buildT3Messages,
-  buildT4Messages,
-  keepLatestScreenshotOnly,
-  type ExtensionMessage,
+  buildConversationMessages,
+  buildExecutionMessages,
+  buildTaskOutputMessages,
 } from "@/lib/llm/messages";
-import type { StreamSession } from "@/lib/llm/stream";
+import { extractAutomationPlan } from "@/lib/llm/prompts";
+import { streamResponse } from "@/lib/llm/stream";
+import { StreamMode } from "@/lib/llm/modes";
+import type { TaskStatus } from "@/lib/llm/tools/automate";
 import { errorMessage, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import { initAnalytics } from "@/lib/posthog";
 import HistorySidebar from "./components/history-sidebar";
@@ -79,7 +68,6 @@ import type {
   Conversation,
   AppSettings,
   StreamingState,
-  ToolCall,
   FileFormat,
   PageSource,
 } from "../types";
@@ -87,23 +75,29 @@ import "@/stylesheets/globals.css";
 
 type PanelView = "loading" | "home" | "chat";
 
+const RESPONSE_DISPLAY = { status: "GENERATING", stream: "response" } as const;
+const STAGE_DISPLAY = {
+  base: RESPONSE_DISPLAY,
+  search: RESPONSE_DISPLAY,
+  research: RESPONSE_DISPLAY,
+  t1: RESPONSE_DISPLAY,
+  t2: { status: "EXECUTING", stream: "execution" },
+  t3: { status: "FINALIZING", stream: "output" },
+} satisfies Record<StreamMode, { status: string; stream: StreamingState }>;
+
 const App = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, renderMessages] = useState<Message[]>([]);
+  const messagesRef = useRef(messages);
   const [panelView, setPanelView] = useState<PanelView>("loading");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [showWorkingDialog, setShowWorkingDialog] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [toolActivityText, setToolActivityText] = useState<string | null>(null);
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [streaming, setStreaming] = useState<StreamingState>({
-    response: false,
-    execution: false,
-    validation: false,
-    output: false,
-  });
+  const [streaming, setStreaming] = useState<StreamingState | null>(null);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const isGenerating = streamingMessageId !== null;
   const [missingApiKeys, setMissingApiKeys] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
 
@@ -121,12 +115,6 @@ const App = () => {
   const conversationIdRef = useRef<string>(null);
   const messageIdRef = useRef<string>(null);
   const lastPanelActionRef = useRef<number>(null);
-
-  const t2SessionRef = useRef<StreamSession>({
-    screenshot: null,
-    screenshotMetadata: null,
-    previousReasoning: "",
-  });
 
   const checkAppSettings = async () => {
     const data = await getAppSettings();
@@ -176,8 +164,7 @@ const App = () => {
     });
 
     const init = async () => {
-      const minDelay = new Promise((resolve) => setTimeout(resolve, 600));
-      const [{ data, missingApiKeys }] = await Promise.all([checkAppSettings(), minDelay]);
+      const { data, missingApiKeys } = await checkAppSettings();
       setAppSettings(data);
       setMissingApiKeys(missingApiKeys);
     };
@@ -236,35 +223,28 @@ const App = () => {
     return () => chrome.storage.onChanged.removeListener(onStorageChanged);
   }, [appSettings]);
 
-  const initConversation = async () => {
-    if (!conversationIdRef.current) return;
-    await createConversation(conversationIdRef.current);
+  const replaceMessages = (next: Message[]) => {
+    messagesRef.current = next;
+    renderMessages(next);
   };
 
-  const generateTitle = async (prompt: string) => {
-    const title = await createTitle(prompt);
-    setCurrentTitle(title);
-    if (conversationIdRef.current) {
-      await updateConversationTitle(conversationIdRef.current, title);
-    }
+  const generateConversationTitle = async (id: string, prompt: string, settings: AppSettings) => {
+    const title = await generateTitle(prompt, settings);
+    await updateConversationTitle(id, title);
+    if (conversationIdRef.current === id) setCurrentTitle(title);
   };
 
-  const syncMessages = (updatedMessages: Message[]) => {
-    if (conversationIdRef.current) {
-      void updateConversationMessages(conversationIdRef.current, updatedMessages);
-    }
-    return updatedMessages;
+  const persistMessages = async () => {
+    const id = conversationIdRef.current;
+    if (id) await updateConversationMessages(id, messagesRef.current);
   };
 
-  // Capture id at schedule time — finally clears messageIdRef before batched updaters run.
   const updateAssistantMessage = (patch: (msg: Message) => Message, persist = false) => {
     const messageId = messageIdRef.current;
     if (!messageId) return;
     const assistantId = `assistant-${messageId}`;
-    setMessages((prev) => {
-      const next = prev.map((msg) => (msg.id === assistantId ? patch(msg) : msg));
-      return persist ? syncMessages(next) : next;
-    });
+    replaceMessages(messagesRef.current.map((msg) => (msg.id === assistantId ? patch(msg) : msg)));
+    if (persist) return persistMessages();
   };
 
   const isAborted = () => Boolean(abortControllerRef.current?.signal.aborted);
@@ -275,765 +255,153 @@ const App = () => {
 
   const showError = (error?: unknown) => setErrorText(errorMessage(error));
 
-  const attachController = async () => {
-    const tab = await getActiveTab();
-    if (!tab?.id) return;
-    await Browser.runtime.sendMessage({ action: ACTIONS.startSession, tabId: tab.id });
-  };
-
-  const detachController = async () => {
-    await Browser.runtime.sendMessage({ action: ACTIONS.stopSession });
-  };
-
-  const cleanupBackground = () => {
-    Browser.runtime.sendMessage({ action: ACTIONS.stopGeneration }).catch(() => { });
-  };
-
-  const automateHandler = async (
-    prompt_text: string,
-    prompt_files: FileFormat[],
-    conversationMessages: Message[]
+  const generateResponse = async (
+    mode: StreamMode,
+    messages: ModelMessage[],
+    settings: AppSettings,
+    toolsContext?: Record<string, object>
   ) => {
-    assertNotAborted();
-    setStatusText("GENERATING");
-    setStreaming((prev) => ({ ...prev, response: true }));
+    const abortSignal = abortControllerRef.current!.signal;
+    abortSignal.throwIfAborted();
+    const { status, stream } = STAGE_DISPLAY[mode];
+    setStatusText(status);
+    setStreaming(stream);
 
-    await attachController();
+    let text = "";
+    let finalText = "";
     try {
-      const task = await t1Handler(prompt_text, prompt_files, conversationMessages);
-      if (task) {
-        const t2Reasoning = await t2Handler(task, prompt_files, conversationMessages);
-        if (t2Reasoning) {
-          await t3Handler(task, t2Reasoning);
-          await t4Handler(task, t2Reasoning);
-        }
-      }
-    } finally {
-      try {
-        await detachController();
-      } catch {
-        console.log("Error detaching from tab");
-      }
-    }
-  };
-
-  const t1Handler = async (
-    prompt_text: string,
-    prompt_files: FileFormat[],
-    conversationMessages: Message[]
-  ) => {
-    assertNotAborted();
-    const controller = abortControllerRef.current!;
-    const mcp = await openMcpTurn(controller.signal, {
-      onUnavailable: (error) => toast.error(error),
-      onToolStart: setToolActivityText,
-    });
-    try {
-      const t1Messages = buildT1Messages(prompt_text, prompt_files, conversationMessages);
-      let textResponse = "";
-      while (true) {
-        assertNotAborted();
-        const calls: ToolCall[] = [];
-        let iterationText = "";
-        for await (const res of AI(t1Messages, "t1", controller, mcp.tools)) {
-          if (res.type === "action.call") {
-            calls.push(...Object.values(res.action));
-          }
-          if (res.type === "text.stream") {
-            if (!iterationText) setToolActivityText(null);
-            iterationText += res.text;
-            textResponse += res.text;
+      for await (const event of streamResponse({
+        mode,
+        messages,
+        settings,
+        abortSignal,
+        toolsContext,
+        onToolActivity: setToolActivityText,
+        onMcpUnavailable: (message) => toast.error(message),
+      })) {
+        switch (event.type) {
+          case "text.stream": {
+            if (stream === "execution") break;
+            text += event.text;
+            const response = text;
             updateAssistantMessage((msg) => ({
               ...msg,
-              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
+              content: { ...msg.content, text: { ...msg.content.text, [stream]: response } },
             }));
+            break;
           }
-          if (res.type === "response.completed") {
-            updateAssistantMessage((msg) => msg, true);
-          }
-          if (res.type === "response.error") {
-            updateAssistantMessage((msg) => msg, true);
-            throw res.error;
-          }
-        }
-
-        assertNotAborted();
-        if (!calls.some((call) => mcp.hasTool(call.name))) {
-          setStreaming((prev) => ({ ...prev, response: false }));
-          const proceed = calls.find((call) => call.name === "proceed");
-          if (!proceed) return false;
-          const { task } = JSON.parse(proceed.arguments) as { task: string };
-          updateAssistantMessage((msg) => ({ ...msg, content: { ...msg.content, task } }), true);
-          return task;
-        }
-
-        if (iterationText) {
-          t1Messages.push({ type: "response", content: [{ type: "text", text: iterationText }] });
-        }
-        for (const { id, name, arguments: args } of calls) {
-          t1Messages.push({ type: "action.init", id, name, arguments: args });
-        }
-        for (const call of calls) {
-          const output = call.name === "proceed"
-            ? "Review the MCP tool results before calling this tool again."
-            : await mcp.call(call);
-          t1Messages.push({ type: "action.result", id: call.id, name: call.name, output });
-        }
-      }
-    } finally {
-      setToolActivityText(null);
-      await mcp.close();
-    }
-  };
-
-  const t2Handler = async (
-    task: string,
-    prompt_files: FileFormat[],
-    conversationMessages: Message[]
-  ) => {
-    assertNotAborted();
-    setStatusText("EXECUTING");
-    setStreaming((prev) => ({ ...prev, execution: true }));
-
-    const controller = abortControllerRef.current!;
-    const mcp = await openMcpTurn(controller.signal, {
-      onUnavailable: (error) => toast.error(error),
-      onToolStart: setToolActivityText,
-    });
-    try {
-      assertNotAborted();
-
-      t2SessionRef.current = {
-        screenshot: null,
-        screenshotMetadata: null,
-        previousReasoning: "",
-      };
-
-      await updateOpenedTabs();
-      const automationTab = (await Browser.runtime.sendMessage({ action: ACTIONS.getTab })) as {
-        id?: number;
-      } | null;
-      if (!automationTab || !automationTab.id) throw new Error("Tab not found");
-      await Browser.runtime.sendMessage({
-        action: ACTIONS.enableAutomationOverlay,
-        tabId: automationTab.id,
-      });
-
-      let responded = true;
-      let finish = false;
-      let functionExecState = false;
-      updateAssistantMessage(
-        (msg) => ({
-          ...msg,
-          content: {
-            ...msg.content,
-            text: { ...msg.content.text, execution: ["Initializing"] },
-          },
-        }),
-        true
-      );
-
-      const t2Messages = buildT2Messages(task, prompt_files, conversationMessages);
-      let t2Reasoning = "";
-
-      while (!finish || functionExecState) {
-        assertNotAborted();
-        if (!responded) return false;
-        responded = false;
-
-        let reasoning = "";
-        const executionToolCalls: Record<string, ToolCall> = {};
-        keepLatestScreenshotOnly(t2Messages);
-        const executionModelStream = AI(
-          t2Messages,
-          "t2",
-          controller,
-          mcp.tools,
-          t2SessionRef.current
-        );
-
-        for await (const res of executionModelStream) {
-          responded = true;
-          if (res.type === "reasoning.delta") {
-            const delta = res.text;
-            reasoning += delta;
-          }
-          if (res.type === "action.call") {
-            for (const [key, value] of Object.entries(res.action)) {
-              executionToolCalls[key] = value;
-            }
-            if (res.step) {
-              const step = res.step;
-              updateAssistantMessage((msg) => {
-                const execution = [...(msg.content.text?.execution ?? []), step];
-                return {
-                  ...msg,
-                  content: { ...msg.content, text: { ...msg.content.text, execution } },
-                };
-              });
-            }
-          }
-          if (res.type === "response.completed") {
-            if (!functionExecState) finish = true;
-            updateAssistantMessage((msg) => msg, true);
-          }
-          if (res.type === "response.error") {
-            updateAssistantMessage((msg) => msg, true);
-            throw res.error;
-          }
-        }
-
-        const iterationMessages: ExtensionMessage[] = [];
-        if (reasoning) {
-          iterationMessages.push({
-            type: "response",
-            content: [{ type: "text", text: reasoning }],
-          });
-        }
-
-        functionExecState = false;
-
-        for (const toolCall of Object.values(executionToolCalls)) {
-          const toolName = toolCall.name;
-          iterationMessages.push({
-            type: "action.init",
-            id: toolCall.id,
-            name: toolName,
-            arguments: toolCall.arguments,
-          });
-        }
-
-        for (const toolCall of Object.values(executionToolCalls)) {
-          const toolName = toolCall.name;
-          const mcpOutput = await mcp.call(toolCall);
-          if (mcpOutput !== undefined) {
-            setToolActivityText(null);
-            iterationMessages.push({
-              type: "action.result",
-              id: toolCall.id,
-              name: toolName,
-              output: mcpOutput,
+          case "execution.step":
+            updateAssistantMessage((msg) => {
+              const execution = [...(msg.content.text?.execution ?? []), event.label];
+              return {
+                ...msg,
+                content: { ...msg.content, text: { ...msg.content.text, execution } },
+              };
             });
-            functionExecState = true;
-            continue;
-          }
-          await updateOpenedTabs();
-          const toolArgs = JSON.parse(toolCall.arguments);
-
-          const toolCallResult = await automateFunctions[toolName](toolArgs);
-          assertNotAborted();
-
-          const screenshotData =
-            toolCallResult.data?.type === "screenshot"
-              ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
-              : {};
-
-          iterationMessages.push({
-            type: "action.result",
-            id: toolCall.id,
-            name: toolName,
-            output: toolCallResult.message,
-            ...screenshotData,
-          });
-
-          if (screenshotData.data?.image) {
-            t2SessionRef.current.screenshot = screenshotData.data.image;
-            t2SessionRef.current.screenshotMetadata = screenshotData.data.metadata ?? null;
-          }
-          functionExecState = true;
+            break;
+          case "response.completed":
+            finalText = event.finalText;
+            await persistMessages();
+            break;
+          case "tools.pending":
+            await persistMessages();
+            break;
         }
-
-        t2Reasoning += reasoning;
-        t2Messages.push(...iterationMessages);
       }
-
-      setStreaming((prev) => ({ ...prev, execution: false }));
-      const finishedAutomationTab = (await Browser.runtime.sendMessage({
-        action: ACTIONS.getTab,
-      })) as {
-        id?: number;
-      } | null;
-      if (!finishedAutomationTab || !finishedAutomationTab.id) throw new Error("Tab not found");
-      await Browser.runtime.sendMessage({
-        action: ACTIONS.disableAutomationOverlay,
-        tabId: finishedAutomationTab.id,
-      });
-
-      return t2Reasoning;
+      abortSignal.throwIfAborted();
+      return finalText;
     } finally {
       setToolActivityText(null);
-      await mcp.close();
+      setStreaming(null);
     }
   };
 
-  const t3Handler = async (task: string, t2Reasoning: string) => {
-    assertNotAborted();
-    setStatusText("VALIDATING");
-    setStreaming((prev) => ({ ...prev, validation: true }));
-    const t3Messages = buildT3Messages(task, t2Reasoning);
-    const summaryModelStream = AI(t3Messages, "t3", abortControllerRef?.current);
-    const toolCalls: Record<string, ToolCall> = {};
-    let textResponse = "";
-    for await (const res of summaryModelStream) {
-      if (res.type === "action.call") {
-        for (const [key, value] of Object.entries(res.action)) {
-          toolCalls[key] = value;
-        }
-      }
-      if (res.type === "text.stream") {
-        textResponse += res.text;
-        updateAssistantMessage((msg) => ({
-          ...msg,
-          content: { ...msg.content, text: { ...msg.content.text, validation: textResponse } },
-        }));
-      }
-      if (res.type === "response.completed") {
-        updateAssistantMessage((msg) => msg, true);
-      }
-      if (res.type === "response.error") {
-        updateAssistantMessage((msg) => msg, true);
-        throw res.error;
-      }
-    }
-    setStreaming((prev) => ({ ...prev, validation: false }));
-    for (const toolCall of Object.values(toolCalls)) {
-      const statusMap: Record<string, string> = {
-        success: "success",
-        failed: "failed",
-        suspended: "suspended",
-      };
-      const status = statusMap[toolCall.name];
-      if (status) {
-        updateAssistantMessage(
-          (msg) => ({ ...msg, content: { ...msg.content, taskStatus: status } }),
+  const executeBrowserTask = async (
+    tabId: number,
+    task: string,
+    promptFiles: FileFormat[],
+    conversationMessages: Message[],
+    settings: AppSettings
+  ) =>
+    navigator.locks.request("waffy-browser-automation", { ifAvailable: true }, async (lock) => {
+      if (!lock) throw new Error("Another Waffy window is running browser automation.");
+      assertNotAborted();
+      setStatusText("EXECUTING");
+      try {
+        const session = (await Browser.runtime.sendMessage({
+          action: ACTIONS.startSession,
+          tabId,
+        })) as { status: string; value?: string };
+        if (session?.status !== "success")
+          throw new Error(session?.value ?? "Could not start browser automation.");
+        assertNotAborted();
+        await updateAssistantMessage(
+          (msg) => ({
+            ...msg,
+            content: {
+              ...msg.content,
+              text: { ...msg.content.text, execution: ["Initializing"] },
+            },
+          }),
           true
         );
-      }
-    }
-  };
-
-  const t4Handler = async (task: string, t2Reasoning: string) => {
-    assertNotAborted();
-    setStatusText("FINALIZING");
-    setStreaming((prev) => ({ ...prev, output: true }));
-    const t4Messages = buildT4Messages(task, t2Reasoning);
-    const summaryModelStream = AI(t4Messages, "t4", abortControllerRef?.current);
-    let textResponse = "";
-    for await (const res of summaryModelStream) {
-      if (res.type === "text.stream") {
-        textResponse += res.text;
-        updateAssistantMessage((msg) => ({
-          ...msg,
-          content: { ...msg.content, text: { ...msg.content.text, output: textResponse } },
-        }));
-      }
-      if (res.type === "response.completed") {
-        updateAssistantMessage((msg) => msg, true);
-      }
-      if (res.type === "response.error") {
-        updateAssistantMessage((msg) => msg, true);
-        throw res.error;
-      }
-    }
-    setStreaming((prev) => ({ ...prev, output: false }));
-  };
-
-  const baseHandler = async (
-    prompt_text: string,
-    prompt_files: FileFormat[],
-    conversationMessages: Message[]
-  ) => {
-    assertNotAborted();
-    setStatusText("GENERATING");
-    setStreaming((prev) => ({ ...prev, response: true }));
-
-    const controller = abortControllerRef.current!;
-    const mcp = await openMcpTurn(controller.signal, {
-      onUnavailable: (error) => toast.error(error),
-      onToolStart: setToolActivityText,
-    });
-    console.log("mcp", mcp);
-    let automationTask: string | undefined;
-    try {
-      const baseMessages = buildBaseMessages(prompt_text, prompt_files, conversationMessages);
-      let finish = false;
-      let functionExecState = false;
-      let textResponse = "";
-
-      while (!finish || functionExecState) {
-        assertNotAborted();
-        const iterationStart = textResponse.length;
-        const baseToolCalls: Record<string, ToolCall> = {};
-        const baseStream = AI(baseMessages, "base", controller, mcp.tools);
-
-        for await (const res of baseStream) {
-          if (res.type === "text.stream") {
-            if (textResponse.length === iterationStart) setToolActivityText(null);
-            textResponse += res.text;
-            updateAssistantMessage((msg) => ({
-              ...msg,
-              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
-            }));
-          }
-          if (res.type === "action.call") {
-            for (const [key, value] of Object.entries(res.action)) {
-              baseToolCalls[key] = value;
-            }
-          }
-          if (res.type === "response.completed") {
-            if (!functionExecState) finish = true;
-            updateAssistantMessage((msg) => msg, true);
-          }
-          if (res.type === "response.error") {
-            updateAssistantMessage((msg) => msg, true);
-            throw res.error;
-          }
-        }
-
-        const iterationText = textResponse.slice(iterationStart);
-        const iterationMessages: ExtensionMessage[] = [];
-        if (iterationText) {
-          iterationMessages.push({
-            type: "response",
-            content: [{ type: "text", text: iterationText }],
-          });
-        }
-
-        functionExecState = false;
-
-        const automateCall = Object.values(baseToolCalls).find(
-          (toolCall) => toolCall.name === "automate"
+        return await generateResponse(
+          "t2",
+          buildExecutionMessages(task, promptFiles, conversationMessages),
+          settings
         );
-
-        if (automateCall && !Object.values(baseToolCalls).some((call) => mcp.hasTool(call.name))) {
-          if (!features.featureAutomation) {
-            toast.error("Enable Automation in extension settings.");
-            return;
-          }
-
-          let task = prompt_text;
-          try {
-            const args = JSON.parse(automateCall.arguments) as { task?: string };
-            if (args.task?.trim()) task = args.task.trim();
-          } catch {
-            // fall back to original prompt
-          }
-
-          updateAssistantMessage(
-            (msg) => ({
-              ...msg,
-              mode: "automate" as MessageMode,
-            }),
-            true
-          );
-
-          setToolActivityText(null);
-          setStreaming((prev) => ({ ...prev, response: false }));
-          automationTask = task;
-          break;
-        }
-
-        for (const toolCall of Object.values(baseToolCalls)) {
-          const toolName = toolCall.name;
-
-          iterationMessages.push({
-            type: "action.init",
-            id: toolCall.id,
-            name: toolName,
-            arguments: toolCall.arguments,
-          });
-        }
-
-        for (const toolCall of Object.values(baseToolCalls)) {
-          const toolName = toolCall.name;
-          const mcpOutput = toolName === "automate"
-            ? "Review the MCP tool results before calling this tool again."
-            : await mcp.call(toolCall);
-          if (mcpOutput !== undefined) {
-            iterationMessages.push({
-              type: "action.result",
-              id: toolCall.id,
-              name: toolName,
-              output: mcpOutput,
-            });
-            functionExecState = true;
-            continue;
-          }
-
-          const toolArgs = JSON.parse(toolCall.arguments);
-          setToolActivityText(getToolActivityLabel(toolName, toolArgs));
-          const toolCallResult = await baseFunctions[toolName](toolArgs);
-          assertNotAborted();
-
-          const screenshotData =
-            toolCallResult.data?.type === "screenshot"
-              ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
-              : {};
-
-          iterationMessages.push({
-            type: "action.result",
-            id: toolCall.id,
-            name: toolName,
-            output: toolCallResult.message,
-            ...screenshotData,
-          });
-
-          functionExecState = true;
-        }
-
-        baseMessages.push(...iterationMessages);
+      } finally {
+        await Browser.runtime.sendMessage({ action: ACTIONS.stopSession });
       }
+    });
 
-      setToolActivityText(null);
-      setStreaming((prev) => ({ ...prev, response: false }));
-    } finally {
-      setToolActivityText(null);
-      await mcp.close();
-    }
-    if (automationTask) {
-      assertNotAborted();
-      await automateHandler(automationTask, prompt_files, conversationMessages);
-    }
-  };
-
-  const searchHandler = async (
-    prompt_text: string,
-    prompt_files: FileFormat[],
-    conversationMessages: Message[]
+  const automateRequest = async (
+    promptText: string,
+    promptFiles: FileFormat[],
+    conversationMessages: Message[],
+    settings: AppSettings
   ) => {
     assertNotAborted();
     setStatusText("GENERATING");
-    setStreaming((prev) => ({ ...prev, response: true }));
 
-    const controller = abortControllerRef.current!;
-    const mcp = await openMcpTurn(controller.signal, {
-      onUnavailable: (error) => toast.error(error),
-      onToolStart: setToolActivityText,
-    });
-    try {
-      const searchMessages = buildSearchMessages(prompt_text, prompt_files, conversationMessages);
-      let finish = false;
-      let functionExecState = false;
-      let textResponse = "";
-
-      while (!finish || functionExecState) {
-        assertNotAborted();
-        const iterationStart = textResponse.length;
-        const searchToolCalls: Record<string, ToolCall> = {};
-        const searchStream = AI(searchMessages, "search", controller, mcp.tools);
-
-        for await (const res of searchStream) {
-          if (res.type === "text.stream") {
-            if (textResponse.length === iterationStart) setToolActivityText(null);
-            textResponse += res.text;
-            updateAssistantMessage((msg) => ({
-              ...msg,
-              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
-            }));
-          }
-          if (res.type === "action.call") {
-            for (const [key, value] of Object.entries(res.action)) {
-              searchToolCalls[key] = value;
-            }
-          }
-          if (res.type === "response.completed") {
-            if (!functionExecState) finish = true;
-            updateAssistantMessage((msg) => msg, true);
-          }
-          if (res.type === "response.error") {
-            updateAssistantMessage((msg) => msg, true);
-            throw res.error;
-          }
-        }
-
-        const iterationText = textResponse.slice(iterationStart);
-        const iterationMessages: ExtensionMessage[] = [];
-        if (iterationText) {
-          iterationMessages.push({
-            type: "response",
-            content: [{ type: "text", text: iterationText }],
-          });
-        }
-
-        functionExecState = false;
-
-        for (const toolCall of Object.values(searchToolCalls)) {
-          const toolName = toolCall.name;
-
-          iterationMessages.push({
-            type: "action.init",
-            id: toolCall.id,
-            name: toolName,
-            arguments: toolCall.arguments,
-          });
-        }
-
-        for (const toolCall of Object.values(searchToolCalls)) {
-          const toolName = toolCall.name;
-          const mcpOutput = await mcp.call(toolCall);
-          if (mcpOutput !== undefined) {
-            iterationMessages.push({
-              type: "action.result",
-              id: toolCall.id,
-              name: toolName,
-              output: mcpOutput,
-            });
-            functionExecState = true;
-            continue;
-          }
-
-          const toolArgs = JSON.parse(toolCall.arguments);
-          setToolActivityText(getToolActivityLabel(toolName, toolArgs));
-          const toolCallResult = await searchFunctions[toolName](toolArgs);
-          assertNotAborted();
-
-          iterationMessages.push({
-            type: "action.result",
-            id: toolCall.id,
-            name: toolName,
-            output: toolCallResult.message,
-          });
-
-          functionExecState = true;
-        }
-
-        searchMessages.push(...iterationMessages);
-      }
-
-      setToolActivityText(null);
-      setStreaming((prev) => ({ ...prev, response: false }));
-    } finally {
-      setToolActivityText(null);
-      await mcp.close();
-    }
-  };
-
-  const researchHandler = async (
-    prompt_text: string,
-    prompt_files: FileFormat[],
-    conversationMessages: Message[]
-  ) => {
+    const tab = await getActiveTab();
+    const finalText = await generateResponse(
+      "t1",
+      buildConversationMessages(promptText, promptFiles, conversationMessages),
+      settings
+    );
+    const task = extractAutomationPlan(finalText);
+    if (!task) return;
+    if (tab?.id == null) throw new Error("No active tab found for automation.");
+    await updateAssistantMessage((msg) => ({ ...msg, content: { ...msg.content, task } }), true);
     assertNotAborted();
-    setStatusText("GENERATING");
-    setStreaming((prev) => ({ ...prev, response: true }));
 
-    const controller = abortControllerRef.current!;
-    const mcp = await openMcpTurn(controller.signal, {
-      onUnavailable: (error) => toast.error(error),
-      onToolStart: setToolActivityText,
+    const executionResponse = await executeBrowserTask(
+      tab.id,
+      task,
+      promptFiles,
+      conversationMessages,
+      settings
+    );
+    await generateResponse("t3", buildTaskOutputMessages(task, executionResponse), settings, {
+      reportStatus: {
+        onTaskStatus: (taskStatus: TaskStatus) => {
+          updateAssistantMessage((msg) => ({
+            ...msg,
+            content: { ...msg.content, taskStatus },
+          }));
+        },
+      },
     });
-    try {
-      const researchMessages = buildResearchMessages(prompt_text, prompt_files, conversationMessages);
-      let finish = false;
-      let functionExecState = false;
-      let textResponse = "";
-
-      while (!finish || functionExecState) {
-        assertNotAborted();
-        const iterationStart = textResponse.length;
-        const researchToolCalls: Record<string, ToolCall> = {};
-        const researchStream = AI(researchMessages, "research", controller, mcp.tools);
-
-        for await (const res of researchStream) {
-          if (res.type === "text.stream") {
-            if (textResponse.length === iterationStart) setToolActivityText(null);
-            textResponse += res.text;
-            updateAssistantMessage((msg) => ({
-              ...msg,
-              content: { ...msg.content, text: { ...msg.content.text, response: textResponse } },
-            }));
-          }
-          if (res.type === "action.call") {
-            for (const [key, value] of Object.entries(res.action)) {
-              researchToolCalls[key] = value;
-            }
-          }
-          if (res.type === "response.completed") {
-            if (!functionExecState) finish = true;
-            updateAssistantMessage((msg) => msg, true);
-          }
-          if (res.type === "response.error") {
-            updateAssistantMessage((msg) => msg, true);
-            throw res.error;
-          }
-        }
-
-        const iterationText = textResponse.slice(iterationStart);
-        const iterationMessages: ExtensionMessage[] = [];
-        if (iterationText) {
-          iterationMessages.push({
-            type: "response",
-            content: [{ type: "text", text: iterationText }],
-          });
-        }
-
-        functionExecState = false;
-
-        for (const toolCall of Object.values(researchToolCalls)) {
-          const toolName = toolCall.name;
-
-          iterationMessages.push({
-            type: "action.init",
-            id: toolCall.id,
-            name: toolName,
-            arguments: toolCall.arguments,
-          });
-        }
-
-        for (const toolCall of Object.values(researchToolCalls)) {
-          const toolName = toolCall.name;
-          const mcpOutput = await mcp.call(toolCall);
-          if (mcpOutput !== undefined) {
-            iterationMessages.push({
-              type: "action.result",
-              id: toolCall.id,
-              name: toolName,
-              output: mcpOutput,
-            });
-            functionExecState = true;
-            continue;
-          }
-
-          const toolArgs = JSON.parse(toolCall.arguments);
-          setToolActivityText(getToolActivityLabel(toolName, toolArgs));
-          const toolCallResult = await researchFunctions[toolName](toolArgs);
-          assertNotAborted();
-
-          const screenshotData =
-            toolCallResult.data?.type === "screenshot"
-              ? { data: { image: toolCallResult.data.image, metadata: toolCallResult.data.metadata } }
-              : {};
-
-          iterationMessages.push({
-            type: "action.result",
-            id: toolCall.id,
-            name: toolName,
-            output: toolCallResult.message,
-            ...screenshotData,
-          });
-
-          functionExecState = true;
-        }
-
-        researchMessages.push(...iterationMessages);
-      }
-
-      setToolActivityText(null);
-      setStreaming((prev) => ({ ...prev, response: false }));
-    } finally {
-      setToolActivityText(null);
-      await mcp.close();
-    }
   };
 
-  const ensureProvidersConfigured = async () => {
-    if (!appSettings) return false;
-
+  const ensureProvidersConfigured = async (mode: MessageMode, appSettings: AppSettings) => {
     const missingStage = await findMissingProvider(
       appSettings.settings.models,
       appSettings.apiKeys,
-      features,
-      appSettings.settings.customApi
+      getFeatureFlags(appSettings.settings),
+      appSettings.settings.customApi,
+      mode === "automate" ? ["t1", "t2", "t3"] : [mode]
     );
     if (!missingStage) return true;
 
@@ -1047,28 +415,6 @@ const App = () => {
     }
     Browser.runtime.openOptionsPage();
     return false;
-  };
-
-  const runModeHandler = async (
-    mode: MessageMode,
-    promptText: string,
-    promptFiles: FileFormat[],
-    conversationMessages: Message[]
-  ) => {
-    switch (mode) {
-      case "base":
-        await baseHandler(promptText, promptFiles, conversationMessages);
-        break;
-      case "search":
-        await searchHandler(promptText, promptFiles, conversationMessages);
-        break;
-      case "research":
-        await researchHandler(promptText, promptFiles, conversationMessages);
-        break;
-      case "automate":
-        await automateHandler(promptText, promptFiles, conversationMessages);
-        break;
-    }
   };
 
   const sendMessage = async ({
@@ -1085,52 +431,51 @@ const App = () => {
     mode: MessageMode;
     messageId: string;
     conversationContext: Message[];
-    prepareMessages: () => void | Promise<void>;
+    prepareMessages: (settings: AppSettings) => void | Promise<void>;
     clearInput?: boolean;
   }) => {
-    if (generationLockRef.current) return;
-    generationLockRef.current = true;
+    const settings = await getAppSettings();
+    if (!isModeEnabled(mode, getFeatureFlags(settings.settings))) {
+      toast.error(`Enable ${MODE_LABELS[mode] ?? mode} in extension settings.`);
+      return;
+    }
+    if (!(await ensureProvidersConfigured(mode, settings))) return;
+
+    messageIdRef.current = messageId;
+    setStreamingMessageId(`assistant-${messageId}`);
+    setStatusText("INITIALIZING");
+    setErrorText("");
+    abortControllerRef.current = new AbortController();
 
     try {
-      if (!(await ensureProvidersConfigured())) return;
-
-      if (!isModeEnabled(mode, features)) {
-        toast.error(`Enable ${MODE_LABELS[mode] ?? mode} in extension settings.`);
-        return;
-      }
-
-      messageIdRef.current = messageId;
-      setIsGenerating(true);
-      setStreamingMessageId(`assistant-${messageId}`);
-      setStatusText("INITIALIZING");
-      setErrorText("");
-      abortControllerRef.current = new AbortController();
-
+      await prepareMessages(settings);
+      assertNotAborted();
       if (clearInput) {
         setMessage("");
         setFiles([]);
         setInputResetKey((key) => key + 1);
       }
 
-      try {
-        await prepareMessages();
-        await runModeHandler(mode, promptText, promptFiles, conversationContext);
-      } catch (error: unknown) {
-        showError(isAborted() ? USER_INTERRUPTED_MESSAGE : error);
-      } finally {
-        setStreaming({ response: false, execution: false, validation: false, output: false });
-        setStreamingMessageId(null);
-        setIsGenerating(false);
-        setStatusText("");
-        setToolActivityText(null);
-        if (!clearInput) {
-          textareaRef.current?.focus();
-        }
-        messageIdRef.current = null;
-        abortControllerRef.current = null;
+      if (mode === "automate") {
+        await automateRequest(promptText, promptFiles, conversationContext, settings);
+      } else {
+        await generateResponse(
+          mode,
+          buildConversationMessages(promptText, promptFiles, conversationContext),
+          settings
+        );
       }
+    } catch (error) {
+      showError(isAborted() ? USER_INTERRUPTED_MESSAGE : error);
+      await updateAssistantMessage((msg) => ({ ...msg, aborted: true }), true);
     } finally {
-      generationLockRef.current = false;
+      setStreaming(null);
+      setStreamingMessageId(null);
+      setStatusText("");
+      setToolActivityText(null);
+      if (!clearInput) textareaRef.current?.focus();
+      messageIdRef.current = null;
+      abortControllerRef.current = null;
     }
   };
 
@@ -1150,16 +495,15 @@ const App = () => {
       return;
     }
 
+    generationLockRef.current = true;
     let wasPrepared = false;
     try {
-      const displayPrompt = markupToDisplay(text).trim();
+      const displayPrompt = markupToDisplay(text);
       const pageMentions = parsePageMentionsFromMarkup(text);
-      const slashMentions = parseSlashCommandsFromMarkup(text);
-      const command = parseSlashCommand(slashMentions, displayPrompt);
-      const mode = resolveMode(command);
-      const stripped = command ? stripSlashCommands(displayPrompt) : displayPrompt;
+      const command = findSlashCommand(displayPrompt, selectedCommandOffset(text));
+      const mode = command?.value ?? "base";
 
-      if (!displayPrompt && promptFilesInput.length === 0) return;
+      if (!displayPrompt.trim() && promptFilesInput.length === 0) return;
 
       const muted = pageMentions.find((page) => page.muted || page.tabId == null);
       if (muted) {
@@ -1187,7 +531,8 @@ const App = () => {
                   content: "",
                 })),
                 openPages
-              )
+              ),
+              command?.start
             )
           );
           setInputResetKey((key) => key + 1);
@@ -1231,15 +576,14 @@ const App = () => {
       }
 
       const promptFiles = await fileHandler(promptFilesInput);
-      if (!stripped && promptFiles.length === 0 && pageSources.length === 0) {
-        toast.error(command ? `Add a message after /${command}` : "Message cannot be empty");
+      const modelPrompt = buildPageTaggedPrompt(displayPrompt, pageSources, command?.start);
+      if (!modelPrompt.trim() && promptFiles.length === 0) {
+        toast.error(command ? `Add a message after /${command.value}` : "Message cannot be empty");
         return;
       }
 
-      const storedPrompt = displayPrompt;
-      const modelPrompt = buildPageTaggedPrompt(storedPrompt, pageSources);
       const messageId = uuid4();
-      const conversationContext = conversationContextOverride ?? messages;
+      const conversationContext = conversationContextOverride ?? messagesRef.current;
       const isFirstMessage = conversationContext.length === 0;
 
       await sendMessage({
@@ -1249,49 +593,44 @@ const App = () => {
         messageId,
         conversationContext,
         clearInput: true,
-        prepareMessages: async () => {
-          if (isFirstMessage && !conversationIdRef.current) {
-            conversationIdRef.current = uuid4();
-            await initConversation();
+        prepareMessages: async (settings) => {
+          if (!conversationIdRef.current) {
+            const id = uuid4();
+            await createConversation(id);
+            conversationIdRef.current = id;
           }
-
-          setMessages(() => {
-            const update = [
-              ...conversationContext,
-              {
-                id: `user-${messageId}`,
-                content: {
-                  text: {
-                    prompt: storedPrompt,
-                  },
-                  files: promptFiles,
-                  ...(pageSources.length > 0 ? { pageSources: JSON.stringify(pageSources) } : {}),
-                },
+          replaceMessages([
+            ...conversationContext,
+            {
+              id: `user-${messageId}`,
+              content: {
+                text: { prompt: displayPrompt },
+                files: promptFiles,
+                ...(command && { commandOffset: command.start }),
+                ...(pageSources.length > 0 && { pageSources: JSON.stringify(pageSources) }),
               },
-              {
-                id: `assistant-${messageId}`,
-                content: {
-                  task: "",
-                  taskStatus: "",
-                  text: { response: "", execution: [], validation: "", output: "" },
-                  files: [],
-                },
-                mode,
-              },
-            ];
-            return syncMessages(update);
-          });
+            },
+            { id: `assistant-${messageId}`, content: {}, mode },
+          ]);
+          await persistMessages();
 
           setPanelView("chat");
           wasPrepared = true;
           onPrepared?.(true);
 
           if (isFirstMessage) {
-            generateTitle(storedPrompt).catch(() => { });
+            void generateConversationTitle(
+              conversationIdRef.current,
+              displayPrompt,
+              settings
+            ).catch(() => { });
           }
         },
       });
+    } catch (error) {
+      showError(error);
     } finally {
+      generationLockRef.current = false;
       if (!wasPrepared) onPrepared?.(false);
     }
   };
@@ -1314,11 +653,12 @@ const App = () => {
   const handleRetryMessage = async (assistantMessageId: string) => {
     if (generationLockRef.current || !assistantMessageId.startsWith("assistant-")) return;
 
-    const assistantIndex = messages.findIndex((msg) => msg.id === assistantMessageId);
+    const history = messagesRef.current;
+    const assistantIndex = history.findIndex((msg) => msg.id === assistantMessageId);
     if (assistantIndex < 1) return;
 
-    const userMsg = messages[assistantIndex - 1];
-    const assistantMsg = messages[assistantIndex];
+    const userMsg = history[assistantIndex - 1];
+    const assistantMsg = history[assistantIndex];
     if (!userMsg?.id.startsWith("user-") || !assistantMsg) return;
 
     const promptText = userMsg.content.text?.prompt ?? "";
@@ -1328,77 +668,74 @@ const App = () => {
       return;
     }
 
-    const mode = resolveMode(assistantMsg.mode);
+    const commandOffset = storedCommandOffset(userMsg, assistantMsg);
+    const mode = findSlashCommand(promptText, commandOffset)?.value ?? "base";
     const modelPrompt = buildPageTaggedPrompt(
       promptText,
-      parsePageSources(userMsg.content.pageSources)
+      parsePageSources(userMsg.content.pageSources),
+      commandOffset
     );
 
-    await sendMessage({
-      promptText: modelPrompt,
-      promptFiles,
-      mode,
-      messageId: assistantMessageId.slice("assistant-".length),
-      conversationContext: messages.slice(0, assistantIndex - 1),
-      prepareMessages: () => {
-        updateAssistantMessage(
-          (msg) => ({
-            ...msg,
-            content: {
-              task: "",
-              taskStatus: "",
-              text: { response: "", execution: [], validation: "", output: "" },
-              files: [],
-            },
-            mode,
-          }),
-          true
-        );
-      },
-    });
+    generationLockRef.current = true;
+    try {
+      await sendMessage({
+        promptText: modelPrompt,
+        promptFiles,
+        mode,
+        messageId: assistantMessageId.slice("assistant-".length),
+        conversationContext: history.slice(0, assistantIndex - 1),
+        prepareMessages: () =>
+          updateAssistantMessage((msg) => ({ ...msg, aborted: false, content: {}, mode }), true),
+      });
+    } catch (error) {
+      showError(error);
+    } finally {
+      generationLockRef.current = false;
+    }
   };
 
   const handleRevertMessage = async (userMessageId: string) => {
     if (generationLockRef.current || !userMessageId.startsWith("user-")) return;
 
-    const userIndex = messages.findIndex((msg) => msg.id === userMessageId);
+    const history = messagesRef.current;
+    const userIndex = history.findIndex((msg) => msg.id === userMessageId);
     if (userIndex < 0) return;
 
-    const userMsg = messages[userIndex];
+    const userMsg = history[userIndex];
     const promptText = userMsg.content.text?.prompt ?? "";
     const promptFiles = userMsg.content.files ?? [];
-    const remainingMessages = messages.slice(0, userIndex);
-    const conversationId = conversationIdRef.current;
     const storedPages = parsePageSources(userMsg.content.pageSources);
-    const openPages = toWindowPages(await getCurrentWindowTabs());
-    const rebound = rebindStoredPages(storedPages, openPages);
-
-    setMessages(remainingMessages);
-    if (conversationId) {
-      await updateConversationMessages(conversationId, remainingMessages);
+    try {
+      const tabs = storedPages.length ? await getCurrentWindowTabs() : [];
+      if (generationLockRef.current || messagesRef.current !== history) return;
+      const rebound = rebindStoredPages(storedPages, toWindowPages(tabs));
+      const restoredFiles = fileFormatsToFiles(promptFiles);
+      replaceMessages(history.slice(0, userIndex));
+      setMessage(
+        displayToMarkup(promptText, rebound, storedCommandOffset(userMsg, history[userIndex + 1]))
+      );
+      setFiles(restoredFiles);
+      setErrorText("");
+      setInputResetKey((key) => key + 1);
+      textareaRef.current?.focus();
+      await persistMessages();
+    } catch (error) {
+      showError(error);
     }
-
-    setMessage(displayToMarkup(promptText, rebound));
-    setFiles(await fileFormatsToFiles(promptFiles));
-    setErrorText("");
-    setInputResetKey((key) => key + 1);
-    textareaRef.current?.focus();
   };
 
-  const handleStopGeneration = async () => {
+  const handleStopGeneration = () => {
     if (!abortControllerRef.current) return;
     abortControllerRef.current.abort();
 
-    cleanupBackground();
     setToolActivityText(null);
     showError(USER_INTERRUPTED_MESSAGE);
 
-    updateAssistantMessage((msg) => ({ ...msg, aborted: true }), true);
+    updateAssistantMessage((msg) => ({ ...msg, aborted: true }));
   };
 
-  const resetConversation = async () => {
-    await handleStopGeneration();
-    setMessages([]);
+  const resetConversation = () => {
+    replaceMessages([]);
     conversationIdRef.current = null;
     setCurrentTitle("New Chat");
     setStatusText("");
@@ -1409,16 +746,16 @@ const App = () => {
     setInputResetKey((key) => key + 1);
   };
 
-  const handleNewChat = async () => {
+  const handleNewChat = () => {
     if (generationLockRef.current) {
       setShowWorkingDialog(true);
       return;
     }
-    await resetConversation();
+    resetConversation();
     setPanelView("home");
   };
 
-  const handleSelectConversation = async (id: string) => {
+  const handleSelectConversation = (id: string) => {
     if (id === conversationIdRef.current) return;
     if (generationLockRef.current) {
       setShowWorkingDialog(true);
@@ -1426,10 +763,7 @@ const App = () => {
     }
     const conversation = conversations.find((c) => c.id === id);
     if (conversation) {
-      await handleStopGeneration();
-      setMessages([]);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      setMessages(conversation.messages);
+      replaceMessages(conversation.messages);
       conversationIdRef.current = id;
       setMessage("");
       setFiles([]);
@@ -1467,7 +801,7 @@ const App = () => {
       return;
     }
     setPanelView("loading");
-    await resetConversation();
+    resetConversation();
     await sendUserPrompt({
       text: `Summarize this page @[${page.label}](tab:${tabId})`,
       promptFilesInput: [],

@@ -1,12 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-export type BaseToolResult = {
-  status: string;
-  message: string;
-  data?: { type: string; metadata?: Record<string, unknown>; image?: string };
-};
-
 export const BASE_TOOLS = {
   getPageInfo: tool({
     description: "Get URL, title, and loading status of the active browser tab.",
@@ -34,17 +28,6 @@ export const BASE_TOOLS = {
       "Fetch the contents of a URL. Use after webSearch to read a chosen result.",
     inputSchema: z.object({
       url: z.string().describe("The URL to fetch"),
-    }),
-  }),
-  automate: tool({
-    description:
-      "Hand off to browser automation when the user wants clicks, typing, navigation, form filling, or multi-step browser actions.",
-    inputSchema: z.object({
-      task: z
-        .string()
-        .describe(
-          "Clear, unambiguous task plan for the automation pipeline, including necessary details from the user request."
-        ),
     }),
   }),
 };

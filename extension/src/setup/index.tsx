@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { Eye, EyeOff, Info, Pin } from "lucide-react";
+import { Eye, EyeOff, Info } from "lucide-react";
 import Browser from "webextension-polyfill";
 import "@fontsource/space-grotesk/latin-400.css";
 import "@fontsource/space-grotesk/latin-500.css";

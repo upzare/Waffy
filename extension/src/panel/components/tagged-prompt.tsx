@@ -12,7 +12,15 @@ const mentionComponents = {
   ),
 };
 
-function TaggedPrompt({ prompt, pageSources }: { prompt: string; pageSources?: string }) {
+function TaggedPrompt({
+  prompt,
+  pageSources,
+  commandOffset,
+}: {
+  prompt: string;
+  pageSources?: string;
+  commandOffset?: number;
+}) {
   return (
     <Streamdown
       mode="static"
@@ -24,7 +32,7 @@ function TaggedPrompt({ prompt, pageSources }: { prompt: string; pageSources?: s
       literalTagContent={["mention"]}
       components={mentionComponents}
     >
-      {wrapPromptMentions(prompt, parsePageSources(pageSources))}
+      {wrapPromptMentions(prompt, parsePageSources(pageSources), commandOffset)}
     </Streamdown>
   );
 }

@@ -4,13 +4,10 @@ import type { Tabs } from "webextension-polyfill";
 export const ACTIONS = {
   setTab: "SET_TAB",
   getTab: "GET_TAB",
-  setOpenedTabs: "SET_OPENED_TABS",
-  enableAutomationOverlay: "ENABLE_AUTOMATION_OVERLAY",
-  disableAutomationOverlay: "DISABLE_AUTOMATION_OVERLAY",
   getAutomationOverlayStatus: "GET_AUTOMATION_OVERLAY_STATUS",
   startSession: "START_SESSION",
   stopSession: "STOP_SESSION",
-  stopGeneration: "STOP_GENERATION",
+  cancelWebRequest: "CANCEL_WEB_REQUEST",
   getPageInfo: "GET_PAGE_INFO",
   getPageContent: "GET_PAGE_CONTENT",
   captureVisibleTab: "CAPTURE_VISIBLE_TAB",
@@ -119,4 +116,8 @@ export async function getActiveTab(): Promise<Tabs.Tab | undefined> {
     if (tab?.id) return tab;
   }
   return undefined;
+}
+
+export const isBrowserOffline = () => {
+  return navigator.onLine === false;
 }

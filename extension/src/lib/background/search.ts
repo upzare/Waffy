@@ -1,6 +1,6 @@
 import { isHttpUrl } from "@/lib/helper";
 import { errorMessage } from "../errors";
-import { closeOwnedTabs, openTab, snapshotPage } from "./fetch";
+import { readWebPage } from "./fetch";
 
 const RESULT_LIMIT = 10;
 
@@ -53,17 +53,15 @@ const extractSearchResults = (html: string, limit = RESULT_LIMIT): SearchResult[
   return results;
 };
 
-export const fetchWebSearch = async (query: string) => {
+export const fetchWebSearch = async (query: string, signal: AbortSignal) => {
   const trimmed = query.trim();
   if (!trimmed) return { status: "error", message: "Search query is required." };
 
   try {
-    const tab = await openTab(
-      `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(trimmed)}`
+    const snapshot = await readWebPage(
+      `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(trimmed)}`,
+      signal
     );
-    if (!tab) return { status: "error", message: "Failed to open the search page." };
-
-    const snapshot = await snapshotPage(tab.tabId);
     if (!snapshot) return { status: "error", message: "Failed to read the search page." };
 
     const results = extractSearchResults(snapshot.html);
@@ -79,7 +77,5 @@ export const fetchWebSearch = async (query: string) => {
     return { status: "success" as const, message: `Query: ${trimmed}\n\n${body}` };
   } catch (e) {
     return { status: "error", message: errorMessage(e) };
-  } finally {
-    await closeOwnedTabs();
   }
 };

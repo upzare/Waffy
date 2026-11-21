@@ -1,11 +1,12 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { BASE_TOOLS } from "./base";
 
-export type AutomateToolResult = {
-  status: string;
-  message: string;
-  data?: { type: string; metadata?: Record<string, unknown>; image?: string };
-};
+const coordinate = z.number().min(0).max(1000);
+const screenshotPoint = z.object({
+  x: coordinate.describe("Horizontal screenshot position from 0 (left) to 1000 (right)."),
+  y: coordinate.describe("Vertical screenshot position from 0 (top) to 1000 (bottom)."),
+});
 
 const keyEnum = z.enum([
   "Enter",
@@ -22,15 +23,6 @@ const keyEnum = z.enum([
   "PageDown",
 ]);
 
-export const T1_TOOLS = {
-  proceed: tool({
-    description: "Proceed to execution model.",
-    inputSchema: z.object({
-      task: z.string().describe("Generated task."),
-    }),
-  }),
-};
-
 export const T2_TOOLS = {
   fetchScreen: tool({
     description:
@@ -44,22 +36,14 @@ export const T2_TOOLS = {
   }),
   click: tool({
     description: "Simulate a click on the specified coordinates.",
-    inputSchema: z.object({
-      x: z.number().describe("The x coordinate of the element to click."),
-      y: z.number().describe("The y coordinate of the element to click."),
-    }),
+    inputSchema: screenshotPoint,
   }),
   drag: tool({
     description:
       "Press the left mouse button at the first coordinate, drag through every following coordinate in order, then release at the last. Use for drag and drop, sliders, resize handles, selecting text, and drawing on a canvas. Supply at least 2 points; supply many closely spaced points to trace a curve or freehand shape.",
     inputSchema: z.object({
       path: z
-        .array(
-          z.object({
-            x: z.number().describe("The x coordinate of this point."),
-            y: z.number().describe("The y coordinate of this point."),
-          })
-        )
+        .array(screenshotPoint)
         .min(2)
         .describe(
           "Ordered list of points. The press happens at the first point, the release at the last. Any number of points is allowed."
@@ -68,18 +52,13 @@ export const T2_TOOLS = {
   }),
   typeText: tool({
     description: "Type text into the element at the specified coordinates.",
-    inputSchema: z.object({
-      x: z.number().describe("The x coordinate of the input element."),
-      y: z.number().describe("The y coordinate of the input element."),
+    inputSchema: screenshotPoint.extend({
       text: z.string().describe("The text to type"),
     }),
   }),
   clearValue: tool({
     description: "Clears the value in the input element at the specified coordinates.",
-    inputSchema: z.object({
-      x: z.number().describe("The x coordinate of the input element."),
-      y: z.number().describe("The y coordinate of the input element."),
-    }),
+    inputSchema: screenshotPoint,
   }),
   keyPress: tool({
     description: "Send key press to the page.",
@@ -89,24 +68,17 @@ export const T2_TOOLS = {
   }),
   getOption: tool({
     description: "Get all available options for the select element at the specified coordinates.",
-    inputSchema: z.object({
-      x: z.number().describe("The x coordinate of the select element."),
-      y: z.number().describe("The y coordinate of the select element."),
-    }),
+    inputSchema: screenshotPoint,
   }),
   setOption: tool({
     description: "Set the value of a select element at the specified coordinates.",
-    inputSchema: z.object({
-      x: z.number().describe("The x coordinate of the select element."),
-      y: z.number().describe("The y coordinate of the select element."),
+    inputSchema: screenshotPoint.extend({
       value: z.string().describe("The value to set."),
     }),
   }),
   scroll: tool({
     description: "Scrolls the page at the specified coordinates by the given scroll distances.",
-    inputSchema: z.object({
-      x: z.number().describe("The x coordinate of the scroll point."),
-      y: z.number().describe("The y coordinate of the scroll point."),
+    inputSchema: screenshotPoint.extend({
       xDistance: z.number().describe("The distance to scroll along the X axis (pixels)."),
       yDistance: z.number().describe("The distance to scroll along the Y axis (pixels)."),
     }),
@@ -150,36 +122,33 @@ export const T2_TOOLS = {
   wait: tool({
     description: "Wait for a specified amount of time.",
     inputSchema: z.object({
-      ms: z.number().describe("The amount of time to wait in milliseconds."),
+      ms: z.number().nonnegative().describe("The amount of time to wait in milliseconds."),
     }),
   }),
   webSearch: tool({
     description:
       "Search the web. Returns titles, URLs, and snippets. Then call webFetch on the most relevant URL to read the page. Use mid-task when you need a fact, value, URL, or other information that is not available on the current page — without navigating the automation tab away from the task.",
-    inputSchema: z.object({
-      query: z.string().describe("Short keyword search query"),
-    }),
+    inputSchema: BASE_TOOLS.webSearch.inputSchema,
   }),
-  webFetch: tool({
-    description:
-      "Fetch the contents of a URL. Use after webSearch to read a chosen result.",
-    inputSchema: z.object({
-      url: z.string().describe("The URL to fetch"),
-    }),
-  }),
+  webFetch: BASE_TOOLS.webFetch,
 };
 
-export const T3_TOOLS = {
-  success: tool({
-    description: "Call when validation is successful.",
-    inputSchema: z.object({}),
-  }),
-  failed: tool({
-    description: "Call when validation fails.",
-    inputSchema: z.object({}),
-  }),
-  suspended: tool({
-    description: "Call when the task is suspended.",
-    inputSchema: z.object({}),
-  }),
-};
+const taskStatusSchema = z.enum(["success", "failed", "suspended"]);
+export type TaskStatus = z.infer<typeof taskStatusSchema>;
+
+export const reportStatus = tool({
+  description: "Record the final outcome of the requested task.",
+  inputSchema: z.object({ status: taskStatusSchema }),
+  contextSchema: z
+    .object({
+      onTaskStatus: z
+        .custom<(status: TaskStatus) => void>((value) => typeof value === "function")
+        .optional(),
+    })
+    .default({}),
+  execute: ({ status }, { context, abortSignal }) => {
+    abortSignal?.throwIfAborted();
+    context.onTaskStatus?.(status);
+    return { status };
+  },
+});

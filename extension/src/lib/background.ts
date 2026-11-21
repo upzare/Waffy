@@ -3,31 +3,31 @@ import type { Runtime } from "webextension-polyfill";
 import { EXTENSION_VERSION, X_VERSION_URL } from "@/config";
 import { ACTIONS, restrictLocalStorageAccess } from "@/lib/helper";
 import {
-  disableAutomationOverlay,
-  enableAutomationOverlay,
   getAutomationOverlayStatus,
   getTab,
   registerAutomationListeners,
-  setOpenedTabs,
   setTab,
   startSession,
   stopSession,
 } from "./background/automation";
 import { createContextMenus, registerContextMenuListeners } from "./background/context-menu";
-import { closeOwnedTabs, fetchWebPage } from "./background/fetch";
+import { fetchWebPage } from "./background/fetch";
 import { captureVisibleTab, getPageContent, getPageInfo } from "./background/page";
-import {
-  capture,
-  getCaptureState,
-  registerCaptureListeners,
-} from "./background/capture";
+import { capture, getCaptureState, registerCaptureListeners } from "./background/capture";
 import { fetchWebSearch } from "./background/search";
-import { initClient, initSettings } from "./client";
+import { initClient, initSettings, migrateAppSettings } from "./client";
 
-const stopGeneration = async () => {
-  await Promise.all([closeOwnedTabs(), stopSession()]);
-  return { status: "success" };
-};
+const webRequests = new Map<string, AbortController>();
+
+async function handleWebRequest(id: string, read: (signal: AbortSignal) => Promise<unknown>) {
+  const controller = new AbortController();
+  webRequests.set(id, controller);
+  try {
+    return await read(controller.signal);
+  } finally {
+    webRequests.delete(id);
+  }
+}
 
 const releaseNotesAvailable = async () => {
   try {
@@ -53,20 +53,15 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
       return setTab(request.tabId);
     case ACTIONS.getTab:
       return getTab();
-    case ACTIONS.setOpenedTabs:
-      return setOpenedTabs(request.tabs);
-    case ACTIONS.enableAutomationOverlay:
-      return enableAutomationOverlay(request.tabId);
-    case ACTIONS.disableAutomationOverlay:
-      return disableAutomationOverlay(request.tabId);
     case ACTIONS.getAutomationOverlayStatus:
       return getAutomationOverlayStatus(sender);
     case ACTIONS.startSession:
       return startSession(request.tabId);
     case ACTIONS.stopSession:
       return stopSession();
-    case ACTIONS.stopGeneration:
-      return stopGeneration();
+    case ACTIONS.cancelWebRequest:
+      webRequests.get(request.id)?.abort();
+      return undefined;
     case ACTIONS.getPageInfo:
       return getPageInfo(request.tabId);
     case ACTIONS.getPageContent:
@@ -78,9 +73,9 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
     case ACTIONS.capture:
       return capture(sender, request.rect, request.viewport);
     case ACTIONS.webSearch:
-      return fetchWebSearch(request.query);
+      return handleWebRequest(request.id, (signal) => fetchWebSearch(request.query, signal));
     case ACTIONS.webFetch:
-      return fetchWebPage(request.url);
+      return handleWebRequest(request.id, (signal) => fetchWebPage(request.url, signal));
     default:
       return undefined;
   }
@@ -95,8 +90,11 @@ Browser.runtime.onInstalled.addListener(async (details) => {
     await Promise.all([initClient(), initSettings()]);
     if (details.reason === "install") {
       await Browser.tabs.create({ url: Browser.runtime.getURL("setup.html") });
-    } else if (details.reason === "update" && (await releaseNotesAvailable())) {
-      await Browser.tabs.create({ url: Browser.runtime.getURL("release.html") });
+    } else if (details.reason === "update") {
+      await migrateAppSettings();
+      if (await releaseNotesAvailable()) {
+        await Browser.tabs.create({ url: Browser.runtime.getURL("release.html") });
+      }
     }
   } catch (error) {
     console.error("Failed to initialize extension:", error);

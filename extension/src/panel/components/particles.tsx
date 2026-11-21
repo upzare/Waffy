@@ -11,7 +11,7 @@ const Particles = ({
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const context = useRef<CanvasRenderingContext2D | null>(null);
   const circles = useRef<any[]>([]);
-  const mousePosition = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const animationFrame = useRef(0);
   const mouse = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const canvasSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
@@ -25,6 +25,7 @@ const Particles = ({
     window.addEventListener("resize", initCanvas);
 
     return () => {
+      window.cancelAnimationFrame(animationFrame.current);
       window.removeEventListener("resize", initCanvas);
     };
   }, []);
@@ -171,7 +172,7 @@ const Particles = ({
         );
       }
     });
-    window.requestAnimationFrame(animate);
+    animationFrame.current = window.requestAnimationFrame(animate);
   };
 
   return (

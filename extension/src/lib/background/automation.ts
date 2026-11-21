@@ -1,5 +1,5 @@
 import Browser from "webextension-polyfill";
-import type { Runtime, Tabs } from "webextension-polyfill";
+import type { Runtime } from "webextension-polyfill";
 import { ACTIONS, DOM_ACTIONS, isInaccessiblePage } from "@/lib/helper";
 import { attachTab, detachTab, disableDomains, enableDomains, isAttached } from "../cdp";
 import { errorMessage } from "../errors";
@@ -10,11 +10,11 @@ const DOMAINS = ["Page", "DOM", "Overlay"];
 const WAFFY_GROUP_TITLE = "Waffy";
 const WAFFY_GROUP_COLOR = "green" as const;
 
-let openedTabs: Tabs.Tab[] = [];
 let activeTabId: number | null = null;
 let active = false;
 
-const overlayInfo: Record<number, boolean> = {};
+const attachedTabs = new Map<number, Promise<void>>();
+const groupedTabs = new Map<number, number>();
 
 const setAutomationOverlay = (tabId: number, enabled: boolean) => {
   Browser.tabs
@@ -22,20 +22,12 @@ const setAutomationOverlay = (tabId: number, enabled: boolean) => {
       type: ACTIONS.interactDom,
       name: enabled ? DOM_ACTIONS.showAutomationOverlay : DOM_ACTIONS.hideAutomationOverlay,
     })
-    .catch(() => { });
-  overlayInfo[tabId] = enabled;
-};
-
-const disableNonActiveOverlays = (activeId: number) => {
-  for (const key of Object.keys(overlayInfo)) {
-    const tabId = Number(key);
-    if (tabId !== activeId && overlayInfo[tabId]) setAutomationOverlay(tabId, false);
-  }
+    .catch(() => {});
 };
 
 /** Make one tab the only one showing the overlay. */
 const focusTab = (tabId: number) => {
-  disableNonActiveOverlays(tabId);
+  if (activeTabId !== null && activeTabId !== tabId) setAutomationOverlay(activeTabId, false);
   activeTabId = tabId;
   setAutomationOverlay(tabId, true);
 };
@@ -44,17 +36,18 @@ const addTabToWaffyGroup = async (tabId: number) => {
   if (!active || isOwnedTab(tabId) || !chrome.tabGroups) return;
   try {
     const tab = await chrome.tabs.get(tabId);
-    if (tab.windowId == null) return;
+    if (tab.windowId == null || tab.groupId >= 0) return;
 
     const existing = await chrome.tabGroups.query({
-      title: WAFFY_GROUP_TITLE,
       windowId: tab.windowId,
     });
-    const groupId = existing[0]?.id;
+    const sessionGroups = new Set(groupedTabs.values());
+    const groupId = existing.find((group) => sessionGroups.has(group.id))?.id;
     const nextGroupId = await chrome.tabs.group({
       tabIds: tabId,
       ...(groupId != null ? { groupId } : {}),
     });
+    groupedTabs.set(tabId, nextGroupId);
     await chrome.tabGroups.update(nextGroupId, {
       title: WAFFY_GROUP_TITLE,
       color: WAFFY_GROUP_COLOR,
@@ -66,47 +59,47 @@ const addTabToWaffyGroup = async (tabId: number) => {
 };
 
 const clearWaffyGroups = async () => {
-  if (!chrome.tabGroups) return;
-  try {
-    const groups = await chrome.tabGroups.query({ title: WAFFY_GROUP_TITLE });
-    await Promise.all(
-      groups.map(async (group) => {
-        const tabs = await chrome.tabs.query({ groupId: group.id });
-        const tabIds = tabs.map((tab) => tab.id).filter((id): id is number => id != null);
-        if (tabIds.length) await chrome.tabs.ungroup(tabIds as [number, ...number[]]);
-      })
-    );
-  } catch {
-    // Group already gone or grouping unavailable.
-  }
-};
-
-const attachDebugger = async (tabId: number) => {
-  await attachTab(tabId);
-  await enableDomains(tabId, DOMAINS);
+  await Promise.allSettled(
+    Array.from(groupedTabs, async ([tabId, groupId]) => {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab.groupId === groupId) await chrome.tabs.ungroup(tabId);
+    })
+  );
+  groupedTabs.clear();
 };
 
 const detachDebugger = async (tabId: number) => {
   if (!(await isAttached(tabId))) return;
-  setAutomationOverlay(tabId, false);
   await disableDomains(tabId, DOMAINS);
   await detachTab(tabId);
 };
 
-const syncOpenedTabs = async () => {
-  openedTabs = await Browser.tabs.query({});
-};
-
-/** Tabs automation may drive: real web pages that fetch/search does not own. */
-const automationTabIds = (tabs: Tabs.Tab[]) =>
-  tabs
-    .filter((tab) => !isInaccessiblePage(tab.url))
-    .map((tab) => tab.id)
-    .filter((tabId): tabId is number => tabId != null && !isOwnedTab(tabId));
+function attachDebugger(tabId: number): Promise<void> {
+  const existing = attachedTabs.get(tabId);
+  if (existing) return existing;
+  const attaching = attachTab(tabId)
+    .then(async () => {
+      try {
+        await enableDomains(tabId, DOMAINS);
+      } catch (error) {
+        await detachDebugger(tabId);
+        throw error;
+      }
+    })
+    .catch((error) => {
+      attachedTabs.delete(tabId);
+      throw error;
+    });
+  attachedTabs.set(tabId, attaching);
+  return attaching;
+}
 
 const setActiveTab = async (tabId: number) => {
-  await syncOpenedTabs();
-  if (!openedTabs.some((tab) => tab.id === tabId)) return;
+  const tab = await Browser.tabs.get(tabId);
+  if (!active) throw new Error("The automation session has ended.");
+  if (isOwnedTab(tabId)) throw new Error("This tab is being used for a web lookup.");
+  if (!isInaccessiblePage(tab.url)) await attachDebugger(tabId);
+  if (!active) return;
   focusTab(tabId);
   await addTabToWaffyGroup(tabId);
 };
@@ -114,9 +107,7 @@ const setActiveTab = async (tabId: number) => {
 export const startSession = async (tabId: number) => {
   try {
     active = true;
-    await syncOpenedTabs();
-    await Promise.all(automationTabIds(openedTabs).map(attachDebugger));
-    if (tabId) await setActiveTab(tabId);
+    await setActiveTab(tabId);
     return { status: "success" };
   } catch (e) {
     return { status: "error", value: errorMessage(e) };
@@ -126,69 +117,62 @@ export const startSession = async (tabId: number) => {
 export const stopSession = async () => {
   try {
     active = false;
+    if (activeTabId !== null) setAutomationOverlay(activeTabId, false);
     activeTabId = null;
-    const tabs = await Browser.tabs.query({});
-    await Promise.all([...automationTabIds(tabs).map(detachDebugger), clearWaffyGroups()]);
+    const pending = [...attachedTabs];
+    await Promise.all([
+      ...pending.map(([id, ready]) =>
+        ready.then(
+          () => detachDebugger(id),
+          () => {}
+        )
+      ),
+      clearWaffyGroups(),
+    ]);
+    attachedTabs.clear();
     return { status: "success" };
   } catch (e) {
     return { status: "error", value: errorMessage(e) };
   }
 };
 
-export const setTab = (tabId: number) => {
-  const tab = openedTabs.find((t) => t.id === tabId);
-  if (tab?.id == null) return Promise.resolve({ status: "error", value: "Tab not found" });
-
-  focusTab(tab.id);
-  void addTabToWaffyGroup(tab.id);
-  return Promise.resolve({ status: "success", value: "Tab set successfully" });
+export const setTab = async (tabId: number) => {
+  try {
+    await setActiveTab(tabId);
+    return { status: "success", value: "Tab set successfully" };
+  } catch (error) {
+    return { status: "error", value: errorMessage(error) };
+  }
 };
 
-export const getTab = () => Promise.resolve(openedTabs.find((tab) => tab.id === activeTabId));
-
-export const setOpenedTabs = (tabs: Tabs.Tab[]) => {
-  openedTabs = tabs;
-  return Promise.resolve({ status: "success", value: "Tabs updated successfully" });
-};
-
-export const enableAutomationOverlay = (tabId: number) => {
-  focusTab(tabId);
-  return Promise.resolve({ status: "success", value: "Automation overlay enabled" });
-};
-
-export const disableAutomationOverlay = (tabId: number) => {
-  setAutomationOverlay(tabId, false);
-  return Promise.resolve({ status: "success", value: "Automation overlay disabled" });
-};
+export const getTab = async () =>
+  activeTabId === null ? undefined : Browser.tabs.get(activeTabId).catch(() => undefined);
 
 export const getAutomationOverlayStatus = (sender: Runtime.MessageSender) => {
   const tabId = sender?.tab?.id;
   return Promise.resolve({
-    status: tabId != null && overlayInfo[tabId] ? "enabled" : "disabled",
+    status: active && tabId != null && activeTabId === tabId ? "enabled" : "disabled",
   });
 };
 
 export const registerAutomationListeners = () => {
+  chrome.debugger.onDetach.addListener(({ tabId }) => {
+    if (tabId != null) attachedTabs.delete(tabId);
+  });
   Browser.tabs.onCreated.addListener(async (tab) => {
     if (!active || tab.id == null) return;
     // Search/fetch tabs are created inactive; skip them so they never join the Waffy group.
-    if (isOwnedTab(tab.id) || !tab.active) {
-      await syncOpenedTabs();
-      return;
-    }
+    if (isOwnedTab(tab.id) || !tab.active) return;
 
     if (tab.openerTabId != null && tab.openerTabId === activeTabId) {
       await setActiveTab(tab.id);
       await Browser.tabs.update(tab.id, { active: true });
-      return;
     }
-
-    await syncOpenedTabs();
   });
 
   Browser.tabs.onUpdated.addListener((tabId, _changeInfo, tab) => {
     // Fetch/search runs its own debugger session, so its tabs must not get the automation overlay.
-    if (!active || isOwnedTab(tabId) || isInaccessiblePage(tab.url)) return;
+    if (!active || tabId !== activeTabId || isInaccessiblePage(tab.url)) return;
     attachDebugger(tabId).catch((e) => console.error("Error attaching debugger:", errorMessage(e)));
   });
 };

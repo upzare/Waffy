@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, Copy, File, Repeat, Undo2, X } from "lucide-react";
 import RenderResponse from "./render-response";
 import TaggedPrompt from "./tagged-prompt";
+import { storedCommandOffset } from "../utils/slash-commands";
 import { useStickyScroll } from "../hooks/use-sticky-scroll";
 import type { ChatContainerProps, FileFormat, Message } from "../../types";
 
@@ -236,15 +237,16 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                             <TaggedPrompt
                               prompt={msg.content.text?.prompt ?? ""}
                               pageSources={msg.content.pageSources}
+                              commandOffset={storedCommandOffset(msg, messages[virtualRow.index + 1])}
                             />
                           ) : (
                             <RenderResponse
                               content={msg.content.text}
-                              isInitial={isStreamingMessage && streaming.response}
-                              isExecuting={isStreamingMessage && streaming.execution}
-                              isValidating={isStreamingMessage && streaming.validation}
-                              isOutput={isStreamingMessage && streaming.output}
+                              isInitial={isStreamingMessage && streaming === "response"}
+                              isExecuting={isStreamingMessage && streaming === "execution"}
+                              isOutput={isStreamingMessage && streaming === "output"}
                               taskStatus={msg.content.taskStatus}
+                              aborted={msg.aborted}
                               toolActivityText={isStreamingMessage ? toolActivityText : null}
                             />
                           )}
