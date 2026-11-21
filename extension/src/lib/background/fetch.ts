@@ -35,17 +35,17 @@ const PROBE_EXPRESSION =
 
 type PageSnapshot = { url: string; title: string; html: string };
 type PageProbe = { readyState: string; chars: number };
-type OpenedTab = { tabId: number };
 
 /** Tabs this module owns, so automation leaves them alone and cancellation can close them. */
 const ownedTabIds = new Set<number>();
 
 export const isOwnedTab = (tabId: number) => ownedTabIds.has(tabId);
 
-const attachDebugger = async (tabId: number) => {
+const attachDebugger = async (tabId: number, signal: AbortSignal) => {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < ATTACH_RETRIES; attempt++) {
+    signal.throwIfAborted();
     try {
       await attachTab(tabId);
       await enableDomains(tabId, DOMAINS);
@@ -59,7 +59,7 @@ const attachDebugger = async (tabId: number) => {
       return;
     } catch (e) {
       lastError = e;
-      if (attempt < ATTACH_RETRIES - 1) await sleep(ATTACH_RETRY_DELAY_MS);
+      if (attempt < ATTACH_RETRIES - 1) await sleep(ATTACH_RETRY_DELAY_MS, signal);
     }
   }
 
@@ -70,7 +70,7 @@ const detachDebugger = async (tabId: number) => {
   if (!(await isAttached(tabId))) return;
   try {
     await sendCommand(tabId, "Emulation.setFocusEmulationEnabled", { enabled: false });
-  } catch (_) { }
+  } catch (_) {}
   await disableDomains(tabId, DOMAINS);
   await detachTab(tabId);
 };
@@ -99,8 +99,9 @@ const probePage = async (tabId: number): Promise<PageProbe | null> => {
  * or a hard timeout. Never waits for tab "complete", and always resolves so we can
  * capture whatever is on the page.
  */
-const waitForPageReady = (tabId: number): Promise<void> =>
+const waitForPageReady = (tabId: number, signal: AbortSignal): Promise<void> =>
   new Promise((resolve) => {
+    signal.throwIfAborted();
     const inflight = new Set<string>();
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     let pollTimer: ReturnType<typeof setTimeout> | undefined;
@@ -115,6 +116,7 @@ const waitForPageReady = (tabId: number): Promise<void> =>
       settled = true;
       chrome.debugger.onEvent.removeListener(onEvent);
       Browser.tabs.onRemoved.removeListener(onRemoved);
+      signal.removeEventListener("abort", finish);
       clearTimeout(timeout);
       if (idleTimer) clearTimeout(idleTimer);
       if (pollTimer) clearTimeout(pollTimer);
@@ -124,8 +126,7 @@ const waitForPageReady = (tabId: number): Promise<void> =>
     const maybeFinish = (domReady: boolean) => {
       if (settled || Date.now() - startedAt < MIN_WAIT_MS || !domReady) return;
 
-      const contentStable =
-        stableSince != null && Date.now() - stableSince >= CONTENT_STABLE_MS;
+      const contentStable = stableSince != null && Date.now() - stableSince >= CONTENT_STABLE_MS;
       if (contentStable || networkIdle) finish();
     };
 
@@ -192,6 +193,7 @@ const waitForPageReady = (tabId: number): Promise<void> =>
     const timeout = setTimeout(finish, PAGE_READY_TIMEOUT_MS);
     chrome.debugger.onEvent.addListener(onEvent);
     Browser.tabs.onRemoved.addListener(onRemoved);
+    signal.addEventListener("abort", finish, { once: true });
     bumpIdle();
     void probeAndMaybeFinish().then(() => {
       if (!settled) schedulePoll();
@@ -199,7 +201,7 @@ const waitForPageReady = (tabId: number): Promise<void> =>
   });
 
 /** Read the live DOM through CDP, which works without a content script on the page. */
-export const snapshotPage = async (tabId: number): Promise<PageSnapshot | null> => {
+const snapshotPage = async (tabId: number): Promise<PageSnapshot | null> => {
   try {
     const response = (await sendCommand(tabId, "Runtime.evaluate", {
       expression: SNAPSHOT_EXPRESSION,
@@ -215,74 +217,42 @@ export const snapshotPage = async (tabId: number): Promise<PageSnapshot | null> 
   }
 };
 
-export const closeOwnedTabs = async () => {
-  const tabIds = [...ownedTabIds];
-  ownedTabIds.clear();
-
-  await Promise.all(
-    tabIds.map(async (tabId) => {
-      await detachDebugger(tabId).catch(() => { });
-      await Browser.tabs.remove(tabId).catch(() => { });
-    })
-  );
-};
-
-export const openTab = async (url: string): Promise<OpenedTab | null> => {
+export async function readWebPage(url: string, signal: AbortSignal): Promise<PageSnapshot | null> {
+  signal.throwIfAborted();
+  const { id } = await Browser.tabs.create({ url: "about:blank", active: false });
+  if (id == null) return null;
+  ownedTabIds.add(id);
   try {
-    // Open blank and attach first
-    const tab = await Browser.tabs.create({ url: "about:blank", active: false });
-    if (tab.id == null) return null;
-    ownedTabIds.add(tab.id);
-
-    await attachDebugger(tab.id);
-    await sendCommand(tab.id, "Page.setLifecycleEventsEnabled", { enabled: true }).catch(() => { });
-    // Navigate, then reload for reliability
-    await sendCommand(tab.id, "Page.navigate", { url });
-    await waitForPageReady(tab.id);
-    await sendCommand(tab.id, "Page.reload", { ignoreCache: false })
-    await waitForPageReady(tab.id);
-
-    return { tabId: tab.id };
-  } catch {
-    return null;
-  }
-};
-
-const captureTab = async (tabId: number): Promise<string | null> => {
-  try {
-    const tab = await Browser.tabs.get(tabId);
+    await attachDebugger(id, signal);
+    signal.throwIfAborted();
+    await sendCommand(id, "Page.setLifecycleEventsEnabled", { enabled: true }).catch(() => {});
+    await sendCommand(id, "Page.navigate", { url });
+    await waitForPageReady(id, signal);
+    signal.throwIfAborted();
+    await sendCommand(id, "Page.reload", { ignoreCache: false });
+    await waitForPageReady(id, signal);
+    signal.throwIfAborted();
+    const tab = await Browser.tabs.get(id);
     if (isInaccessiblePage(tab.url)) return null;
-
-    const snapshot = await snapshotPage(tabId);
-    if (!snapshot) return null;
-
-    const pageUrl = snapshot.url || tab.url || "";
-    const rendered = renderPageMessage(
-      htmlToMarkdown(snapshot.html, pageUrl, snapshot.title),
-      pageUrl
-    );
-    return rendered.status === "success" ? rendered.message : null;
-  } catch {
-    return null;
+    return await snapshotPage(id);
+  } finally {
+    await detachDebugger(id).catch(() => {});
+    await Browser.tabs.remove(id).catch(() => {});
+    ownedTabIds.delete(id);
   }
-};
+}
 
-export const fetchWebPage = async (url: string) => {
+export const fetchWebPage = async (url: string, signal: AbortSignal) => {
   const trimmed = url.trim();
   if (!trimmed) return { status: "error", message: "URL is required." };
   if (!isHttpUrl(trimmed)) return { status: "error", message: "A valid http(s) URL is required." };
 
   try {
-    const tab = await openTab(trimmed);
-    if (!tab) return { status: "error", message: "Failed to open the page." };
-
-    const page = await captureTab(tab.tabId);
-    if (!page) return { status: "error", message: "Failed to read the page." };
-
-    return { status: "success" as const, message: page };
+    const snapshot = await readWebPage(trimmed, signal);
+    if (!snapshot) return { status: "error", message: "Failed to read the page." };
+    const pageUrl = snapshot.url || trimmed;
+    return renderPageMessage(htmlToMarkdown(snapshot.html, pageUrl, snapshot.title), pageUrl);
   } catch (e) {
     return { status: "error", message: errorMessage(e) };
-  } finally {
-    await closeOwnedTabs();
   }
 };

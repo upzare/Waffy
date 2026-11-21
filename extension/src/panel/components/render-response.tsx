@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { DropdownSteps } from "../components/dropdown-steps";
@@ -11,20 +11,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-interface ResponseContent {
-  prompt?: string;
-  response?: string;
-  execution?: string[];
-  validation?: string;
-  output?: string;
-}
+import type { Message } from "@/types";
 
 interface RenderResponseProps {
-  content?: ResponseContent;
+  content?: Message["content"]["text"];
   taskStatus?: string;
+  aborted?: boolean;
   isInitial?: boolean;
   isExecuting?: boolean;
-  isValidating?: boolean;
   isOutput?: boolean;
   toolActivityText?: string | null;
 }
@@ -44,16 +38,15 @@ const streamdownControls = {
   mermaid: false,
 } as const;
 
-const getExecutionStatus = (isExecuting: boolean): StatusInfo =>
+const getExecutionStatus = (isExecuting: boolean, outcome?: StatusInfo): StatusInfo =>
   isExecuting
     ? { icon: Loader2, label: "Executing Actions", spinning: true }
-    : { icon: CheckCircle2, label: "Actions Executed" };
+    : (outcome ?? { icon: CheckCircle2, label: "Actions Executed" });
 
-const getValidationStatus = (isValidating: boolean, taskStatus: string): StatusInfo => {
-  if (isValidating) return { icon: Loader2, label: "Validating Task", spinning: true };
+const getTaskOutcome = (taskStatus: string): StatusInfo | undefined => {
   if (taskStatus === "success") return { icon: CheckCircle2, label: "Task Completed" };
   if (taskStatus === "suspended") return { icon: CirclePause, label: "Task Suspended" };
-  return { icon: CircleX, label: "Task Failed" };
+  if (taskStatus === "failed") return { icon: CircleX, label: "Task Failed" };
 };
 
 const MarkdownContent = ({
@@ -79,13 +72,11 @@ const MarkdownContent = ({
 );
 
 const StatusPanel = ({
-  className,
   expanded,
   onToggle,
   status,
   children,
 }: {
-  className?: string;
   expanded: boolean;
   onToggle: () => void;
   status: StatusInfo;
@@ -94,9 +85,7 @@ const StatusPanel = ({
   const Icon = status.icon;
 
   return (
-    <div
-      className={`rounded-lg border border-border bg-[rgba(0,0,0,0.3)] overflow-hidden ${className ?? ""}`}
-    >
+    <div className="mt-4 mb-2 rounded-lg border border-border bg-[rgba(0,0,0,0.3)] overflow-hidden">
       <button
         type="button"
         className="w-full flex justify-between items-center p-3 bg-[rgba(0,0,0,0.4)] cursor-pointer transition-[background] duration-300 ease-in-out hover:bg-[rgba(0,0,0,0.5)] border-none text-white"
@@ -203,58 +192,29 @@ const ToolActivityLabel = ({
 const RenderResponse = ({
   content,
   taskStatus = "",
+  aborted = false,
   isInitial = false,
   isExecuting = false,
-  isValidating = false,
   isOutput = false,
   toolActivityText = null,
 }: RenderResponseProps) => {
   const [isExecutingExpanded, setIsExecutingExpanded] = useState(false);
-  const [isValidatingExpanded, setIsValidatingExpanded] = useState(false);
   const [activityPresent, setActivityPresent] = useState(false);
+  const outcome = aborted
+    ? { icon: CirclePause, label: "Task Interrupted" }
+    : getTaskOutcome(taskStatus);
 
   return (
     <div className="w-full">
       <MarkdownContent isAnimating={isInitial}>{content?.response}</MarkdownContent>
 
-      {(content?.execution?.length || isExecuting) && (
+      {(Boolean(content?.execution?.length) || isExecuting) && (
         <StatusPanel
-          className="mt-4 mb-2"
           expanded={isExecutingExpanded}
           onToggle={() => setIsExecutingExpanded((open) => !open)}
-          status={getExecutionStatus(isExecuting)}
+          status={getExecutionStatus(isExecuting && !aborted, outcome)}
         >
           <DropdownSteps steps={content?.execution || []} isExecuting={isExecuting} />
-        </StatusPanel>
-      )}
-
-      {(content?.validation || isValidating) && (
-        <StatusPanel
-          className="mt-2 mb-4"
-          expanded={isValidatingExpanded}
-          onToggle={() => setIsValidatingExpanded((open) => !open)}
-          status={getValidationStatus(isValidating, taskStatus)}
-        >
-          <div className="p-4 border-t border-[rgba(255,255,255,0.05)]">
-            <MarkdownContent isAnimating={isValidating}>
-              {content?.validation || ""}
-            </MarkdownContent>
-            {isValidating && (
-              <div className="flex justify-center p-2">
-                <div
-                  className="w-8 aspect-[2] animate-dots"
-                  style={
-                    {
-                      "--dots":
-                        "no-repeat radial-gradient(circle closest-side, rgb(0, 200, 83) 90%, transparent)",
-                      background: "var(--dots) 0% 50%, var(--dots) 50% 50%, var(--dots) 100% 50%",
-                      backgroundSize: "calc(100% / 3) 50%",
-                    } as CSSProperties
-                  }
-                />
-              </div>
-            )}
-          </div>
         </StatusPanel>
       )}
 

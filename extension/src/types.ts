@@ -5,12 +5,6 @@ export interface Conversation {
   messages: Message[];
 }
 
-export interface Model {
-  id: string;
-  name: string;
-  description: string;
-}
-
 export interface HeaderProps {
   currentConversationId: string | null;
   currentTitle: string;
@@ -28,18 +22,13 @@ export interface PinnedPromptProps {
   onClick?: () => void;
 }
 
-export interface StreamingState {
-  response: boolean;
-  execution: boolean;
-  validation: boolean;
-  output: boolean;
-}
+export type StreamingState = "response" | "execution" | "output";
 
 export interface ChatContainerProps {
   hidden: boolean;
   conversationId: string | null;
   messages: Message[];
-  streaming: StreamingState;
+  streaming: StreamingState | null;
   streamingMessageId: string | null;
   isGenerating: boolean;
   statusText: string;
@@ -61,7 +50,7 @@ export interface InputContainerProps {
   setMessage: React.Dispatch<React.SetStateAction<string>>;
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;
   onSendMessage: () => Promise<void>;
-  onStopGeneration: () => Promise<void>;
+  onStopGeneration: () => void;
 }
 
 export interface HistorySidebarProps {
@@ -89,10 +78,10 @@ export interface Message {
       prompt?: string;
       response?: string;
       execution?: string[];
-      validation?: string;
       output?: string;
     };
     pageSources?: string;
+    commandOffset?: number;
     files?: FileFormat[];
     task?: string;
     taskStatus?: string;
@@ -104,21 +93,6 @@ export interface Message {
 export interface FileFormat {
   type: string;
   payload: { name: string; size: number; mimeType: string; content: string };
-}
-
-export interface StorageResult {
-  isActive?: boolean;
-}
-
-export interface TextMessage {
-  key: string;
-  type: string;
-  value: string;
-}
-
-export interface ToggleMessage {
-  type: string;
-  isActive: boolean;
 }
 
 export interface DomMessage {
@@ -160,7 +134,7 @@ export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai" | "custom";
 
 export type StageId =
-  "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "t4" | "step" | "memory";
+  "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "step" | "memory";
 
 export interface ModelConfig {
   provider: ProviderId;
@@ -180,21 +154,4 @@ export interface ApiKeys {
 export interface AppSettings {
   settings: Settings;
   apiKeys: ApiKeys;
-}
-
-export interface DomProps {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  type: string;
-  content: string;
-  interactivity: boolean;
-}
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: string;
 }

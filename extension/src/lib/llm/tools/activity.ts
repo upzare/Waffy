@@ -1,4 +1,4 @@
-export function getToolActivityLabel(toolName: string, args?: Record<string, unknown>): string {
+export function getToolActivityLabel(toolName: string): string {
   switch (toolName) {
     case "webSearch":
       return "Searching the web...";

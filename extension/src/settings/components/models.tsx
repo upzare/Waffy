@@ -1,20 +1,23 @@
 import React, { useState } from "react";
-import { AlertCircle, ChevronDown, Info } from "lucide-react";
-import { CUSTOM_MODEL_OPTION, isPresetModel, PROVIDER_MODELS } from "@/lib/llm/model";
+import { ChevronDown, Info } from "lucide-react";
+import {
+  CUSTOM_MODEL_OPTION,
+  getStageConfig,
+  isPresetModel,
+  PROVIDER_MODELS,
+} from "@/lib/llm/model";
 import { getFeatureFlags, isStageEnabled } from "@/lib/features";
 import { getBrowserAIModelLabel, type BrowserAIStatus } from "@/lib/llm/browser-ai";
 import {
   BROWSER_AI_PROVIDER,
   CUSTOM_PROVIDER,
-  getProviderMeta,
   hasApiKey,
   isCustomApiReady,
   PROVIDERS,
 } from "../providers";
-import type { CloudProviderId } from "../providers";
 import BrowserAISection from "./browser-ai";
-import type { ApiKeys, ModelConfig, ProviderId, Settings, StageId } from "@/types";
-import { alertError, alertInfo, fieldLabel, monoInput, selectInput } from "../styles";
+import type { ApiKeys, ModelConfig, Settings, StageId } from "@/types";
+import { alertInfo, fieldLabel, monoInput, selectInput } from "../styles";
 
 interface ModelsSectionProps {
   settings: Settings;
@@ -34,6 +37,8 @@ interface StageGroup {
   subtitle: string;
   stages: StageConfig[];
 }
+
+const MODEL_PROVIDERS = [BROWSER_AI_PROVIDER, ...PROVIDERS, CUSTOM_PROVIDER];
 
 const STAGE_GROUPS: StageGroup[] = [
   {
@@ -95,13 +100,8 @@ const STAGE_GROUPS: StageGroup[] = [
       },
       {
         id: "t3",
-        label: "Validation Model",
-        description: "Validates that the task completed or not",
-      },
-      {
-        id: "t4",
         label: "Output Model",
-        description: "Generates a summary of the task completion",
+        description: "Determines whether the task completed and summarizes the result.",
       },
     ],
   },
@@ -138,25 +138,26 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
   const [expandedStages, setExpandedStages] = useState<Partial<Record<StageId, boolean>>>({});
   const [browserAIStatus, setBrowserAIStatus] = useState<BrowserAIStatus>("unavailable");
 
-  const isProviderReady = (provider: ProviderId) => {
-    if (provider === "browser-ai") {
+  const configuredProviders = MODEL_PROVIDERS.filter(({ id }) => {
+    if (id === "browser-ai") {
       return browserAIStatus === "available";
     }
-    if (provider === "custom") {
+    if (id === "custom") {
       return isCustomApiReady(settings.customApi);
     }
-    return hasApiKey(apiKeys, provider as CloudProviderId);
-  };
+    return hasApiKey(apiKeys, id);
+  });
+  const hasProviders = configuredProviders.length > 0;
+  const providerPlaceholder = hasProviders ? "Select a provider" : "No providers configured";
+  const customApiModel = settings.customApi.model.trim();
+  const browserAIModel = getBrowserAIModelLabel();
 
   const updateStage = (stage: StageId, patch: Partial<ModelConfig>) => {
     setSettings((prev) => ({
       ...prev,
       models: {
         ...prev.models,
-        [stage]: {
-          provider: patch.provider ?? prev.models[stage]?.provider ?? "openai",
-          model: patch.model ?? prev.models[stage]?.model ?? PROVIDER_MODELS.openai[0],
-        },
+        [stage]: { ...getStageConfig(prev.models, stage), ...patch },
       },
     }));
   };
@@ -165,44 +166,20 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
     setExpandedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
   };
 
-  const renderBrowserAIWarning = () => {
-    if (browserAIStatus === "available") return null;
-
-    let message = "Download Browser AI in the section above before using it for this stage.";
-    if (browserAIStatus === "unsupported") {
-      message = "Browser AI is not supported in this browser.";
-    } else if (browserAIStatus === "unavailable") {
-      message = "Browser AI is unavailable on this device. Check storage and system requirements.";
-    }
-
-    return (
-      <div className={alertError}>
-        <AlertCircle size={15} />
-        <span>{message}</span>
-      </div>
-    );
-  };
-
   const renderStageCard = ({ id, label, description, recommendation }: StageConfig) => {
-    const config = settings.models[id] ?? {
-      provider: "openai" as ProviderId,
-      model: PROVIDER_MODELS.openai[0],
-    };
-    const isBrowserAI = config.provider === "browser-ai";
-    const isCustomProvider = config.provider === "custom";
-    const models = PROVIDER_MODELS[config.provider] ?? [];
-    const isCustom =
-      !isBrowserAI && !isCustomProvider && !isPresetModel(config.provider, config.model);
+    const config = getStageConfig(settings.models, id);
+    const provider = configuredProviders.find(({ id }) => id === config.provider);
+    const isBrowserAI = provider?.id === "browser-ai";
+    const isCustomProvider = provider?.id === "custom";
+    const isCloudProvider = !!provider && !isBrowserAI && !isCustomProvider;
+    const isCustom = isCloudProvider && !isPresetModel(config.provider, config.model);
     const selectValue = isCustom ? CUSTOM_MODEL_OPTION : config.model;
-    const providerMeta = isBrowserAI ? BROWSER_AI_PROVIDER : getProviderMeta(config.provider);
-    const keyMissing = !isProviderReady(config.provider);
     const isExpanded = expandedStages[id] ?? false;
-    const customApiModel = settings.customApi.model.trim();
     const modelPreview = isBrowserAI
-      ? getBrowserAIModelLabel()
+      ? browserAIModel
       : isCustomProvider
-        ? customApiModel || "—"
-        : config.model || "—";
+        ? customApiModel
+        : config.model;
 
     return (
       <div
@@ -221,7 +198,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
             <span className="min-w-0 flex-1 truncate font-mono text-xs text-text-muted sm:max-w-55 sm:flex-none">
-              {providerMeta.shortLabel} / {modelPreview}
+              {provider ? `${provider.shortLabel} / ${modelPreview || "—"}` : providerPlaceholder}
             </span>
             <ChevronDown
               size={16}
@@ -233,19 +210,6 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
 
         {isExpanded && (
           <div className="flex animate-fade-in flex-col gap-4 border-t border-white/10 px-4 py-4 sm:px-5 sm:pb-5">
-            {isBrowserAI
-              ? renderBrowserAIWarning()
-              : keyMissing && (
-                <div className={alertError}>
-                  <AlertCircle size={15} />
-                  <span>
-                    {isCustomProvider
-                      ? "Custom API is not configured. Add a URL and model in the Custom API section."
-                      : `No API key for ${providerMeta.label}. Add one in the API Keys section.`}
-                  </span>
-                </div>
-              )}
-
             {recommendation && (
               <div className={alertInfo}>
                 <Info size={15} />
@@ -261,33 +225,33 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                 <div className="relative">
                   <select
                     id={`${id}-provider`}
-                    className={selectInput}
-                    value={config.provider}
+                    className={`${selectInput} disabled:cursor-not-allowed`}
+                    value={provider?.id ?? ""}
+                    disabled={!hasProviders}
                     onChange={(e) => {
-                      const provider = e.target.value as ProviderId;
+                      const nextProvider = configuredProviders.find(
+                        ({ id }) => id === e.target.value
+                      );
+                      if (!nextProvider) return;
                       updateStage(id, {
-                        provider,
+                        provider: nextProvider.id,
                         model:
-                          provider === "custom"
-                            ? settings.customApi.model || ""
-                            : PROVIDER_MODELS[provider][0],
+                          nextProvider.id === "custom"
+                            ? customApiModel
+                            : PROVIDER_MODELS[nextProvider.id][0],
                       });
                     }}
                   >
-                    <option value={BROWSER_AI_PROVIDER.id}>
-                      {BROWSER_AI_PROVIDER.label}
-                      {browserAIStatus === "available" ? "" : " (not ready)"}
-                    </option>
-                    {PROVIDERS.map((provider) => (
+                    {!provider && (
+                      <option value="" disabled>
+                        {providerPlaceholder}
+                      </option>
+                    )}
+                    {configuredProviders.map((provider) => (
                       <option key={provider.id} value={provider.id}>
                         {provider.label}
-                        {isProviderReady(provider.id) ? "" : " (not configured)"}
                       </option>
                     ))}
-                    <option value={CUSTOM_PROVIDER.id}>
-                      {CUSTOM_PROVIDER.label}
-                      {isProviderReady(CUSTOM_PROVIDER.id) ? "" : " (not configured)"}
-                    </option>
                   </select>
                   <ChevronDown
                     size={16}
@@ -296,7 +260,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                 </div>
               </div>
 
-              {!isBrowserAI && !isCustomProvider && (
+              {isCloudProvider && (
                 <div className="flex min-w-0 flex-col gap-2">
                   <label htmlFor={`${id}-model`} className={fieldLabel}>
                     Model
@@ -315,7 +279,7 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
                         }
                       }}
                     >
-                      {models.map((m) => (
+                      {PROVIDER_MODELS[config.provider].map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -334,16 +298,14 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
             {isBrowserAI && (
               <div className="flex min-w-0 flex-col gap-2">
                 <span className={fieldLabel}>Model</span>
-                <p className="text-sm text-text-secondary">{getBrowserAIModelLabel()}</p>
+                <p className="text-sm text-text-secondary">{browserAIModel}</p>
               </div>
             )}
 
             {isCustomProvider && (
               <div className="flex min-w-0 flex-col gap-2">
                 <span className={fieldLabel}>Model</span>
-                <p className="text-sm text-text-secondary">
-                  {customApiModel || "Configure in Custom API"}
-                </p>
+                <p className="text-sm text-text-secondary">{customApiModel}</p>
               </div>
             )}
 
@@ -376,7 +338,13 @@ const ModelsSection: React.FC<ModelsSectionProps> = ({ settings, setSettings, ap
 
   return (
     <>
-      <BrowserAISection onStatusChange={setBrowserAIStatus} />
+      <BrowserAISection status={browserAIStatus} setStatus={setBrowserAIStatus} />
+      {!hasProviders && (
+        <p className={`${alertInfo} mb-6`}>
+          <Info size={15} />
+          <span>Add an API key or configure a Custom API to choose a model.</span>
+        </p>
+      )}
       {visibleGroups.map((group) => (
         <div className="mb-7" key={group.title}>
           <div className="mb-3">

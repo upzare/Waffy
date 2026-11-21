@@ -36,7 +36,6 @@
   --animate-anim-star: anim-star 60s linear infinite;
   --animate-anim-star-rotate: anim-star-rotate 90s linear infinite;
   --animate-l7: l7 1s infinite linear alternate;
-  --animate-dots: dots 1s infinite linear;
   --animate-wobble1: wobble1 0.95s infinite ease-in-out;
   --animate-wobble2: wobble2 0.95s infinite ease-in-out;
   --animate-spin-loader: spin 1.4s infinite linear;
@@ -153,36 +152,6 @@
       20% 50%,
       20% 50%,
       20% 50%;
-  }
-}
-
-@keyframes dots {
-  20% {
-    background-position:
-      0% 0%,
-      50% 50%,
-      100% 50%;
-  }
-
-  40% {
-    background-position:
-      0% 100%,
-      50% 0%,
-      100% 50%;
-  }
-
-  60% {
-    background-position:
-      0% 50%,
-      50% 100%,
-      100% 0%;
-  }
-
-  80% {
-    background-position:
-      0% 50%,
-      50% 50%,
-      100% 100%;
   }
 }
 

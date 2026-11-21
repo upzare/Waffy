@@ -26,10 +26,7 @@ import { PRIVACY_URL, TERMS_URL } from "@/config";
 interface GeneralSectionProps {
   settings: Settings;
   setSettings: React.Dispatch<React.SetStateAction<Settings>>;
-  pinnedPrompts: string[];
-  setPinnedPrompts: (value: string[]) => void;
   onResetDefaults: () => void;
-  canReset: boolean;
 }
 
 const MIN_PINNED_PROMPTS = 2;
@@ -44,12 +41,14 @@ const FEATURE_TOGGLES: { key: keyof FeatureFlags; label: string }[] = [
 const GeneralSection: React.FC<GeneralSectionProps> = ({
   settings,
   setSettings,
-  pinnedPrompts,
-  setPinnedPrompts,
   onResetDefaults,
-  canReset,
 }) => {
   const [resetOpen, setResetOpen] = useState(false);
+  const pinnedPrompts = settings.pinnedPrompts.length > 0 ? settings.pinnedPrompts : [""];
+
+  const setPinnedPrompts = (prompts: string[]) =>
+    setSettings((current) => ({ ...current, pinnedPrompts: prompts }));
+
   const updatePrompt = (index: number, value: string) => {
     setPinnedPrompts(pinnedPrompts.map((prompt, i) => (i === index ? value : prompt)));
   };
@@ -186,12 +185,7 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
             values.
           </p>
         </div>
-        <button
-          type="button"
-          className={`${dangerButton} disabled:cursor-not-allowed disabled:opacity-40`}
-          onClick={() => setResetOpen(true)}
-          disabled={!canReset}
-        >
+        <button type="button" className={dangerButton} onClick={() => setResetOpen(true)}>
           Reset Defaults
         </button>
       </div>
@@ -201,12 +195,12 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
           <DialogHeader>
             <DialogTitle>Reset defaults</DialogTitle>
             <DialogDescription>
-              This restores pinned prompts, features, models, custom API, and API keys to their
-              original values. This cannot be undone.
+              Save Changes will restore pinned prompts, features, models, custom API, and API keys
+              to their original values.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose className={secondaryButton}>No</DialogClose>
+            <DialogClose className={secondaryButton}>Cancel</DialogClose>
             <button
               type="button"
               className={dangerButton}
@@ -215,7 +209,7 @@ const GeneralSection: React.FC<GeneralSectionProps> = ({
                 onResetDefaults();
               }}
             >
-              Yes
+              Reset Defaults
             </button>
           </DialogFooter>
         </DialogContent>

@@ -37,29 +37,28 @@ Search and Research are on by default. Turn either one off in **Settings → Gen
 
 ### Browser automation
 
-Automation is off until you turn it on in **Settings → General**, or during setup. Ask Waffy to fill a form, click through a flow, or move between tabs. You can also start with `/automate`.
+Enable automation in **Settings → General** or during setup. Use `/automate` when you want Waffy to fill a form, click through a flow, or move between tabs.
 
 It plans the task, then drives the page from screenshots: click, type, drag, scroll, choose dropdowns, and open or switch tabs. Execution needs a vision model that can point at UI elements. **gemini-3.6-flash** is the recommended model for that stage.
 
 ### Personalized memory
 
-Memory is off until you turn it on in **Settings → Memory**.
+Memory is on by default. You can turn it off in **Settings → Memory**.
 
 Waffy then saves lasting facts from your chats (name, work, preferences, projects) and uses them in later conversations. You do not have to say “remember this.” Facts are embedded on this device with `all-MiniLM-L6-v2` and stored in IndexedDB. You can read, delete, summarize, or reset them in settings. Passwords, payment details, and one-off tasks are left out.
 
 ### Bring your own model
 
-Each stage can use a different provider and model. Chat, search, research, titles, and memory summaries default to the built-in browser model, so they can run with no API key. Automation defaults to Gemini for planning and execution, and to GPT for validation and the final write-up.
+Each stage can use a different provider and model. Chat, search, research, titles, and memory summaries default to the built-in browser model, so they can run with no API key. Automation defaults to Gemini for planning and execution. The Output Model defaults to GPT and reports whether the task succeeded, failed, or needs user input.
 
 | Stage      | What it does                                      | A good fit                                        |
 | ---------- | ------------------------------------------------- | ------------------------------------------------- |
-| Base       | Everyday answers and handoff to other modes       | Browser model, or a cloud model for harder questions |
+| Base       | Everyday answers from the active page or the web | Browser model, or a cloud model for harder questions |
 | Search     | Answers from web search                           | Browser model or a fast cloud model               |
 | Research   | Longer answers from the page and the web          | A capable cloud model                             |
 | Planning   | Turns a request into an automation plan           | A fast text model                                 |
 | Execution  | Clicks and types from screenshots                 | A vision model with image grounding               |
-| Validation | Checks whether the task succeeded                 | A fast text model                                 |
-| Output     | Writes the result in plain language               | A fast text model                                 |
+| Output     | Reviews execution and reports the outcome        | A fast text model                                 |
 | Title      | Names the conversation                            | Browser model                                     |
 | Step       | Short labels while automation runs                | Browser model                                     |
 | Memory     | Summarizes saved facts in settings                | Browser model                                     |
@@ -112,7 +111,7 @@ The first install opens a setup page for your provider, model, and features.
 1. Open **Extension settings** from the side panel, or right-click the toolbar icon and choose **Options**.
 2. Add an API key, use Browser built-in AI, or connect a custom endpoint.
 3. Under **Models**, pick a model for each stage. For **Execution**, use a vision model such as **gemini-3.6-flash**.
-4. Turn Automation on under **General**, and personalized memory on under **Memory**, if you want them.
+4. Turn Automation on under **General** if you want browser actions. Manage personalized memory under **Memory**.
 
 ## Project structure
 
@@ -128,7 +127,6 @@ extension/
       llm/                 Providers, prompts, tools, streaming
       memory/              On-device embeddings and saved facts
       background/          Tabs, search, page capture, automation, context menu
-      agent.ts             Entry point for AI calls
       client.ts            Extension settings and storage
       content.ts           In-page actions
       db.ts                IndexedDB: conversations and memory

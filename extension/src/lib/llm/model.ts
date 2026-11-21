@@ -14,7 +14,7 @@ import type {
   StageId,
 } from "@/types";
 import { isStageEnabled } from "@/lib/features";
-import { ensureBrowserAIModelReady, getBrowserAIStatus } from "./browser-ai";
+import { createBrowserAIModel, ensureBrowserAIModelReady, getBrowserAIStatus } from "./browser-ai";
 
 export const PROVIDER_MODELS: Record<ProviderId, string[]> = {
   openai: [
@@ -99,7 +99,6 @@ export const DEFAULT_MODELS: Record<StageId, ModelConfig> = {
   t1: { provider: "google", model: "gemini-flash-latest" },
   t2: { provider: "google", model: "gemini-3.6-flash" },
   t3: { provider: "openai", model: "gpt-5.6-luna" },
-  t4: { provider: "openai", model: "gpt-5.6-luna" },
   step: { provider: "browser-ai", model: "default" },
   memory: { provider: "browser-ai", model: "default" },
 };
@@ -115,11 +114,12 @@ export async function findMissingProvider(
   models: Partial<Record<StageId, ModelConfig>> | undefined,
   apiKeys: ApiKeys,
   flags: FeatureFlags,
-  customApi?: CustomApiConfig
+  customApi?: CustomApiConfig,
+  stages: readonly StageId[] = Object.keys(DEFAULT_MODELS) as StageId[]
 ): Promise<StageId | null> {
   let browserAIReady: boolean | null = null;
 
-  for (const stage of Object.keys(DEFAULT_MODELS) as StageId[]) {
+  for (const stage of stages) {
     if (!isStageEnabled(stage, flags)) continue;
 
     const config = getStageConfig(models, stage);
@@ -140,11 +140,11 @@ export async function findMissingProvider(
 export async function resolveModel(
   config: ModelConfig,
   apiKeys: ApiKeys,
-  customApi?: CustomApiConfig,
-  onProgress?: (progress: number) => void
+  customApi?: CustomApiConfig
 ): Promise<LanguageModel> {
   if (config.provider === "browser-ai") {
-    return ensureBrowserAIModelReady(onProgress);
+    await ensureBrowserAIModelReady();
+    return createBrowserAIModel();
   }
 
   if (config.provider === "custom") {
