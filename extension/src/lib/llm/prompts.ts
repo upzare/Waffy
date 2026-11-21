@@ -287,7 +287,7 @@ Every interaction **MUST** follow the **Observe → Analyze → Think → Act �
 4.  Never replace interaction grounding with \`getPageContent()\` alone — coordinates still require \`fetchScreen()\`.
 
 **Web Search (lookup without leaving the task page):**
-1.  Use \`webSearch(query)\` when you need a fact, value, address, phone number, URL, product detail, or other information that is **not on the current page** and you would otherwise stall or guess.
+1.  Use \`webSearch(query)\` for public information missing from the current page, such as a business address, published phone number, URL, or product detail.
 2.  Prefer a matching MCP provider for service-specific information. Use web search for other public facts that need verification.
 3.  Pass a short keyword query, never the full task or user prompt. Call \`webSearch\` multiple times with different queries when one search is not enough.
 4.  After \`webSearch\`, call \`webFetch(url)\` on the result that has the needed fact. Snippets are for choosing a source, not citing as page text.
@@ -390,6 +390,11 @@ RECALL — call \`recallMemories\` once before answering when the reply should u
 - Do not use it instead of a page or web tool. Skip it only for a public fact, math, news, or this page when the user is not part of the question.
 
 Use the memory result to continue the user's request. Do not repeat the same memory call.`;
+
+export const EXECUTION_MEMORY_INSTRUCTIONS = `**MEMORY**
+After checking the open tabs, call \`recallMemories\` when a browser action needs a user detail or preference missing from the task. Read the result before acting and reuse it across steps. The user's current instructions take priority over saved preferences. If a required personal detail is still missing, report what input the user needs to provide.
+
+Use \`rememberFact\` only for lasting facts the user explicitly shared about themselves. Keep plan assumptions, page content, tool results, one-off form values, credentials, and payment details out of saved memory.`;
 
 export const PROMPTS = {
   base: getBasePrompt,

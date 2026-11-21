@@ -3,7 +3,7 @@ import { createBrowserAISessionHooks } from "./browser-ai";
 import { generateStepLabel } from "./generate";
 import { getStageConfig, resolveModel } from "./model";
 import { MODES, resolveBuiltInTools, STAGE_TOOL_ACCESS, type StreamMode } from "./modes";
-import { MCP_INSTRUCTIONS, MEMORY_INSTRUCTIONS } from "./prompts";
+import { MCP_INSTRUCTIONS, MEMORY_INSTRUCTIONS, EXECUTION_MEMORY_INSTRUCTIONS } from "./prompts";
 import { createToolExecutor } from "./tools/execute";
 import { MEMORY_TOOLS } from "./tools/memory";
 import { getFeatureFlags } from "@/lib/features";
@@ -58,10 +58,11 @@ export async function* streamResponse({
     : undefined;
 
   try {
+    const memoryInstructions = automation ? EXECUTION_MEMORY_INSTRUCTIONS : MEMORY_INSTRUCTIONS;
     const instructions = [
       config.prompt(flags, Boolean(mcp)),
       ...(mcp ? [MCP_INSTRUCTIONS] : []),
-      ...(memoryEnabled ? [MEMORY_INSTRUCTIONS] : []),
+      ...(memoryEnabled ? [memoryInstructions] : []),
     ].join("\n\n");
     const tools: ToolSet = {
       ...builtInTools,

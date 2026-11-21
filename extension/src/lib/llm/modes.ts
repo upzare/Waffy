@@ -15,7 +15,7 @@ export const STAGE_TOOL_ACCESS = {
   search: { mcp: true, memory: true },
   research: { mcp: true, memory: true },
   t1: { mcp: true, memory: true },
-  t2: { mcp: true, memory: false },
+  t2: { mcp: true, memory: true },
   t3: { mcp: false, memory: false },
   title: { mcp: false, memory: false },
   step: { mcp: false, memory: false },
