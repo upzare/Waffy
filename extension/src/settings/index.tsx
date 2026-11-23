@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster } from "react-hot-toast";
-import { Brain, Cpu, Info, Key, LifeBuoy, Server, Settings as SettingsIcon } from "lucide-react";
+import { Brain, Cpu, Info, Key, LifeBuoy, Server, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import "@fontsource/space-grotesk/latin-400.css";
 import "@fontsource/space-grotesk/latin-500.css";
 import "@fontsource/space-grotesk/latin-600.css";
@@ -16,6 +16,7 @@ import MemorySection from "./components/memory";
 import ApiKeysSection from "./components/api-keys";
 import CustomApiSection from "./components/custom-api";
 import McpServersSection from "./components/mcp-servers";
+import SkillsSection from "./components/skills";
 import ModelsSection from "./components/models";
 import SupportSection from "./components/support";
 import AboutSection from "./components/about";
@@ -36,6 +37,12 @@ const SECTIONS = [
     label: "Memory",
     description: "Turn personalized memory on or off, and review what has been saved.",
     icon: Brain,
+  },
+  {
+    id: "skills",
+    label: "Skills",
+    description: "Import and manage reusable instructions for Waffy.",
+    icon: Sparkles,
   },
   {
     id: "mcp-servers",
@@ -101,7 +108,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeSection, onSele
     </div>
 
     <nav
-      className={`relative flex w-full gap-1 px-2 pb-2 md:flex-1 md:flex-col md:gap-1 md:overflow-y-auto md:px-3 md:pb-4 ${thinScroll}`}
+      className={`relative flex w-full gap-1 overflow-x-auto px-2 pb-2 md:flex-1 md:flex-col md:gap-1 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:pb-4 ${thinScroll}`}
     >
       {SECTIONS.map((section) => {
         const Icon = section.icon;
@@ -189,6 +196,19 @@ const Settings = () => {
             memoryEnabled={form.savedMemoryEnabled}
           />
         );
+      case "skills":
+        return (
+          <SkillsSection
+            skills={form.skills}
+            loadError={form.skillLoadError}
+            saving={saving}
+            onStage={form.stageSkill}
+          />
+        );
+      case "mcp-servers":
+        return (
+          <McpServersSection servers={form.servers} saving={saving} onStage={form.stageServer} />
+        );
       case "api-keys":
         return <ApiKeysSection apiKeys={apiKeys} setApiKeys={setApiKeys} />;
       case "models":
@@ -201,10 +221,6 @@ const Settings = () => {
             apiKeys={apiKeys}
             setApiKeys={setApiKeys}
           />
-        );
-      case "mcp-servers":
-        return (
-          <McpServersSection servers={form.servers} saving={saving} onStage={form.stageServer} />
         );
     }
   };

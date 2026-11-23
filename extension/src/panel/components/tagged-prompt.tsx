@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Streamdown } from "streamdown";
+import type { SkillMention } from "@/types";
 import {
   MENTION_CHIP_BUBBLE_CLASS,
   parsePageSources,
@@ -16,10 +17,12 @@ function TaggedPrompt({
   prompt,
   pageSources,
   commandOffset,
+  skill,
 }: {
   prompt: string;
   pageSources?: string;
   commandOffset?: number;
+  skill?: SkillMention;
 }) {
   return (
     <Streamdown
@@ -32,7 +35,7 @@ function TaggedPrompt({
       literalTagContent={["mention"]}
       components={mentionComponents}
     >
-      {wrapPromptMentions(prompt, parsePageSources(pageSources), commandOffset)}
+      {wrapPromptMentions(prompt, parsePageSources(pageSources), commandOffset, skill)}
     </Streamdown>
   );
 }

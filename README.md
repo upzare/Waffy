@@ -35,6 +35,12 @@ Search and Research are on by default. Turn either one off in **Settings → Gen
 | **Research** | `/research`  | Goes further: the current page, a screenshot when it helps, and more searches |
 | **Chat**     | Just type    | Answers from the page in front of you, and can search when Search is on      |
 
+### Skills
+
+Open **Settings → Skills**, import a [`SKILL.md`](https://agentskills.io/specification) file, and select **Save Changes** to install it. Type `$` in the composer and pick a skill for that message. You can combine it with a mode and tab mentions, for example `/research $compare-products Compare @Laptop A and @Laptop B`. Importing another file with the same skill name lets you review and replace the installed version.
+
+Skills work with Chat, Search, Research, and Automation. Each mode uses its configured tools. The library is stored on this device, and a selected skill's instructions go to the models processing that message.
+
 ### Browser automation
 
 Enable automation in **Settings → General** or during setup. Use `/automate` when you want Waffy to fill a form, click through a flow, or move between tabs.

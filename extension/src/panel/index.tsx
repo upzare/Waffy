@@ -17,9 +17,11 @@ import {
   parsePageMentionsFromMarkup,
   parsePageSources,
   selectedCommandOffset,
+  selectedSkillMentions,
   rebindStoredPages,
   toWindowPages,
 } from "./utils/page-mentions";
+import { findTypedSkill } from "./utils/skill-mentions";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import {
   ACTIONS,
@@ -44,6 +46,7 @@ import {
   updateConversationTitle,
   deleteConversation,
 } from "@/lib/db";
+import { findSkillByName, observeSkills, readSelectedSkill } from "@/lib/skills/storage";
 import { findMissingProvider, getStageConfig } from "@/lib/llm/model";
 import { generateTitle } from "@/lib/llm/generate";
 import {
@@ -53,7 +56,7 @@ import {
 } from "@/lib/llm/messages";
 import { extractAutomationPlan } from "@/lib/llm/prompts";
 import { streamResponse } from "@/lib/llm/stream";
-import { StreamMode } from "@/lib/llm/modes";
+import type { StreamMode } from "@/lib/llm/modes";
 import type { TaskStatus } from "@/lib/llm/tools/automate";
 import { errorMessage, USER_INTERRUPTED_MESSAGE } from "@/lib/errors";
 import { initAnalytics } from "@/lib/posthog";
@@ -70,6 +73,9 @@ import type {
   StreamingState,
   FileFormat,
   PageSource,
+  SkillMention,
+  SkillSummary,
+  StoredSkill,
 } from "../types";
 import "@/stylesheets/globals.css";
 
@@ -100,6 +106,7 @@ const App = () => {
   const isGenerating = streamingMessageId !== null;
   const [missingApiKeys, setMissingApiKeys] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [skills, setSkills] = useState<SkillSummary[]>([]);
 
   const features = appSettings ? getFeatureFlags(appSettings.settings) : DEFAULT_FEATURES;
   const pinnedPrompts = appSettings?.settings.pinnedPrompts ?? DEFAULT_PINNED_PROMPTS;
@@ -159,8 +166,15 @@ const App = () => {
   };
 
   useEffect(() => {
-    const sub = observeConversations().subscribe({
-      next: (result) => setConversations(result),
+    const conversationSubscription = observeConversations().subscribe({
+      next: setConversations,
+    });
+    const skillSubscription = observeSkills().subscribe({
+      next: (storedSkills) =>
+        setSkills(
+          storedSkills.filter((skill) => skill.enabled).map(({ instructions, ...summary }) => summary)
+        ),
+      error: () => setSkills([]),
     });
 
     const init = async () => {
@@ -192,7 +206,8 @@ const App = () => {
 
     return () => {
       abortControllerRef.current?.abort();
-      sub.unsubscribe();
+      conversationSubscription.unsubscribe();
+      skillSubscription.unsubscribe();
       Browser.runtime.onMessage.removeListener(onMessage);
     };
   }, []);
@@ -259,7 +274,7 @@ const App = () => {
     mode: StreamMode,
     messages: ModelMessage[],
     settings: AppSettings,
-    toolsContext?: Record<string, object>
+    options?: { toolsContext?: Record<string, object>; skill?: StoredSkill }
   ) => {
     const abortSignal = abortControllerRef.current!.signal;
     abortSignal.throwIfAborted();
@@ -275,7 +290,7 @@ const App = () => {
         messages,
         settings,
         abortSignal,
-        toolsContext,
+        ...options,
         onToolActivity: setToolActivityText,
         onMcpUnavailable: (message) => toast.error(message),
       })) {
@@ -321,7 +336,8 @@ const App = () => {
     task: string,
     promptFiles: FileFormat[],
     conversationMessages: Message[],
-    settings: AppSettings
+    settings: AppSettings,
+    skill?: StoredSkill
   ) =>
     navigator.locks.request("waffy-browser-automation", { ifAvailable: true }, async (lock) => {
       if (!lock) throw new Error("Another Waffy window is running browser automation.");
@@ -348,7 +364,8 @@ const App = () => {
         return await generateResponse(
           "t2",
           buildExecutionMessages(task, promptFiles, conversationMessages),
-          settings
+          settings,
+          { skill }
         );
       } finally {
         await Browser.runtime.sendMessage({ action: ACTIONS.stopSession });
@@ -359,7 +376,8 @@ const App = () => {
     promptText: string,
     promptFiles: FileFormat[],
     conversationMessages: Message[],
-    settings: AppSettings
+    settings: AppSettings,
+    skill?: StoredSkill
   ) => {
     assertNotAborted();
     setStatusText("GENERATING");
@@ -368,7 +386,8 @@ const App = () => {
     const finalText = await generateResponse(
       "t1",
       buildConversationMessages(promptText, promptFiles, conversationMessages),
-      settings
+      settings,
+      { skill }
     );
     const task = extractAutomationPlan(finalText);
     if (!task) return;
@@ -381,15 +400,19 @@ const App = () => {
       task,
       promptFiles,
       conversationMessages,
-      settings
+      settings,
+      skill
     );
     await generateResponse("t3", buildTaskOutputMessages(task, executionResponse), settings, {
-      reportStatus: {
-        onTaskStatus: (taskStatus: TaskStatus) => {
-          updateAssistantMessage((msg) => ({
-            ...msg,
-            content: { ...msg.content, taskStatus },
-          }));
+      skill,
+      toolsContext: {
+        reportStatus: {
+          onTaskStatus: (taskStatus: TaskStatus) => {
+            updateAssistantMessage((msg) => ({
+              ...msg,
+              content: { ...msg.content, taskStatus },
+            }));
+          },
         },
       },
     });
@@ -421,6 +444,7 @@ const App = () => {
     promptText,
     promptFiles,
     mode,
+    skill,
     messageId,
     conversationContext,
     prepareMessages,
@@ -429,11 +453,22 @@ const App = () => {
     promptText: string;
     promptFiles: FileFormat[];
     mode: MessageMode;
+    skill?: SkillMention;
     messageId: string;
     conversationContext: Message[];
     prepareMessages: (settings: AppSettings) => void | Promise<void>;
     clearInput?: boolean;
   }) => {
+    let activeSkill: StoredSkill | undefined;
+    if (skill) {
+      try {
+        activeSkill = await readSelectedSkill(skill);
+      } catch (error) {
+        toast.error(errorMessage(error));
+        return;
+      }
+    }
+
     const settings = await getAppSettings();
     if (!isModeEnabled(mode, getFeatureFlags(settings.settings))) {
       toast.error(`Enable ${MODE_LABELS[mode] ?? mode} in extension settings.`);
@@ -457,12 +492,13 @@ const App = () => {
       }
 
       if (mode === "automate") {
-        await automateRequest(promptText, promptFiles, conversationContext, settings);
+        await automateRequest(promptText, promptFiles, conversationContext, settings, activeSkill);
       } else {
         await generateResponse(
           mode,
           buildConversationMessages(promptText, promptFiles, conversationContext),
-          settings
+          settings,
+          { skill: activeSkill }
         );
       }
     } catch (error) {
@@ -505,6 +541,20 @@ const App = () => {
 
       if (!displayPrompt.trim() && promptFilesInput.length === 0) return;
 
+      const selectedSkills = selectedSkillMentions(text);
+      if (selectedSkills.length > 1) {
+        toast.error("Select one skill per message.");
+        return;
+      }
+      let skill: SkillMention | undefined = selectedSkills[0];
+      if (!skill) {
+        const typedSkill = findTypedSkill(displayPrompt, command);
+        if (typedSkill) {
+          const found = await findSkillByName(typedSkill.name);
+          if (found) skill = { ...typedSkill, id: found.id, revision: found.revision };
+        }
+      }
+
       const muted = pageMentions.find((page) => page.muted || page.tabId == null);
       if (muted) {
         toast.error(`${muted.label} is no longer open`);
@@ -532,7 +582,8 @@ const App = () => {
                 })),
                 openPages
               ),
-              command?.start
+              command?.start,
+              skill
             )
           );
           setInputResetKey((key) => key + 1);
@@ -576,9 +627,11 @@ const App = () => {
       }
 
       const promptFiles = await fileHandler(promptFilesInput);
-      const modelPrompt = buildPageTaggedPrompt(displayPrompt, pageSources, command?.start);
+      const modelPrompt = buildPageTaggedPrompt(displayPrompt, pageSources, command?.start, skill);
       if (!modelPrompt.trim() && promptFiles.length === 0) {
-        toast.error(command ? `Add a message after /${command.value}` : "Message cannot be empty");
+        const promptControls = [skill && `$${skill.name}`, command && `/${command.value}`];
+        const promptControl = promptControls.find(Boolean);
+        toast.error(promptControl ? `Add a message after ${promptControl}` : "Message cannot be empty");
         return;
       }
 
@@ -590,6 +643,7 @@ const App = () => {
         promptText: modelPrompt,
         promptFiles,
         mode,
+        skill,
         messageId,
         conversationContext,
         clearInput: true,
@@ -607,6 +661,7 @@ const App = () => {
                 text: { prompt: displayPrompt },
                 files: promptFiles,
                 ...(command && { commandOffset: command.start }),
+                ...(skill && { skill }),
                 ...(pageSources.length > 0 && { pageSources: JSON.stringify(pageSources) }),
               },
             },
@@ -670,10 +725,12 @@ const App = () => {
 
     const commandOffset = storedCommandOffset(userMsg, assistantMsg);
     const mode = findSlashCommand(promptText, commandOffset)?.value ?? "base";
+    const skill = userMsg.content.skill;
     const modelPrompt = buildPageTaggedPrompt(
       promptText,
       parsePageSources(userMsg.content.pageSources),
-      commandOffset
+      commandOffset,
+      skill
     );
 
     generationLockRef.current = true;
@@ -682,6 +739,7 @@ const App = () => {
         promptText: modelPrompt,
         promptFiles,
         mode,
+        skill,
         messageId: assistantMessageId.slice("assistant-".length),
         conversationContext: history.slice(0, assistantIndex - 1),
         prepareMessages: () =>
@@ -712,7 +770,12 @@ const App = () => {
       const restoredFiles = fileFormatsToFiles(promptFiles);
       replaceMessages(history.slice(0, userIndex));
       setMessage(
-        displayToMarkup(promptText, rebound, storedCommandOffset(userMsg, history[userIndex + 1]))
+        displayToMarkup(
+          promptText,
+          rebound,
+          storedCommandOffset(userMsg, history[userIndex + 1]),
+          userMsg.content.skill
+        )
       );
       setFiles(restoredFiles);
       setErrorText("");
@@ -873,6 +936,7 @@ const App = () => {
           files={files}
           inputResetKey={inputResetKey}
           features={features}
+          skills={skills}
           setMessage={setMessage}
           setFiles={setFiles}
           onSendMessage={handleSendMessage}

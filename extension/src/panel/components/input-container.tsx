@@ -4,6 +4,7 @@ import { CircleStop, File, Globe, Paperclip, Send, X } from "lucide-react";
 import { Mention, MentionsInput, makeTriggerRegex } from "react-mentions-ts";
 import type { InputContainerProps } from "../../types";
 import { getSlashCommands } from "../utils/slash-commands";
+import { SKILL_MARKUP } from "../utils/skill-mentions";
 import { useWindowTabs } from "../hooks/use-window-tabs";
 import {
   MENTION_CHIP_COMPOSER_CLASS,
@@ -20,6 +21,8 @@ const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
 const INPUT_CLASS = "box-border max-h-50 min-h-12 w-full resize-none border-none bg-transparent py-3.5 pr-18 pl-2.5 caret-current outline-none text-[0.9rem] text-white placeholder:text-[0.875rem] placeholder:text-white/40 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar]:bg-[#22222299] [&::-webkit-scrollbar-thumb]:bg-white/30";
 
 const pageTrigger = makeTriggerRegex("@", { allowSpaceInQuery: true });
+const skillTrigger = makeTriggerRegex("$");
+const suggestionTitles = { command: "Commands", page: "Pages", skill: "Skills" } as const;
 
 function SuggestionHeader({ title }: { title: string }) {
   return <p className="p-1.5 text-xs font-medium tracking-wider text-white/35 uppercase">{title}</p>;
@@ -79,6 +82,25 @@ function PageRow({
   );
 }
 
+function SkillRow({
+  value,
+  description,
+  focused,
+}: {
+  value: string;
+  description: string;
+  focused: boolean;
+}) {
+  return (
+    <div className={`min-w-0 rounded px-2 py-1.5 ${focused ? "bg-white/6" : ""}`}>
+      <p className={`truncate text-sm ${focused ? "text-green-300" : "text-white/90"}`}>
+        {`$${value}`}
+      </p>
+      <p className="line-clamp-2 text-xs text-white/45">{description}</p>
+    </div>
+  );
+}
+
 function InputContainer({
   isGenerating,
   textareaRef,
@@ -87,6 +109,7 @@ function InputContainer({
   files,
   inputResetKey,
   features,
+  skills,
   setMessage,
   setFiles,
   onSendMessage,
@@ -95,7 +118,7 @@ function InputContainer({
   const canSend = message.trim().length > 0 || files.length > 0;
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [isFileDrag, setIsFileDrag] = useState(false);
-  const [suggestionKind, setSuggestionKind] = useState<"command" | "page">("command");
+  const [suggestionKind, setSuggestionKind] = useState<keyof typeof suggestionTitles>("command");
   const [suggestionsHost, setSuggestionsHost] = useState<HTMLDivElement | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const slashCommands = getSlashCommands(features);
@@ -281,11 +304,11 @@ function InputContainer({
             suggestionsPortalHost={suggestionsHost}
             customSuggestionsContainer={(children) => (
               <>
-                <SuggestionHeader title={suggestionKind === "page" ? "Pages" : "Commands"} />
+                <SuggestionHeader title={suggestionTitles[suggestionKind]} />
                 {children}
               </>
             )}
-            placeholder="Type / for commands or @ for pages"
+            placeholder="/ commands · @ tabs · $ skills"
             className="relative w-full"
             classNames={{
               control: "relative w-full border-0 bg-transparent",
@@ -350,6 +373,41 @@ function InputContainer({
               )}
               renderSuggestion={(entry, _search, _highlighted, _index, focused) => (
                 <PageRow page={entry} focused={focused} />
+              )}
+            />
+            <Mention
+              trigger={skillTrigger}
+              markup={SKILL_MARKUP}
+              displayTransform={(_, display) => `$${display ?? ""}`}
+              data={(query) => {
+                setSuggestionKind("skill");
+                const term = query.toLowerCase();
+                return skills
+                  .filter(({ name, description }) =>
+                    name.includes(term) || description.toLowerCase().includes(term)
+                  )
+                  .map(({ id, revision, name, description }) => ({
+                    id: `${id}:${revision}`,
+                    display: name,
+                    description,
+                  }));
+              }}
+              appendSpaceOnAdd
+              className={MENTION_CHIP_COMPOSER_CLASS}
+              renderEmpty={() => (
+                <SuggestionEmpty
+                  title="Skills"
+                  message={
+                    skills.length ? "No matching skills" : "Enable a skill in Settings → Skills"
+                  }
+                />
+              )}
+              renderSuggestion={(entry, _search, _highlighted, _index, focused) => (
+                <SkillRow
+                  value={String(entry.display ?? entry.id)}
+                  description={String(entry.description)}
+                  focused={focused}
+                />
               )}
             />
             <Mention

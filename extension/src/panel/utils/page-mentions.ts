@@ -1,8 +1,9 @@
 import type { Tabs } from "webextension-polyfill";
 import Browser from "webextension-polyfill";
 import { ACTIONS, isInaccessiblePage } from "@/lib/helper";
-import type { PageSource } from "@/types";
-import { findSlashCommand, stripSlashCommand } from "./slash-commands";
+import type { PageSource, SkillMention } from "@/types";
+import { findSlashCommand } from "./slash-commands";
+import { SKILL_MARKUP_PATTERN, skillMentionSpan } from "./skill-mentions";
 
 export const SLASH_MARKUP = "/[__display__](__id__)";
 export const PAGE_MARKUP = "@[__display__](tab:__id__)";
@@ -109,6 +110,15 @@ export function selectedCommandOffset(markup: string): number | undefined {
   return selected && markupToDisplay(markup.slice(0, selected.index)).length;
 }
 
+export function selectedSkillMentions(markup: string): SkillMention[] {
+  return Array.from(markup.matchAll(SKILL_MARKUP_PATTERN), (match) => ({
+    name: match[1],
+    id: match[2],
+    revision: match[3],
+    offset: markupToDisplay(markup.slice(0, match.index)).length,
+  }));
+}
+
 export function parsePageMentionsFromMarkup(markup: string): ComposerPageMention[] {
   const mentions: ComposerPageMention[] = [];
   const live = new RegExp(PAGE_MARKUP_PATTERN.source, "g");
@@ -140,7 +150,8 @@ export function markupToDisplay(markup: string): string {
   return markup
     .replace(SLASH_MARKUP_PATTERN, "/$1")
     .replace(PAGE_MARKUP_PATTERN, "@$1")
-    .replace(MUTED_MARKUP_PATTERN, "@$1");
+    .replace(MUTED_MARKUP_PATTERN, "@$1")
+    .replace(SKILL_MARKUP_PATTERN, (_, name) => `$${name}`);
 }
 
 type MarkupSpan = { start: number; end: number; markup: string };
@@ -148,14 +159,26 @@ type MarkupSpan = { start: number; end: number; markup: string };
 function formatPromptMentions<T extends { mention: string }>(
   display: string,
   pages: T[],
-  commandOffset: number | undefined,
-  formatCommand: (text: string) => string,
-  formatPage: (page: T) => string
+  {
+    commandOffset,
+    skill,
+    formatCommand,
+    formatPage,
+    formatSkill,
+  }: {
+    commandOffset?: number;
+    skill?: SkillMention;
+    formatCommand: (text: string) => string;
+    formatPage: (page: T) => string;
+    formatSkill: (skill: SkillMention) => string;
+  }
 ): string {
   const command = findSlashCommand(display, commandOffset);
   const spans: MarkupSpan[] = command
     ? [{ ...command, markup: formatCommand(display.slice(command.start, command.end)) }]
     : [];
+  const skillSpan = skillMentionSpan(display, skill);
+  if (skill && skillSpan) spans.push({ ...skillSpan, markup: formatSkill(skill) });
   const byLength = [...pages].sort((a, b) => b.mention.length - a.mention.length);
 
   for (const page of byLength) {
@@ -183,23 +206,24 @@ function formatPromptMentions<T extends { mention: string }>(
 export function displayToMarkup(
   display: string,
   pages: ComposerPageMention[],
-  commandOffset?: number
+  commandOffset?: number,
+  skill?: SkillMention
 ): string {
-  return formatPromptMentions(
-    display,
-    pages,
+  return formatPromptMentions(display, pages, {
     commandOffset,
-    (text) => {
+    skill,
+    formatCommand: (text) => {
       const name = text.slice(1);
       return `/[${name}](${name.toLowerCase()})`;
     },
-    (page) => {
+    formatPage: (page) => {
       const label = page.label || page.mention.slice(1);
       return page.muted || page.tabId == null
         ? `@[${label}](muted:${encodeURIComponent(label)})`
         : `@[${label}](tab:${page.tabId})`;
-    }
-  );
+    },
+    formatSkill: ({ id, name, revision }) => `$[${name}](skill:${id}:${revision})`,
+  });
 }
 
 export function rebindStoredPages(pages: PageSource[], open: WindowPage[]): ComposerPageMention[] {
@@ -248,9 +272,19 @@ function escapeXml(value: string): string {
 export function buildPageTaggedPrompt(
   prompt: string,
   pages: PageSource[],
-  commandOffset?: number
+  commandOffset?: number,
+  skill?: SkillMention
 ): string {
-  const userMessage = stripSlashCommand(prompt, commandOffset);
+  const controls = [findSlashCommand(prompt, commandOffset), skillMentionSpan(prompt, skill)]
+    .filter((span) => span !== undefined)
+    .sort((a, b) => b.start - a.start);
+
+  let userMessage = prompt;
+  for (const { start, end } of controls) {
+    const before = userMessage.slice(0, start);
+    const after = userMessage.slice(end);
+    userMessage = before.trim() ? before + after.replace(/^ /, "") : after.replace(/^(?:\r?\n| )/, "");
+  }
   if (pages.length === 0) return userMessage;
 
   const seen = new Set<number>();
@@ -276,12 +310,19 @@ ${sources}
 </page_sources>`;
 }
 
-/** Wrap / and @ chips as Streamdown mention tags so the rest of the prompt still renders as Markdown. */
+/** Wrap composer chips as Streamdown mention tags so the rest of the prompt renders as Markdown. */
 export function wrapPromptMentions(
   prompt: string,
   pages: PageSource[],
-  commandOffset?: number
+  commandOffset?: number,
+  skill?: SkillMention
 ): string {
   const wrap = (text: string) => `<mention>${escapeXml(text)}</mention>`;
-  return formatPromptMentions(prompt, pages, commandOffset, wrap, (page) => wrap(page.mention));
+  return formatPromptMentions(prompt, pages, {
+    commandOffset,
+    skill,
+    formatCommand: wrap,
+    formatPage: (page) => wrap(page.mention),
+    formatSkill: ({ name }) => wrap(`$${name}`),
+  });
 }

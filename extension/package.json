@@ -43,7 +43,8 @@
     "tailwind-merge": "^3.7.0",
     "turndown": "^7.2.5",
     "uuid": "^14.0.3",
-    "webextension-polyfill": "^0.12.0"
+    "webextension-polyfill": "^0.12.0",
+    "yaml": "^2.9.1"
   },
   "scripts": {
     "build": "cross-env NODE_ENV=production webpack",
