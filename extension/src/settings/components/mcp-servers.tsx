@@ -24,6 +24,7 @@ import {
   dangerButton,
   fieldLabel,
   monoInput,
+  panel,
   panelSubtitle,
   primaryButton,
   revealButton,
@@ -288,10 +289,11 @@ export default function McpServersSection({ servers, saving, onStage }: McpServe
         else show(null);
       }}
     >
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className={`${panelSubtitle} max-w-xl md:flex-1`}>
-            Waffy automatically uses tools from enabled servers when needed.
+      <div className={panel}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <p className={`${panelSubtitle} max-w-lg`}>
+            Waffy automatically uses tools from enabled servers for tasks like searching documents
+            or updating app records.
           </p>
           <button
             ref={addButton}
@@ -301,28 +303,32 @@ export default function McpServersSection({ servers, saving, onStage }: McpServe
             disabled={saving}
             onClick={(event) => open(event, { view: "form" })}
           >
-            <Plus size={16} aria-hidden />
+            <Plus size={15} aria-hidden />
             Add server
           </button>
         </div>
 
         {servers.length === 0 ? (
-          <p className={`rounded-xl border border-border px-4 py-6 text-center ${panelSubtitle}`}>
-            No MCP servers added.
-          </p>
+          <p className={panelSubtitle}>No MCP servers added.</p>
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-white/5">
+          <ul className="flex flex-col gap-2">
             {servers.map(({ server: item }) => (
-              <li key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold" title={item.name}>
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/40 px-4 py-3"
+              >
+                <div className="min-w-36 flex-1">
+                  <p className="wrap-anywhere font-mono text-sm text-white" title={item.name}>
                     {item.name}
                   </p>
-                  <p className={`${panelSubtitle} truncate`} title={visibleEndpoint(item)}>
+                  <p
+                    className={`${panelSubtitle} mt-1 wrap-anywhere`}
+                    title={visibleEndpoint(item)}
+                  >
                     {visibleEndpoint(item)}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
+                <div className="ml-auto flex shrink-0 items-center gap-3">
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${item.enabled ? "bg-green-dim text-green" : "bg-white/8 text-white/65"}`}
                   >

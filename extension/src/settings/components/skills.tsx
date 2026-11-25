@@ -79,7 +79,7 @@ export default function SkillsSection({ skills, loadError, saving, onStage }: Sk
     <>
       <div className={panel}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <p className={`${panelSubtitle} max-w-md`}>
+          <p className={`${panelSubtitle} max-w-lg`}>
             Type <code>$</code> in chat to select a skill for one message. Import a new file with
             the same name to replace a skill.
           </p>

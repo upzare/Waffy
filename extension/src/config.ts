@@ -22,4 +22,4 @@ export const WEBSTORE_URL = "https://chromewebstore.google.com/detail/waffy-ai-c
 export const DISCORD_URL = "https://dsc.gg/waffy";
 export const SUPPORT_EMAIL = "support@waffy.io";
 export const X_VERSION_URL = "https://x-version.waffy.io";
-export const FOUNDER_URL = "https://x.com/aravindmanoj_";
+export const FOUNDER_URL = "https://x.com/aravindmanoj";
