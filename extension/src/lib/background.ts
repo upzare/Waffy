@@ -2,6 +2,7 @@ import Browser from "webextension-polyfill";
 import type { Runtime } from "webextension-polyfill";
 import { EXTENSION_VERSION, X_VERSION_URL } from "@/config";
 import { ACTIONS, restrictLocalStorageAccess } from "@/lib/helper";
+import { WRITING } from "./writing";
 import {
   getAutomationOverlayStatus,
   getTab,
@@ -13,8 +14,10 @@ import {
 import { createContextMenus, registerContextMenuListeners } from "./background/context-menu";
 import { fetchWebPage } from "./background/fetch";
 import { captureVisibleTab, getPageContent, getPageInfo } from "./background/page";
-import { capture, getCaptureState, registerCaptureListeners } from "./background/capture";
+import { capture } from "./background/capture";
 import { fetchWebSearch } from "./background/search";
+import { getToolsOverlayState, registerToolsOverlayListeners } from "./background/tools-overlay";
+import { relayWriting } from "./background/writing";
 import { initClient, initSettings, migrateAppSettings } from "./client";
 
 const webRequests = new Map<string, AbortController>();
@@ -45,7 +48,7 @@ void restrictLocalStorageAccess().catch(() =>
 );
 registerAutomationListeners();
 registerContextMenuListeners();
-registerCaptureListeners();
+registerToolsOverlayListeners();
 
 Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSender) => {
   switch (request.action) {
@@ -68,10 +71,14 @@ Browser.runtime.onMessage.addListener((request: any, sender: Runtime.MessageSend
       return getPageContent(request.tabId);
     case ACTIONS.captureVisibleTab:
       return captureVisibleTab(request.tabId);
-    case ACTIONS.getCaptureButton:
-      return getCaptureState(sender);
+    case ACTIONS.getToolsOverlayState:
+      return getToolsOverlayState(sender);
     case ACTIONS.capture:
       return capture(sender, request.rect, request.viewport);
+    case WRITING.readSelection:
+    case WRITING.releaseSelection:
+    case WRITING.apply:
+      return relayWriting(request, sender);
     case ACTIONS.webSearch:
       return handleWebRequest(request.id, (signal) => fetchWebSearch(request.query, signal));
     case ACTIONS.webFetch:

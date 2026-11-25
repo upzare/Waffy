@@ -68,15 +68,18 @@ const config: webpack.Configuration = {
     rules: [
       {
         test: /\.css$/i,
-        use: ["style-loader", "css-loader", "@tailwindcss/webpack"],
+        oneOf: [
+          { resourceQuery: /\braw\b/, type: "asset/source" },
+          { use: ["style-loader", "css-loader", "@tailwindcss/webpack"] },
+        ],
       },
       {
         test: /\.woff2?$/,
-        type: "asset/resource",
         include: /[\\/]node_modules[\\/]@fontsource[\\/]/,
-        generator: {
-          filename: "fonts/[name][ext]",
-        },
+        oneOf: [
+          { resourceQuery: /\bbytes\b/, type: "asset/bytes" },
+          { type: "asset/resource", generator: { filename: "fonts/[name][ext]" } },
+        ],
       },
       {
         test: new RegExp(".(" + fileExtensions.join("|") + ")$"),

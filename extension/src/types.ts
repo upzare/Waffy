@@ -99,6 +99,7 @@ export interface Message {
     };
     pageSources?: string;
     commandOffset?: number;
+    literalOffsets?: number[];
     skill?: SkillMention;
     files?: FileFormat[];
     task?: string;
@@ -119,6 +120,8 @@ export interface DomMessage {
   args?: Record<string, any>;
   dom?: string;
 }
+
+export type ToolsOverlayState = { visible: false } | { visible: true; side: "left" | "right" };
 
 export interface ParticlesProps {
   quantity?: number;

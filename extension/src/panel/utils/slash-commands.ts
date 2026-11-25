@@ -2,6 +2,7 @@ import type { FeatureFlags, Message, MessageMode } from "@/types";
 import { isModeEnabled } from "@/lib/features";
 
 export type SlashCommand = Exclude<MessageMode, "base">;
+export const NO_SLASH_COMMAND = -1;
 type PromptCommand = { value: SlashCommand; start: number; end: number };
 
 const SLASH_COMMANDS: { value: SlashCommand; description: string }[] = [

@@ -21,7 +21,9 @@
       ],
       "js": [
         "content.bundle.js"
-      ]
+      ],
+      "all_frames": true,
+      "match_origin_as_fallback": true
     }
   ],
   "options_page": "settings.html",
