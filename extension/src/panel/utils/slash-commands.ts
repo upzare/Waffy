@@ -36,11 +36,3 @@ export function storedCommandOffset(message: Message, reply?: Message): number |
     if (token[0].toLowerCase() === `/${reply.mode}`) return token.index;
   }
 }
-
-export function stripSlashCommand(prompt: string, offset?: number): string {
-  const command = findSlashCommand(prompt, offset);
-  if (!command) return prompt;
-  const before = prompt.slice(0, command.start);
-  const after = prompt.slice(command.end);
-  return before.trim() ? before + after.replace(/^ /, "") : after.replace(/^(?:\r?\n| )/, "");
-}

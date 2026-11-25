@@ -14,14 +14,23 @@ import {
   type McpServerConfig,
   type McpServerDraft,
 } from "@/lib/mcp/storage";
+import {
+  applySkillChanges,
+  matchesSkill,
+  observeSkills,
+  rebaseSkillChange,
+  type SkillChange,
+} from "@/lib/skills/storage";
 import { equalJson } from "@/lib/utils";
-import type { ApiKeys, AppSettings, Settings } from "@/types";
+import type { ApiKeys, AppSettings, Settings, StoredSkill } from "@/types";
 
 interface SettingsDraft {
   saved: AppSettings;
   draft: AppSettings;
   servers: Map<string, McpServerConfig>;
   pendingServers: Map<string, McpServerChange>;
+  skills?: Map<string, StoredSkill>;
+  pendingSkills: Map<string, SkillChange>;
 }
 
 const defaults: AppSettings = { settings: DEFAULT_SETTINGS, apiKeys: {} };
@@ -112,12 +121,14 @@ function rebaseServerChange(change: McpServerChange, saved?: McpServerConfig): M
 export function useSettingsDraft() {
   const [state, setState] = useState<SettingsDraft | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [skillLoadError, setSkillLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const savePending = useRef(false);
 
   useEffect(() => {
     if (saving) return;
     let revision = 0;
+    let loadedSkills: SettingsDraft["skills"];
     const storage = chrome.storage.local;
 
     function load() {
@@ -143,6 +154,8 @@ export function useSettingsDraft() {
               draft: current ? rebaseAppDraft(current.saved, current.draft, saved) : saved,
               servers,
               pendingServers,
+              skills: current?.skills ?? loadedSkills,
+              pendingSkills: current?.pendingSkills ?? new Map(),
             };
           });
           setLoadError("");
@@ -160,11 +173,34 @@ export function useSettingsDraft() {
       }
     }
 
+    const skillSubscription = observeSkills().subscribe({
+      next: (storedSkills) => {
+        if (savePending.current) return;
+        const skills = new Map(storedSkills.map((skill) => [skill.name, skill]));
+        loadedSkills = skills;
+        setState((current) => {
+          if (!current) return current;
+          const pendingSkills = new Map<string, SkillChange>();
+          for (const [name, change] of current.pendingSkills) {
+            const saved = skills.get(name);
+            const rebased = rebaseSkillChange(change, saved);
+            if (!matchesSkill(saved, rebased.draft)) pendingSkills.set(name, rebased);
+          }
+          return { ...current, skills, pendingSkills };
+        });
+        setSkillLoadError("");
+      },
+      error: (error) => {
+        console.error("Error loading skills:", error);
+        setSkillLoadError("Couldn't load installed skills.");
+      },
+    });
     storage.onChanged.addListener(onChange);
     load();
     return () => {
       revision += 1;
       storage.onChanged.removeListener(onChange);
+      skillSubscription.unsubscribe();
     };
   }, [saving]);
 
@@ -172,7 +208,7 @@ export function useSettingsDraft() {
   const base = hasAppEdits ? toPayload(state.saved) : null;
   const payload = hasAppEdits ? toPayload(state.draft) : null;
   const appChanged = !equalJson(base, payload);
-  const hasChanges = appChanged || !!state?.pendingServers.size;
+  const hasChanges = appChanged || !!state?.pendingServers.size || !!state?.pendingSkills.size;
 
   const setDraft = <Key extends keyof AppSettings>(
     key: Key,
@@ -212,6 +248,25 @@ export function useSettingsDraft() {
     });
   };
 
+  const stageSkill = (previous?: StoredSkill, draft?: StoredSkill) => {
+    const name = (draft ?? previous)?.name;
+    if (!name || savePending.current) return;
+    setState((current) => {
+      if (!current?.skills) return current;
+      const pendingSkills = new Map(current.pendingSkills);
+      const change = pendingSkills.get(name);
+      const original = change ? change.original : previous;
+      const saved = current.skills.get(name);
+      const rebased = rebaseSkillChange({ original, draft }, saved);
+      if (matchesSkill(rebased.original, rebased.draft) || matchesSkill(saved, rebased.draft)) {
+        pendingSkills.delete(name);
+      } else {
+        pendingSkills.set(name, rebased);
+      }
+      return { ...current, pendingSkills };
+    });
+  };
+
   const save = async () => {
     if (!state || !hasChanges || savePending.current) return;
     savePending.current = true;
@@ -227,14 +282,17 @@ export function useSettingsDraft() {
           return updates;
         })
         : undefined;
-    const [app, ...serverResults] = await Promise.allSettled([
+    const skillSave = state.pendingSkills.size ? applySkillChanges(state.pendingSkills) : undefined;
+    const [app, skillsResult, ...serverResults] = await Promise.allSettled([
       appSave,
+      skillSave,
       ...[...state.pendingServers].map(async ([id, change]) => ({
         id,
         config: await applyMcpServerChange(id, change),
       })),
     ]);
     const saved = app.status === "fulfilled" ? app.value : undefined;
+    const committedSkills = skillsResult.status === "fulfilled" ? skillsResult.value : undefined;
     setState((current) => {
       if (!current) return current;
       const servers = new Map(current.servers);
@@ -251,6 +309,10 @@ export function useSettingsDraft() {
         draft: saved ? rebaseAppDraft(state.draft, current.draft, saved) : current.draft,
         servers,
         pendingServers,
+        skills: committedSkills
+          ? new Map(committedSkills.map((skill) => [skill.name, skill]))
+          : current.skills,
+        pendingSkills: committedSkills ? new Map() : current.pendingSkills,
       };
     });
     savePending.current = false;
@@ -264,7 +326,12 @@ export function useSettingsDraft() {
     }
     const serverError = serverResults.find((result) => result.status === "rejected");
     if (serverError) toast.error(errorMessage(serverError.reason, "Failed to save MCP servers"));
-    if (app.status === "fulfilled" && !serverError) toast.success("Changes saved");
+    if (skillsResult.status === "rejected") {
+      toast.error(errorMessage(skillsResult.reason, "Failed to save skills"));
+    }
+    if (app.status === "fulfilled" && skillsResult.status === "fulfilled" && !serverError) {
+      toast.success("Changes saved");
+    }
   };
 
   const visibleServers = new Map<string, McpServerDraft>(state?.servers);
@@ -272,6 +339,13 @@ export function useSettingsDraft() {
     const [id, { draft }] = entry;
     if (draft) visibleServers.set(id, draft);
     else visibleServers.delete(id);
+  }
+  const visibleSkills = state?.skills ? new Map(state.skills) : undefined;
+  if (state && visibleSkills) {
+    for (const [name, { draft }] of state.pendingSkills) {
+      if (draft) visibleSkills.set(name, draft);
+      else visibleSkills.delete(name);
+    }
   }
 
   return {
@@ -283,13 +357,22 @@ export function useSettingsDraft() {
     servers: [...visibleServers.values()].sort((a, b) =>
       a.server.name.localeCompare(b.server.name)
     ),
+    skills: visibleSkills && [...visibleSkills.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    skillLoadError,
     setSettings: (update: SetStateAction<Settings>) => setDraft("settings", update),
     setApiKeys: (update: SetStateAction<ApiKeys>) => setDraft("apiKeys", update),
     stageServer,
+    stageSkill,
     save,
     cancel: () =>
       setState(
-        (current) => current && { ...current, draft: current.saved, pendingServers: new Map() }
+        (current) =>
+          current && {
+            ...current,
+            draft: current.saved,
+            pendingServers: new Map(),
+            pendingSkills: new Map(),
+          }
       ),
     resetDefaults: () => setState((current) => current && { ...current, draft: defaults }),
   };

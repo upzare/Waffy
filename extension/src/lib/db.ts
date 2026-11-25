@@ -1,5 +1,5 @@
 import Dexie, { liveQuery, type EntityTable } from "dexie";
-import type { Conversation, Message } from "@/types";
+import type { Conversation, Message, StoredSkill } from "@/types";
 
 export interface StoredMemory {
   id: string;
@@ -12,6 +12,7 @@ export interface StoredMemory {
 class WaffyDB extends Dexie {
   conversations!: EntityTable<Conversation, "id">;
   memories!: EntityTable<StoredMemory, "id">;
+  skills!: EntityTable<StoredSkill, "id">;
 
   constructor() {
     super("WaffyDB");
@@ -20,6 +21,9 @@ class WaffyDB extends Dexie {
     });
     this.version(2).stores({
       memories: "id",
+    });
+    this.version(3).stores({
+      skills: "id, &name",
     });
   }
 }

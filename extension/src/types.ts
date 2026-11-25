@@ -47,6 +47,7 @@ export interface InputContainerProps {
   files: File[];
   inputResetKey: number;
   features: FeatureFlags;
+  skills: SkillSummary[];
   setMessage: React.Dispatch<React.SetStateAction<string>>;
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;
   onSendMessage: () => Promise<void>;
@@ -71,6 +72,22 @@ export interface PageSource {
   content: string;
 }
 
+export interface SkillSummary {
+  id: string;
+  revision: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
+export interface StoredSkill extends SkillSummary {
+  instructions: string;
+}
+
+export interface SkillMention extends Pick<SkillSummary, "id" | "revision" | "name"> {
+  offset: number;
+}
+
 export interface Message {
   id: string;
   content: {
@@ -82,6 +99,7 @@ export interface Message {
     };
     pageSources?: string;
     commandOffset?: number;
+    skill?: SkillMention;
     files?: FileFormat[];
     task?: string;
     taskStatus?: string;

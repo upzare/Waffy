@@ -3,19 +3,26 @@ import { createBrowserAISessionHooks } from "./browser-ai";
 import { generateStepLabel } from "./generate";
 import { getStageConfig, resolveModel } from "./model";
 import { MODES, resolveBuiltInTools, STAGE_TOOL_ACCESS, type StreamMode } from "./modes";
-import { MCP_INSTRUCTIONS, MEMORY_INSTRUCTIONS, EXECUTION_MEMORY_INSTRUCTIONS } from "./prompts";
+import {
+  MCP_INSTRUCTIONS,
+  MEMORY_INSTRUCTIONS,
+  EXECUTION_MEMORY_INSTRUCTIONS,
+  SKILL_INSTRUCTIONS,
+} from "./prompts";
+import { withSkillInstructions } from "./messages";
 import { createToolExecutor } from "./tools/execute";
 import { MEMORY_TOOLS } from "./tools/memory";
 import { getFeatureFlags } from "@/lib/features";
 import { getMcpProviders, openMcpTurn } from "@/lib/mcp/turn";
 import { aiObservability } from "@/lib/posthog";
-import type { AppSettings } from "@/types";
+import type { AppSettings, StoredSkill } from "@/types";
 
 interface StreamResponseOptions {
   mode: StreamMode;
   messages: ModelMessage[];
   settings: AppSettings;
   abortSignal: AbortSignal;
+  skill?: StoredSkill;
   toolsContext?: Record<string, object>;
   onToolActivity?: (label: string | null) => void;
   onMcpUnavailable?: (message: string) => void;
@@ -35,6 +42,7 @@ export async function* streamResponse({
   messages,
   settings,
   abortSignal,
+  skill,
   toolsContext,
   onToolActivity,
   onMcpUnavailable,
@@ -61,6 +69,7 @@ export async function* streamResponse({
     const memoryInstructions = automation ? EXECUTION_MEMORY_INSTRUCTIONS : MEMORY_INSTRUCTIONS;
     const instructions = [
       config.prompt(flags, Boolean(mcp)),
+      ...(skill ? [SKILL_INSTRUCTIONS] : []),
       ...(mcp ? [MCP_INSTRUCTIONS] : []),
       ...(memoryEnabled ? [memoryInstructions] : []),
     ].join("\n\n");
@@ -79,7 +88,7 @@ export async function* streamResponse({
       abortSignal,
       onToolActivity,
     });
-    const transcript = [...messages];
+    const transcript = skill ? withSkillInstructions(messages, skill) : [...messages];
     let previousReasoning = "";
     let hasStreamedText = false;
 

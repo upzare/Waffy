@@ -238,6 +238,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                               prompt={msg.content.text?.prompt ?? ""}
                               pageSources={msg.content.pageSources}
                               commandOffset={storedCommandOffset(msg, messages[virtualRow.index + 1])}
+                              skill={msg.content.skill}
                             />
                           ) : (
                             <RenderResponse

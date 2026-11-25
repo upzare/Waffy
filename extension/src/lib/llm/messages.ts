@@ -1,5 +1,5 @@
 import type { FilePart, ModelMessage, TextPart } from "ai";
-import type { FileFormat, Message } from "@/types";
+import type { FileFormat, Message, StoredSkill } from "@/types";
 import { buildPageTaggedPrompt, parsePageSources } from "@/panel/utils/page-mentions";
 import { storedCommandOffset } from "@/panel/utils/slash-commands";
 
@@ -18,6 +18,23 @@ function messageContent(text: string, files?: FileFormat[]): (TextPart | FilePar
   return content;
 }
 
+export function withSkillInstructions(
+  messages: ModelMessage[],
+  { name, instructions }: Pick<StoredSkill, "name" | "instructions">
+): ModelMessage[] {
+  const userMessage = messages.at(-1);
+  if (userMessage?.role !== "user") throw new Error("A skill requires a user message.");
+  const content =
+    typeof userMessage.content === "string" ? messageContent(userMessage.content) : userMessage.content;
+  return [
+    ...messages.slice(0, -1),
+    {
+      role: "user",
+      content: [...content, { type: "text", text: `Selected skill ($${name})\n\n${instructions}` }],
+    },
+  ];
+}
+
 export function buildConversationMessages(
   prompt: string,
   files: FileFormat[],
@@ -25,12 +42,13 @@ export function buildConversationMessages(
 ): ModelMessage[] {
   const messages: ModelMessage[] = [];
   for (const [index, message] of conversation.entries()) {
-    const { text, files, pageSources } = message.content;
+    const { text, files, pageSources, skill } = message.content;
     if (message.id.startsWith("user-")) {
       const taggedPrompt = buildPageTaggedPrompt(
         text?.prompt ?? "",
         parsePageSources(pageSources),
-        storedCommandOffset(message, conversation[index + 1])
+        storedCommandOffset(message, conversation[index + 1]),
+        skill
       );
       const content = messageContent(taggedPrompt, files);
       if (content.length) messages.push({ role: "user", content });
