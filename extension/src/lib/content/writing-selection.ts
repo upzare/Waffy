@@ -136,18 +136,11 @@ function sameRange(a: AbstractRange, b: AbstractRange) {
   );
 }
 
-function insertIntoRange(range: Range, text: string) {
-  const fragment = document.createDocumentFragment();
-  for (const [index, line] of text.split("\n").entries()) {
-    if (index > 0) fragment.append(document.createElement("br"));
-    fragment.append(document.createTextNode(line));
-  }
-  const last = fragment.lastChild!;
-  range.deleteContents();
-  range.insertNode(fragment);
-  range.setStartAfter(last);
-  range.collapse(true);
-  document.getSelection()?.collapse(range.startContainer, range.startOffset);
+function readSelectionBounds(selection: Selection, root: Node) {
+  return (
+    selection.getComposedRanges?.({ shadowRoots: root instanceof ShadowRoot ? [root] : [] })[0] ??
+    new StaticRange(selection.getRangeAt(0))
+  );
 }
 
 function readEditableRange(host: HTMLElement, bounds: StaticRange, text: string): WritingSelection {
@@ -179,19 +172,23 @@ function readEditableRange(host: HTMLElement, bounds: StaticRange, text: string)
       const kept = () => host.isConnected && normalize(host.textContent ?? "") === expected;
 
       const selection = document.getSelection();
-      selection?.setBaseAndExtent(
+      if (!selection) return writingTargetChanged(source);
+      selection.setBaseAndExtent(
         range.startContainer,
         range.startOffset,
         range.endContainer,
         range.endOffset
       );
-      // A native inline edit preserves the browser’s undo history.
+      const hasTargetSelection = () =>
+        isFocused(host) &&
+        selection.rangeCount > 0 &&
+        sameRange(readSelectionBounds(selection, host.getRootNode()), bounds);
+
       if (
         range.startContainer === range.endContainer &&
         range.startContainer instanceof Text &&
         !replacement.includes("\n") &&
-        selection?.rangeCount &&
-        sameRange(selection.getRangeAt(0), range) &&
+        hasTargetSelection() &&
         document.execCommand("insertText", false, replacement)
       ) {
         return confirmEdit(kept);
@@ -203,9 +200,13 @@ function readEditableRange(host: HTMLElement, bounds: StaticRange, text: string)
           new InputEvent("beforeinput", { ...event, cancelable: true, targetRanges: [bounds] })
         )
       ) {
-        if (!isFocused(host) || !stillCurrent()) return writingTargetChanged(source);
-        insertIntoRange(range, replacement);
-        host.dispatchEvent(new InputEvent("input", event));
+        if (!stillCurrent() || !hasTargetSelection()) return writingTargetChanged(source);
+        // A native edit joins blocks as needed and records the replacement in undo history.
+        if (!document.execCommand("insertText", false, replacement)) {
+          return writingFailure(
+            "Could not apply the generated text in this editor. Copy & paste it manually."
+          );
+        }
       }
       return confirmEdit(kept);
     },
@@ -230,9 +231,7 @@ export function readWritingSelection(active: Element | null): WritingSelection |
 
   const root = active.getRootNode();
   const range = selection.getRangeAt(0);
-  const bounds =
-    selection.getComposedRanges?.({ shadowRoots: root instanceof ShadowRoot ? [root] : [] })[0] ??
-    new StaticRange(range);
+  const bounds = readSelectionBounds(selection, root);
   // Rescoping a shadow selection can widen it to the surrounding editable host.
   if (
     bounds.collapsed !== (text.length === 0) ||
