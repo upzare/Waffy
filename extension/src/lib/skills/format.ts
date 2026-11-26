@@ -4,7 +4,10 @@ import type { StoredSkill } from "@/types";
 
 export const MAX_SKILL_FILE_BYTES = 16 * 1024;
 export const SKILL_FILE_SIZE_ERROR = "Choose a Markdown file of 16 KB or less.";
-export type SkillDefinition = Pick<StoredSkill, "name" | "description" | "instructions">;
+export type SkillDefinition = Pick<
+  StoredSkill,
+  "name" | "description" | "instructions" | "originalFile"
+>;
 
 const metadataSchema = z.object({
   name: z
@@ -21,7 +24,7 @@ const metadataSchema = z.object({
     .max(1024, "Use 1,024 characters or fewer for the skill description."),
 });
 
-export function parseSkillFile(source: string): SkillDefinition {
+export function parseSkillFile(source: string): Omit<SkillDefinition, "originalFile"> {
   if (new TextEncoder().encode(source).byteLength > MAX_SKILL_FILE_BYTES) {
     throw new Error(SKILL_FILE_SIZE_ERROR);
   }

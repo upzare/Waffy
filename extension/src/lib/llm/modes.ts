@@ -17,9 +17,7 @@ export const STAGE_TOOL_ACCESS = {
   t1: { mcp: true, memory: true },
   t2: { mcp: true, memory: true },
   t3: { mcp: false, memory: false },
-  title: { mcp: false, memory: false },
   step: { mcp: false, memory: false },
-  memory: { mcp: false, memory: false },
 } satisfies Record<StageId, { mcp: boolean; memory: boolean }>;
 
 interface ModeConfig {

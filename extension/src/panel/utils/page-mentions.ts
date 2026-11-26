@@ -4,6 +4,7 @@ import { ACTIONS, isInaccessiblePage } from "@/lib/helper";
 import type { PageSource, SkillMention } from "@/types";
 import { findSlashCommand } from "./slash-commands";
 import { SKILL_MARKUP_PATTERN, skillMentionSpan } from "./skill-mentions";
+import { decodeLiteralText, encodeLiteralCharacter } from "./literal-text";
 
 export const SLASH_MARKUP = "/[__display__](__id__)";
 export const PAGE_MARKUP = "@[__display__](tab:__id__)";
@@ -146,13 +147,16 @@ export function parsePageMentionsFromMarkup(markup: string): ComposerPageMention
   return mentions.sort((a, b) => a.index - b.index);
 }
 
-export function markupToDisplay(markup: string): string {
-  return markup
+export function readComposerText(markup: string) {
+  const display = markup
     .replace(SLASH_MARKUP_PATTERN, "/$1")
     .replace(PAGE_MARKUP_PATTERN, "@$1")
     .replace(MUTED_MARKUP_PATTERN, "@$1")
     .replace(SKILL_MARKUP_PATTERN, (_, name) => `$${name}`);
+  return decodeLiteralText(display);
 }
+
+export const markupToDisplay = (markup: string) => readComposerText(markup).text;
 
 type MarkupSpan = { start: number; end: number; markup: string };
 
@@ -165,12 +169,16 @@ function formatPromptMentions<T extends { mention: string }>(
     formatCommand,
     formatPage,
     formatSkill,
+    literalOffsets = [],
+    formatLiteral,
   }: {
     commandOffset?: number;
     skill?: SkillMention;
     formatCommand: (text: string) => string;
     formatPage: (page: T) => string;
     formatSkill: (skill: SkillMention) => string;
+    literalOffsets?: readonly number[];
+    formatLiteral?: (character: string) => string;
   }
 ): string {
   const command = findSlashCommand(display, commandOffset);
@@ -180,6 +188,7 @@ function formatPromptMentions<T extends { mention: string }>(
   const skillSpan = skillMentionSpan(display, skill);
   if (skill && skillSpan) spans.push({ ...skillSpan, markup: formatSkill(skill) });
   const byLength = [...pages].sort((a, b) => b.mention.length - a.mention.length);
+  const literal = new Set(literalOffsets);
 
   for (const page of byLength) {
     let from = 0;
@@ -188,11 +197,18 @@ function formatPromptMentions<T extends { mention: string }>(
       if (start === -1) break;
       const end = start + page.mention.length;
       from = start + 1;
-      if (spans.some((span) => start < span.end && end > span.start)) continue;
+      if (literal.has(start) || spans.some((span) => start < span.end && end > span.start)) continue;
       spans.push({ start, end, markup: formatPage(page) });
     }
   }
 
+  if (formatLiteral) {
+    for (const start of literal) {
+      if (display[start] && !spans.some((span) => start >= span.start && start < span.end)) {
+        spans.push({ start, end: start + 1, markup: formatLiteral(display[start]) });
+      }
+    }
+  }
   spans.sort((a, b) => a.start - b.start);
   let result = "";
   let cursor = 0;
@@ -207,11 +223,14 @@ export function displayToMarkup(
   display: string,
   pages: ComposerPageMention[],
   commandOffset?: number,
-  skill?: SkillMention
+  skill?: SkillMention,
+  literalOffsets?: readonly number[]
 ): string {
   return formatPromptMentions(display, pages, {
     commandOffset,
     skill,
+    literalOffsets,
+    formatLiteral: encodeLiteralCharacter,
     formatCommand: (text) => {
       const name = text.slice(1);
       return `/[${name}](${name.toLowerCase()})`;
@@ -315,12 +334,14 @@ export function wrapPromptMentions(
   prompt: string,
   pages: PageSource[],
   commandOffset?: number,
-  skill?: SkillMention
+  skill?: SkillMention,
+  literalOffsets?: readonly number[]
 ): string {
   const wrap = (text: string) => `<mention>${escapeXml(text)}</mention>`;
   return formatPromptMentions(prompt, pages, {
     commandOffset,
     skill,
+    literalOffsets,
     formatCommand: wrap,
     formatPage: (page) => wrap(page.mention),
     formatSkill: ({ name }) => wrap(`$${name}`),

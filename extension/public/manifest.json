@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Waffy - AI Copilot for Web",
-  "version": "1.3.9",
-  "description": "Automate your browser with AI. Browse, click and complete multi-step workflows with models you like. Free and open source.",
+  "short_name": "Waffy",
+  "version": "1.4.0",
+  "description": "AI browser assistant for web research, writing and automation. Use on-device models and memory with Agent Skills and MCP tools.",
+  "homepage_url": "https://waffy.io",
   "icons": {
     "64": "assets/icons/icon64.png",
     "128": "assets/icons/icon128.png",
@@ -21,7 +23,9 @@
       ],
       "js": [
         "content.bundle.js"
-      ]
+      ],
+      "all_frames": true,
+      "match_origin_as_fallback": true
     }
   ],
   "options_page": "settings.html",

@@ -18,11 +18,13 @@ function TaggedPrompt({
   pageSources,
   commandOffset,
   skill,
+  literalOffsets,
 }: {
   prompt: string;
   pageSources?: string;
   commandOffset?: number;
   skill?: SkillMention;
+  literalOffsets?: number[];
 }) {
   return (
     <Streamdown
@@ -35,7 +37,7 @@ function TaggedPrompt({
       literalTagContent={["mention"]}
       components={mentionComponents}
     >
-      {wrapPromptMentions(prompt, parsePageSources(pageSources), commandOffset, skill)}
+      {wrapPromptMentions(prompt, parsePageSources(pageSources), commandOffset, skill, literalOffsets)}
     </Streamdown>
   );
 }

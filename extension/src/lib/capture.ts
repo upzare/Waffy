@@ -1,7 +1,5 @@
 export const MIN_CAPTURE_SIZE = 8;
 
-export type PanelSide = "left" | "right";
-
 export type CaptureRect = {
   x: number;
   y: number;
@@ -13,14 +11,6 @@ export type CaptureViewport = {
   width: number;
   height: number;
 };
-
-export type CaptureState = {
-  visible: boolean;
-  side: PanelSide;
-};
-
-export const isPanelSide = (value: unknown): value is PanelSide =>
-  value === "left" || value === "right";
 
 export const isCaptureRect = (value: unknown): value is CaptureRect => {
   if (!value || typeof value !== "object") return false;

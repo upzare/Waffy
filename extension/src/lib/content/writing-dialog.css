@@ -1,0 +1,266 @@
+:host {
+  display: block;
+  height: 100%;
+  color: white;
+  font: 400 14px/1.5 var(--font-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.writing-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+}
+
+.writing-header {
+  position: relative;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+.writing-progress-track {
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 2px;
+  overflow: hidden;
+  background: var(--color-green-dim);
+}
+
+.writing-progress-track::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--color-green), transparent);
+}
+
+h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.25;
+}
+
+.writing-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.writing-fields {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.writing-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+label {
+  color: rgb(255 255 255 / 70%);
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 43px;
+  max-height: 180px;
+  padding: 10px 12px;
+  resize: vertical;
+  field-sizing: content;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: var(--radius-md);
+  background: rgb(0 0 0 / 50%);
+  color: inherit;
+  font: inherit;
+  outline: none;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+textarea::placeholder {
+  color: rgb(255 255 255 / 35%);
+}
+
+textarea:focus {
+  border-color: rgb(0 255 0 / 70%);
+  box-shadow: 0 0 0 3px rgb(0 255 0 / 12%);
+}
+
+.writing-instruction-field {
+  position: relative;
+}
+
+.writing-instruction-field textarea {
+  min-height: 48px;
+  max-height: 200px;
+  padding-block: 12px;
+  padding-inline-end: 48px;
+  resize: none;
+}
+
+button {
+  padding: 6px 13px;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  color: white;
+  font: 700 14px/1.5 var(--font-sans);
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+
+button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 10%);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+[data-generate] {
+  position: absolute;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+}
+
+[data-generate],
+[data-apply] {
+  border-color: var(--color-green);
+  background: var(--color-green);
+  color: black;
+}
+
+[data-generate]:hover:not(:disabled),
+[data-apply]:hover:not(:disabled) {
+  border-color: white;
+  background: white;
+}
+
+.writing-suggestions,
+.writing-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.writing-suggestions button {
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.writing-footer {
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 20px;
+  border-top: 1px solid rgb(255 255 255 / 15%);
+  background: #151715;
+}
+
+.writing-footer [data-chat] {
+  margin-inline-end: auto;
+}
+
+.writing-note,
+.writing-status {
+  margin: 0;
+  color: rgb(255 255 255 / 60%);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.writing-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.writing-check {
+  display: none;
+  flex: none;
+}
+
+.writing-status[data-state="success"] .writing-check {
+  display: block;
+}
+
+.writing-status[data-state="success"] {
+  color: #a1e5b9;
+}
+
+.writing-status[data-state="error"] {
+  color: #fca5a5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .writing-progress-track::after {
+    width: 40%;
+    animation: writing-progress 1.25s ease-in-out infinite;
+  }
+
+  .writing-status[data-state="success"] .writing-check path {
+    stroke-dasharray: 1;
+    animation: writing-check 260ms ease-out;
+  }
+}
+
+@keyframes writing-progress {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes writing-check {
+  from {
+    stroke-dashoffset: 1;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .writing-header,
+  .writing-fields,
+  .writing-footer {
+    padding-inline: 12px;
+  }
+}

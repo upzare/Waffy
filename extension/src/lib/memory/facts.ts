@@ -6,5 +6,5 @@ export async function summarizeMemory(facts: string[]): Promise<string> {
   if (!appSettings.settings.featureMemory) return "";
 
   const prompt = `Saved facts:\n${facts.map((fact, index) => `${index + 1}. ${fact}`).join("\n")}`;
-  return generateStageText("memory", prompt, appSettings);
+  return generateStageText("memory", "base", prompt, appSettings);
 }

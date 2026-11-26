@@ -82,6 +82,7 @@ export interface SkillSummary {
 
 export interface StoredSkill extends SkillSummary {
   instructions: string;
+  originalFile: { name: string; base64: string };
 }
 
 export interface SkillMention extends Pick<SkillSummary, "id" | "revision" | "name"> {
@@ -99,6 +100,7 @@ export interface Message {
     };
     pageSources?: string;
     commandOffset?: number;
+    literalOffsets?: number[];
     skill?: SkillMention;
     files?: FileFormat[];
     task?: string;
@@ -119,6 +121,8 @@ export interface DomMessage {
   args?: Record<string, any>;
   dom?: string;
 }
+
+export type ToolsOverlayState = { visible: false } | { visible: true; side: "left" | "right" };
 
 export interface ParticlesProps {
   quantity?: number;
@@ -151,8 +155,7 @@ export type FeatureFlags = Pick<
 export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai" | "custom";
 
-export type StageId =
-  "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "step" | "memory";
+export type StageId = "base" | "search" | "research" | "t1" | "t2" | "t3" | "step";
 
 export interface ModelConfig {
   provider: ProviderId;

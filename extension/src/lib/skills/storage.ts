@@ -33,8 +33,15 @@ function sameSkillRevision(a?: StoredSkill, b?: StoredSkill) {
   return a?.id === b?.id && a?.revision === b?.revision;
 }
 
+function sameSkillFile(a?: StoredSkill, b?: StoredSkill) {
+  return (
+    a?.originalFile?.name === b?.originalFile?.name &&
+    a?.originalFile?.base64 === b?.originalFile?.base64
+  );
+}
+
 export function matchesSkill(a?: StoredSkill, b?: StoredSkill) {
-  return sameSkillRevision(a, b) && a?.enabled === b?.enabled;
+  return sameSkillRevision(a, b) && a?.enabled === b?.enabled && sameSkillFile(a, b);
 }
 
 export function rebaseSkillChange(change: SkillChange, saved?: StoredSkill): SkillChange {
@@ -45,6 +52,7 @@ export function rebaseSkillChange(change: SkillChange, saved?: StoredSkill): Ski
     draft: {
       ...draft,
       enabled: draft.enabled === original.enabled ? saved.enabled : draft.enabled,
+      originalFile: sameSkillFile(draft, original) ? saved.originalFile : draft.originalFile,
     },
   };
 }

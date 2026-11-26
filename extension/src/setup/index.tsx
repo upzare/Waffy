@@ -44,7 +44,7 @@ const PROVIDER_CHOICES: { id: ProviderId; label: string; description: string; ba
   {
     id: BROWSER_AI_PROVIDER.id,
     label: BROWSER_AI_PROVIDER.label,
-    description: "Gemini Nano, Phi Mini, and other browser built-in models.",
+    description: "Gemini Nano in Chrome, Aion Instruct in Edge, and other built-in models.",
     badge: "On-device",
   },
   ...PROVIDERS.map((provider) => ({
@@ -705,8 +705,8 @@ const BrowserAiConnect = ({
 
         {status === "unsupported" ? (
           <p className="mt-4 text-sm leading-relaxed text-white/50">
-            This browser does not support the built-in Prompt API. Chrome with Gemini Nano, Edge
-            with Phi Mini, or another supported browser can. Pick a different provider to continue.
+            Browser AI requires the Prompt API. In Edge, enable <strong>Prompt API</strong> in{" "}
+            <code>edge://flags</code> and restart Edge. You can also pick a different provider.
           </p>
         ) : null}
         {status === "unavailable" ? (

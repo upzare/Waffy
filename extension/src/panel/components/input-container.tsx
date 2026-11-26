@@ -5,6 +5,7 @@ import { Mention, MentionsInput, makeTriggerRegex } from "react-mentions-ts";
 import type { InputContainerProps } from "../../types";
 import { getSlashCommands } from "../utils/slash-commands";
 import { SKILL_MARKUP } from "../utils/skill-mentions";
+import { LITERAL_TEXT_MARKUP, literalCharacter } from "../utils/literal-text";
 import { useWindowTabs } from "../hooks/use-window-tabs";
 import {
   MENTION_CHIP_COMPOSER_CLASS,
@@ -320,6 +321,13 @@ function InputContainer({
             }}
             rows={1}
           >
+            <Mention
+              trigger={/((?!))()/}
+              markup={LITERAL_TEXT_MARKUP}
+              displayTransform={literalCharacter}
+              data={[]}
+              className="bg-transparent"
+            />
             <Mention
               trigger="/"
               markup={SLASH_MARKUP}

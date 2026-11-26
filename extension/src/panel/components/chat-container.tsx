@@ -239,6 +239,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                               pageSources={msg.content.pageSources}
                               commandOffset={storedCommandOffset(msg, messages[virtualRow.index + 1])}
                               skill={msg.content.skill}
+                              literalOffsets={msg.content.literalOffsets}
                             />
                           ) : (
                             <RenderResponse

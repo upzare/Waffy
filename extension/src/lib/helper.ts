@@ -14,11 +14,10 @@ export const ACTIONS = {
   webSearch: "WEB_SEARCH",
   webFetch: "WEB_FETCH",
   reloadPanel: "RELOAD_PANEL",
-  getCaptureButton: "GET_CAPTURE_BUTTON",
+  getToolsOverlayState: "GET_TOOLS_OVERLAY_STATE",
+  syncToolsOverlay: "SYNC_TOOLS_OVERLAY",
   capture: "CAPTURE",
   attachCapture: "ATTACH_CAPTURE",
-  showCaptureOverlay: "SHOW_CAPTURE_OVERLAY",
-  hideCaptureOverlay: "HIDE_CAPTURE_OVERLAY",
   getDevicePixelRatio: "GET_DEVICE_PIXEL_RATIO",
   interactDom: "INTERACT_DOM",
 } as const;

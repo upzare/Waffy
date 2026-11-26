@@ -8,12 +8,12 @@ import type { ModelMessage } from "ai";
 import Header from "./components/header";
 import ChatContainer from "./components/chat-container";
 import InputContainer from "./components/input-container";
-import { findSlashCommand, storedCommandOffset } from "./utils/slash-commands";
+import { findSlashCommand, NO_SLASH_COMMAND, storedCommandOffset } from "./utils/slash-commands";
 import {
   buildPageTaggedPrompt,
   displayToMarkup,
   fetchPageContent,
-  markupToDisplay,
+  readComposerText,
   parsePageMentionsFromMarkup,
   parsePageSources,
   selectedCommandOffset,
@@ -22,6 +22,8 @@ import {
   toWindowPages,
 } from "./utils/page-mentions";
 import { findTypedSkill } from "./utils/skill-mentions";
+import { encodeLiteralText, maskLiteralControls } from "./utils/literal-text";
+import { registerWritingMessages } from "./utils/writing";
 import { fileHandler, fileFormatsToFiles } from "./utils/file-handler";
 import {
   ACTIONS,
@@ -172,7 +174,9 @@ const App = () => {
     const skillSubscription = observeSkills().subscribe({
       next: (storedSkills) =>
         setSkills(
-          storedSkills.filter((skill) => skill.enabled).map(({ instructions, ...summary }) => summary)
+          storedSkills
+            .filter((skill) => skill.enabled)
+            .map(({ instructions, originalFile, ...summary }) => summary)
         ),
       error: () => setSkills([]),
     });
@@ -203,12 +207,18 @@ const App = () => {
       }
     };
     Browser.runtime.onMessage.addListener(onMessage);
+    const stopWritingMessages = registerWritingMessages((text) => {
+      const captured = encodeLiteralText(text.replace(/\r\n?/g, "\n"));
+      setMessage((current) => (current ? `${current}\n\n${captured}` : captured));
+      setInputResetKey((key) => key + 1);
+    });
 
     return () => {
       abortControllerRef.current?.abort();
       conversationSubscription.unsubscribe();
       skillSubscription.unsubscribe();
       Browser.runtime.onMessage.removeListener(onMessage);
+      stopWritingMessages();
     };
   }, []);
 
@@ -448,7 +458,7 @@ const App = () => {
     messageId,
     conversationContext,
     prepareMessages,
-    clearInput = false,
+    clearInput,
   }: {
     promptText: string;
     promptFiles: FileFormat[];
@@ -457,7 +467,7 @@ const App = () => {
     messageId: string;
     conversationContext: Message[];
     prepareMessages: (settings: AppSettings) => void | Promise<void>;
-    clearInput?: boolean;
+    clearInput?: string;
   }) => {
     let activeSkill: StoredSkill | undefined;
     if (skill) {
@@ -485,8 +495,13 @@ const App = () => {
     try {
       await prepareMessages(settings);
       assertNotAborted();
-      if (clearInput) {
-        setMessage("");
+      if (clearInput !== undefined) {
+        setMessage((current) => {
+          if (current === clearInput) return "";
+          // A Draft & Rewrite handoff can append a new draft while this send starts.
+          const sentPrefix = `${clearInput}\n\n`;
+          return current.startsWith(sentPrefix) ? current.slice(sentPrefix.length) : current;
+        });
         setFiles([]);
         setInputResetKey((key) => key + 1);
       }
@@ -509,7 +524,7 @@ const App = () => {
       setStreamingMessageId(null);
       setStatusText("");
       setToolActivityText(null);
-      if (!clearInput) textareaRef.current?.focus();
+      if (clearInput === undefined) textareaRef.current?.focus();
       messageIdRef.current = null;
       abortControllerRef.current = null;
     }
@@ -534,9 +549,11 @@ const App = () => {
     generationLockRef.current = true;
     let wasPrepared = false;
     try {
-      const displayPrompt = markupToDisplay(text);
+      const { text: displayPrompt, literalOffsets } = readComposerText(text);
+      const promptControlsText = maskLiteralControls(displayPrompt, literalOffsets);
       const pageMentions = parsePageMentionsFromMarkup(text);
-      const command = findSlashCommand(displayPrompt, selectedCommandOffset(text));
+      const command = findSlashCommand(promptControlsText, selectedCommandOffset(text));
+      const commandOffset = command?.start ?? (literalOffsets.length ? NO_SLASH_COMMAND : undefined);
       const mode = command?.value ?? "base";
 
       if (!displayPrompt.trim() && promptFilesInput.length === 0) return;
@@ -548,7 +565,7 @@ const App = () => {
       }
       let skill: SkillMention | undefined = selectedSkills[0];
       if (!skill) {
-        const typedSkill = findTypedSkill(displayPrompt, command);
+        const typedSkill = findTypedSkill(promptControlsText, command);
         if (typedSkill) {
           const found = await findSkillByName(typedSkill.name);
           if (found) skill = { ...typedSkill, id: found.id, revision: found.revision };
@@ -582,8 +599,9 @@ const App = () => {
                 })),
                 openPages
               ),
-              command?.start,
-              skill
+              commandOffset,
+              skill,
+              literalOffsets
             )
           );
           setInputResetKey((key) => key + 1);
@@ -627,7 +645,7 @@ const App = () => {
       }
 
       const promptFiles = await fileHandler(promptFilesInput);
-      const modelPrompt = buildPageTaggedPrompt(displayPrompt, pageSources, command?.start, skill);
+      const modelPrompt = buildPageTaggedPrompt(displayPrompt, pageSources, commandOffset, skill);
       if (!modelPrompt.trim() && promptFiles.length === 0) {
         const promptControls = [skill && `$${skill.name}`, command && `/${command.value}`];
         const promptControl = promptControls.find(Boolean);
@@ -646,7 +664,7 @@ const App = () => {
         skill,
         messageId,
         conversationContext,
-        clearInput: true,
+        clearInput: text,
         prepareMessages: async (settings) => {
           if (!conversationIdRef.current) {
             const id = uuid4();
@@ -660,7 +678,8 @@ const App = () => {
               content: {
                 text: { prompt: displayPrompt },
                 files: promptFiles,
-                ...(command && { commandOffset: command.start }),
+                ...(commandOffset !== undefined && { commandOffset }),
+                ...(literalOffsets.length > 0 && { literalOffsets }),
                 ...(skill && { skill }),
                 ...(pageSources.length > 0 && { pageSources: JSON.stringify(pageSources) }),
               },
@@ -774,7 +793,8 @@ const App = () => {
           promptText,
           rebound,
           storedCommandOffset(userMsg, history[userIndex + 1]),
-          userMsg.content.skill
+          userMsg.content.skill,
+          userMsg.content.literalOffsets
         )
       );
       setFiles(restoredFiles);

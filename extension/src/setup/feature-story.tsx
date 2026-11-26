@@ -9,7 +9,7 @@ const POINTS = [
   {
     number: "02",
     title: "Built-in and local models",
-    body: "Use the browser’s own model - Gemini Nano in Chrome, Phi Mini in Edge, and Browser AI in other supported browsers or a local OpenAI-compatible server.",
+    body: "Use built-in AI such as Gemini Nano in Chrome or Aion Instruct in Edge. You can also connect a local OpenAI-compatible server.",
   },
   {
     number: "03",

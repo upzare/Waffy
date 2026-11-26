@@ -48,10 +48,10 @@ const STAGE_GROUPS: StageGroup[] = [
       {
         id: "base",
         label: "Base Model",
-        description: "Answers questions and switches to automation when needed.",
+        description: "The default model for chat and everything else.",
         recommendation: (
           <>
-            Use the built-in browser model (like Gemini Nano) for free. For more advanced reasoning
+            Use the Browser AI model for free. For more advanced reasoning
             and querying, switch to a cloud model.
           </>
         ),
@@ -84,12 +84,12 @@ const STAGE_GROUPS: StageGroup[] = [
       {
         id: "t1",
         label: "Planning Model",
-        description: "Analyzes prompts and generates a plan for the automation task",
+        description: "Analyzes prompts and generates a plan for the automation task.",
       },
       {
         id: "t2",
         label: "Execution Model",
-        description: "Performs the automation task based on the generated plan",
+        description: "Performs the automation task based on the generated plan.",
         recommendation: (
           <>
             Execution works best with vision models that support spatial reasoning and image
@@ -101,34 +101,12 @@ const STAGE_GROUPS: StageGroup[] = [
       {
         id: "t3",
         label: "Output Model",
-        description: "Determines whether the task completed and summarizes the result.",
-      },
-    ],
-  },
-  {
-    title: "Miscellaneous",
-    subtitle: "Supporting models used across conversations.",
-    stages: [
-      {
-        id: "title",
-        label: "Title Model",
-        description: "Creates a title for the conversation",
+        description: "Verifies the task completion and summarizes the result.",
       },
       {
         id: "step",
         label: "Step Model",
-        description: "Creates short labels for each execution step",
-      },
-      {
-        id: "memory",
-        label: "Memory Summarize Model",
-        description: "Turns your saved memories into the summary shown in Settings",
-        recommendation: (
-          <>
-            This runs only when you summarize saved memory. A small model is enough, and the
-            built-in browser model keeps that summary on this device.
-          </>
-        ),
+        description: "Creates short labels for each execution step.",
       },
     ],
   },
