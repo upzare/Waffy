@@ -5,82 +5,88 @@
 [![Discord](https://img.shields.io/badge/Discord-Waffy-5865F2?style=flat-square&logo=discord&logoColor=white)](https://dsc.gg/waffy)
 [![Website](https://img.shields.io/badge/website-waffy.io-111111?style=flat-square)](https://waffy.io)
 
-**Waffy** is a free, open-source Chrome extension that puts an AI copilot in the browser side panel. Describe what you want in plain language. It can read the page you are on, search and research the web, click through multi-step workflows, and remember useful facts about you on this device.
+**Waffy** is a free, open-source AI browser assistant for Chrome and compatible Chromium browsers. Use it to summarize web pages, research across tabs, draft and rewrite text directly on a page, and automate repetitive browser tasks. Waffy can remember preferences across chats, follow reusable Agent Skills, and use tools from Model Context Protocol (MCP) servers.
 
-It runs on Chromium browsers (Chrome, Edge, Brave, Opera, and others). You choose the model: a cloud API, the browser’s built-in model, or a local server such as Ollama or LM Studio. API keys, chats, and memory stay in the browser.
+Choose from built-in browser AI, a local model server such as Ollama or LM Studio, or a cloud provider using your own API key. Setup requires no Waffy account.
 
-Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/waffy-ai-copilot-for-web/badjijohkpnecfhjkondhcgacchekldm), or [build it from source](#getting-started).
+[Install Waffy from the Chrome Web Store](https://chromewebstore.google.com/detail/waffy-ai-copilot-for-web/badjijohkpnecfhjkondhcgacchekldm) or [build it from source](#build-from-source).
 
 <div align="center">
-  <img width="auto" height="500" alt="ui" src="https://github.com/user-attachments/assets/6b67d739-8fe0-4d0e-a7dc-66cd9ce8d2a3" />
+  <img width="auto" height="500" alt="Waffy AI browser assistant in the side panel" src="https://github.com/user-attachments/assets/6b67d739-8fe0-4d0e-a7dc-66cd9ce8d2a3" />
 </div>
 
 ## Features
 
-### Read and talk about the current page
+### Web page summaries and AI chat
 
-- Open the side panel from the toolbar, or press `Ctrl+I`.
-- Read the active tab as Markdown, and look at a screenshot when the page is visual.
-- Right-click a page and choose **Summarize this page**.
-- Type `@` to include another open tab, or `/` for Search, Research, and Automation.
-- Attach images, plain text, or PDFs (up to 5 MB), pin quick prompts, and keep chat history on this device.
+- Ask questions about the current page or right-click it and choose **Summarize this page**. Waffy can read page text and look at screenshots for visual context.
+- Type `@` in chat to include another open tab or choose **Capture area** on Waffy’s in-page toolbar to attach part of the page as a screenshot.
+- Attach images, plain text, or PDFs up to 5 MB per file. Pin prompts you use often and revisit earlier conversations in chat history.
 
 ### Web search and research
 
-Search and Research are on by default. Turn either one off in **Settings → General**. Search runs in the browser through DuckDuckGo.
+Search and Research are on by default and use DuckDuckGo for web searches. Type `/` in the composer to choose a mode. Manage these modes in **Settings → General**.
 
-| Mode         | How to start | What it does                                                                 |
-| ------------ | ------------ | ---------------------------------------------------------------------------- |
-| **Search**   | `/search`    | Looks up the question, reads a relevant page, and answers from that page     |
-| **Research** | `/research`  | Goes further: the current page, a screenshot when it helps, and more searches |
-| **Chat**     | Just type    | Answers from the page in front of you, and can search when Search is on      |
+### In-page AI writing tools
 
-### Skills
+Open the side panel to show Waffy’s toolbar on supported pages. Select text or place your cursor in an editable field, then choose **Draft & Rewrite**. Ask Waffy to draft a reply, fix grammar, shorten a passage, or change its tone.
 
-Open **Settings → Skills**, import a [`SKILL.md`](https://agentskills.io/specification) file, and select **Save Changes** to install it. Type `$` in the composer and pick a skill for that message. You can combine it with a mode and tab mentions, for example `/research $compare-products Compare @Laptop A and @Laptop B`. Importing another file with the same skill name lets you review and replace the installed version.
+Preview the result and select **Apply** to insert or replace text in a supported field. You can also copy the result or choose **Ask in Chat** to continue with the text in the side panel.
 
-Skills work with Chat, Search, Research, and Automation. Each mode uses its configured tools. The library is stored on this device, and a selected skill's instructions go to the models processing that message.
+### Personalized memory
+
+Waffy can automatically remember lasting details from your conversations, such as your preferences, work, and ongoing projects. It can use relevant saved facts in later chats and writing requests. Memory is on by default. Open **Settings → Memory** to turn it off, review or summarize saved facts, delete individual entries, or reset all memory.
+
+### Reusable Agent Skills
+
+Skills give Waffy instructions you can reuse for tasks such as comparing products, reviewing a page, or formatting research notes. Go to **Settings → Skills**, choose **Import SKILL.md**, confirm the import, and select **Save Changes**.
+
+Type `$` in the composer to pick a skill for one message. For example, use `/research $compare-products Compare @Laptop A and @Laptop B` to combine a skill with Research mode and two tabs. Skills work with Chat, Search, Research, and Automation. Import a file with the same skill name to review and replace the installed version. See the [Agent Skills file specification](https://agentskills.io/specification).
+
+### MCP server integrations
+
+Waffy’s built-in MCP client can discover and call tools from the Model Context Protocol (MCP) servers you enable. Depending on the server, these tools can search connected documents or update records in another app. MCP tools are available in Chat, Search, Research, and the planning and execution stages of Automation.
+
+1. Go to **Settings → MCP Servers → Add server**. Enter a name and a Streamable HTTP endpoint.
+2. Choose **None**, **Bearer token**, or **OAuth** for authentication and select **Add server**.
+3. Open the menu next to the server. Select **Test** to check the connection and list its tools, or **Sign in or Reconnect** for OAuth. Select **Save Changes** to finish.
+
+Use HTTPS for remote servers. Localhost HTTP works with **None** or **Bearer token**.
 
 ### Browser automation
 
 Enable automation in **Settings → General** or during setup. Use `/automate` when you want Waffy to fill a form, click through a flow, or move between tabs.
 
-It plans the task, then drives the page from screenshots: click, type, drag, scroll, choose dropdowns, and open or switch tabs. Execution needs a vision model that can point at UI elements. **gemini-3.6-flash** is the recommended model for that stage.
+Waffy plans the task and uses screenshots to locate page elements. It can click, type, drag, scroll, choose dropdown options, and open or switch tabs. For execution, use a vision model that can locate UI elements in screenshots, such as **gemini-3.6-flash**.
 
-### Personalized memory
+### Local and cloud AI models
 
-Memory is on by default. You can turn it off in **Settings → Memory**.
+Choose a provider and a model for each stage in **Settings → Models**.
 
-Waffy then saves lasting facts from your chats (name, work, preferences, projects) and uses them in later conversations. You do not have to say “remember this.” Facts are embedded on this device with `all-MiniLM-L6-v2` and stored in IndexedDB. You can read, delete, summarize, or reset them in settings. Passwords, payment details, and one-off tasks are left out.
-
-### Bring your own model
-
-Each stage can use a different provider and model. Chat, search, research, titles, and memory summaries default to the built-in browser model, so they can run with no API key. Automation defaults to Gemini for planning and execution. The Output Model defaults to GPT and reports whether the task succeeded, failed, or needs user input.
-
-| Stage      | What it does                                      | A good fit                                        |
-| ---------- | ------------------------------------------------- | ------------------------------------------------- |
-| Base       | Everyday answers from the active page or the web | Browser model, or a cloud model for harder questions |
-| Search     | Answers from web search                           | Browser model or a fast cloud model               |
-| Research   | Longer answers from the page and the web          | A capable cloud model                             |
-| Planning   | Turns a request into an automation plan           | A fast text model                                 |
-| Execution  | Clicks and types from screenshots                 | A vision model with image grounding               |
-| Output     | Reviews execution and reports the outcome        | A fast text model                                 |
-| Title      | Names the conversation                            | Browser model                                     |
-| Step       | Short labels while automation runs                | Browser model                                     |
-| Memory     | Summarizes saved facts in settings                | Browser model                                     |
+| Stage     | What it does                                                     |
+| --------- | ---------------------------------------------------------------- |
+| Base      | Handles chat, Draft & Rewrite, chat titles, and memory summaries |
+| Search    | Answers questions using web search                               |
+| Research  | Synthesizes information from the page and the web                |
+| Planning  | Turns a request into an automation plan                          |
+| Execution | Uses screenshots to interact with web pages                      |
+| Output    | Checks the outcome and reports what happened                     |
+| Step      | Generates short labels while automation runs                     |
 
 ## Supported providers
 
-| Provider            | Use it for                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| OpenAI              | GPT models                                                                                  |
-| Anthropic           | Claude models                                                                               |
-| Google AI Studio    | Gemini models                                                                               |
-| xAI                 | Grok models                                                                                 |
-| Groq                | Fast open models                                                                            |
-| OpenRouter          | Many models through one API key                                                             |
-| Browser built-in AI | Gemini Nano in Chrome, Phi Mini in Edge. No API key                                        |
-| Custom API          | Any OpenAI-compatible endpoint, including Ollama and LM Studio                              |
+| Provider            | Use it for                                                     |
+| ------------------- | -------------------------------------------------------------- |
+| OpenAI              | GPT models                                                     |
+| Anthropic           | Claude models                                                  |
+| Google AI Studio    | Gemini models                                                  |
+| xAI                 | Grok models                                                    |
+| Groq                | Fast open models                                               |
+| OpenRouter          | Many models through one API key                                |
+| Browser built-in AI | Gemini Nano in Chrome or Aion Instruct in Edge, when available |
+| Custom API          | Any OpenAI-compatible endpoint, including Ollama and LM Studio |
+
+To use Browser AI in Edge 158 or later, enable **Prompt API** in `edge://flags` and restart Edge. See [Microsoft’s Prompt API setup guide](https://learn.microsoft.com/en-us/microsoft-edge/web-ai/prompt-api#test-the-prompt-api-locally).
 
 Add keys in **Extension settings → API Keys**. For a local server, set the base URL under **Custom API**. Ollama also needs `OLLAMA_ORIGINS` set to `chrome-extension://*` before you restart it.
 
@@ -88,7 +94,9 @@ Add keys in **Extension settings → API Keys**. For a local server, set the bas
 
 ### Install from the Chrome Web Store
 
-[Waffy - AI Copilot for Web](https://chromewebstore.google.com/detail/waffy-ai-copilot-for-web/badjijohkpnecfhjkondhcgacchekldm)
+[Waffy on the Chrome Web Store](https://chromewebstore.google.com/detail/waffy-ai-copilot-for-web/badjijohkpnecfhjkondhcgacchekldm)
+
+Open Waffy from the browser toolbar or press `Ctrl+I` (`Cmd+I` on macOS). The first install opens a setup page for choosing your model and enabling features.
 
 ### Build from source
 
@@ -101,23 +109,20 @@ bun install
 bun run build
 ```
 
-The build writes a `build/` directory and a zip in `.output/`, named from the manifest (for example `Waffy - AI Copilot for Web-1.3.3.zip`).
+The build writes the unpacked extension to `build/` and a `<name>-<version>.zip` archive to `.output/` using the manifest name and version.
 
 ### Load the unpacked extension
 
 1. Open `chrome://extensions`, `edge://extensions`, or `brave://extensions`.
 2. Turn on **Developer mode**.
 3. Choose **Load unpacked** and select the `build/` folder.
-4. Open Waffy from the toolbar, or press `Ctrl+I`.
-
-The first install opens a setup page for your provider, model, and features.
+4. Open Waffy from the toolbar and follow the same setup as the store version.
 
 ### Configure
 
 1. Open **Extension settings** from the side panel, or right-click the toolbar icon and choose **Options**.
 2. Add an API key, use Browser built-in AI, or connect a custom endpoint.
-3. Under **Models**, pick a model for each stage. For **Execution**, use a vision model such as **gemini-3.6-flash**.
-4. Turn Automation on under **General** if you want browser actions. Manage personalized memory under **Memory**.
+3. Choose models under **Models** and manage optional features in **General**, **Memory**, **Skills**, and **MCP Servers**.
 
 ## Project structure
 
@@ -125,17 +130,20 @@ The first install opens a setup page for your provider, model, and features.
 extension/
   public/                  Manifest, icons, static assets
   src/
-    panel/                 Side panel: chat, history, composer
-    settings/              Options: general, memory, API keys, models, custom API
+    panel/                 Chat, history, and composer
+    settings/              Models, memory, Skills, MCP servers, and general options
     setup/                 First-run setup
     release/               Update notes
     lib/
-      llm/                 Providers, prompts, tools, streaming
+      llm/                 Model providers, prompts, tools, and streaming
       memory/              On-device embeddings and saved facts
+      skills/              SKILL.md parsing and storage
+      mcp/                 MCP connections and tool calls
       background/          Tabs, search, page capture, automation, context menu
+      content/             In-page writing tools and screenshot capture UI
       client.ts            Extension settings and storage
       content.ts           In-page actions
-      db.ts                IndexedDB: conversations and memory
+      db.ts                IndexedDB for conversations, Skills, and memory
 package.json               Workspace root. Run bun commands from here.
 build/                     Production output (load this unpacked)
 .output/                   Zipped release packages
@@ -143,26 +151,31 @@ build/                     Production output (load this unpacked)
 
 ## Privacy
 
-API keys and settings live in extension storage. Conversations and memory stay in IndexedDB on this device, and memory embeddings are computed locally. A cloud model receives the prompt directly from your browser. Browser built-in AI runs on the device. Automation uses Chrome’s debugger permission while a task is running.
+Waffy stores API keys, settings, and MCP credentials in extension storage. Chat history, imported Skills, and saved memory are stored in IndexedDB. Waffy computes memory embeddings on your device with `all-MiniLM-L6-v2`.
+
+Built-in Browser AI runs on your device. If you choose a cloud model, requests go directly from your browser to the provider with the context needed for the task, which can include page content, screenshots, selected text, skill instructions, or recalled facts. Web search sends queries to DuckDuckGo. Connected MCP servers receive the arguments for their tool calls, and tool results can be sent to your chosen model.
+
+Waffy enables anonymous usage analytics by default. Turn it off during setup or in **Settings → General**. Automation uses Chrome’s debugger permission while a task is running.
 
 See [waffy.io/privacy](https://waffy.io/privacy) for the full privacy policy.
 
 ## FAQ
 
-**Which browsers run Waffy?**
-Chromium browsers with Manifest V3, including Chrome, Edge, Brave, and Opera.
+### Which browsers run Waffy?
 
-**Do I need an API key?**
-Only for a cloud provider. Browser built-in AI needs no key. A local server can leave the key empty.
+Waffy runs in Chrome and compatible Chromium browsers such as Edge and Brave. In-page tools and built-in Browser AI depend on the APIs available in your browser.
 
-**Where are chats and memory stored?**
-On this device. Delete a chat from history, or delete and reset memory in **Settings → Memory**.
+### Can I use Waffy without an API key?
 
-**Can it click, type, and fill forms?**
-Yes, after you turn on Automation. Use a vision model for the execution stage.
+Yes. Use **Browser AI** on a supported device or connect a local OpenAI-compatible endpoint that accepts requests without a key. If you choose a cloud model, add the provider’s API key.
 
-**Is Waffy free?**
-The extension is free under Apache 2.0. Cloud models are billed by the provider whose key you add.
+### Can I use Skills and MCP tools together?
+
+Yes. Select a skill in chat and ask Waffy to use a service from an enabled MCP server. For example, use a weekly-report skill to format updates from a connected project tracker.
+
+### Is Waffy free?
+
+Yes. The extension is free under Apache 2.0. Cloud providers may charge for API usage.
 
 ## Links
 

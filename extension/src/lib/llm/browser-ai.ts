@@ -70,7 +70,7 @@ export function createBrowserAISessionHooks() {
 
 export function getBrowserAIModelLabel(): string {
   const ua = navigator.userAgent;
-  if (/Edg\//.test(ua)) return "Phi Mini";
+  if (/Edg\//.test(ua)) return "Aion Instruct";
   if (/Chrome\//.test(ua)) return "Gemini Nano";
   return "Built-in model";
 }
