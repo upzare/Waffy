@@ -5,21 +5,22 @@ import { getStageConfig, resolveModel } from "./model";
 import { MEMORY_TOOLS } from "./tools/memory";
 import { getFeatureFlags } from "@/lib/features";
 import type { WritingPrompt } from "@/lib/writing";
-import type { AppSettings } from "@/types";
+import type { AppSettings, StageId } from "@/types";
 
 export async function generateStageText(
-  stage: "title" | "step" | "memory",
+  promptId: "title" | "step" | "memory",
+  stageId: StageId,
   prompt: string,
   appSettings: AppSettings,
   signal?: AbortSignal
 ): Promise<string> {
-  const config = getStageConfig(appSettings.settings.models, stage);
+  const config = getStageConfig(appSettings.settings.models, stageId);
   const model = await resolveModel(config, appSettings.apiKeys, appSettings.settings.customApi);
   const lifetime = new AbortController();
   try {
     const { text } = await generateText({
       model,
-      instructions: PROMPTS[stage](getFeatureFlags(appSettings.settings)),
+      instructions: PROMPTS[promptId](getFeatureFlags(appSettings.settings)),
       prompt,
       abortSignal: signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal,
     });
@@ -32,7 +33,7 @@ export async function generateStageText(
 
 export async function generateTitle(prompt: string, appSettings: AppSettings): Promise<string> {
   try {
-    return (await generateStageText("title", prompt, appSettings)) || "Untitled";
+    return (await generateStageText("title", "base", prompt, appSettings)) || "Untitled";
   } catch {
     return "Untitled";
   }
@@ -117,5 +118,5 @@ export async function generateStepLabel(
     arguments: input ?? {},
   }));
   const promptContent = `**PREVIOUS REASONING:**\n ${previousReasoning}\n\n**CURRENT REASONING:**\n ${currentReasoning}\n\n**CURRENT TOOL CALL:**\n ${JSON.stringify(actions)}`;
-  return generateStageText("step", promptContent, appSettings, abortSignal);
+  return generateStageText("step", "step", promptContent, appSettings, abortSignal);
 }

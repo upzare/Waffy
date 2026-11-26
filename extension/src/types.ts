@@ -154,8 +154,7 @@ export type FeatureFlags = Pick<
 export type ProviderId =
   "openai" | "anthropic" | "google" | "xai" | "groq" | "openrouter" | "browser-ai" | "custom";
 
-export type StageId =
-  "base" | "search" | "research" | "title" | "t1" | "t2" | "t3" | "step" | "memory";
+export type StageId = "base" | "search" | "research" | "t1" | "t2" | "t3" | "step";
 
 export interface ModelConfig {
   provider: ProviderId;

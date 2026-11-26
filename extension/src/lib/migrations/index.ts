@@ -1,4 +1,5 @@
 import type { ModelConfig, Settings } from "@/types";
+import { removeTitleAndMemoryModels } from "./remove-title-and-memory-models";
 import { renameOutputStage } from "./rename-output-stage";
 
 export type StoredSettings = Partial<Omit<Settings, "models">> & {
@@ -8,6 +9,7 @@ export type StoredSettings = Partial<Omit<Settings, "models">> & {
 // A migration returns its input when the stored settings are already current.
 const settingsMigrations: readonly ((settings: StoredSettings) => StoredSettings)[] = [
   renameOutputStage,
+  removeTitleAndMemoryModels,
 ];
 
 export function applySettingsMigrations(settings: StoredSettings): StoredSettings {

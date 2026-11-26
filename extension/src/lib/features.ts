@@ -8,11 +8,10 @@ export const DEFAULT_FEATURES: FeatureFlags = {
 };
 
 /** Model stages owned by an optional feature. Stages left out are always active. */
-const FEATURE_STAGES: Record<keyof FeatureFlags, StageId[]> = {
+const FEATURE_STAGES: Partial<Record<keyof FeatureFlags, StageId[]>> = {
   featureSearch: ["search"],
   featureResearch: ["research"],
   featureAutomation: ["t1", "t2", "t3", "step"],
-  featureMemory: ["memory"],
 };
 
 /** Message modes that require a feature flag. `base` is always available. */

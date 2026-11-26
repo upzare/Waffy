@@ -95,12 +95,10 @@ export const DEFAULT_MODELS: Record<StageId, ModelConfig> = {
   base: { provider: "browser-ai", model: "default" },
   search: { provider: "browser-ai", model: "default" },
   research: { provider: "browser-ai", model: "default" },
-  title: { provider: "browser-ai", model: "default" },
   t1: { provider: "google", model: "gemini-flash-latest" },
   t2: { provider: "google", model: "gemini-3.6-flash" },
   t3: { provider: "openai", model: "gpt-5.6-luna" },
   step: { provider: "browser-ai", model: "default" },
-  memory: { provider: "browser-ai", model: "default" },
 };
 
 export function getStageConfig(
