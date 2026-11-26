@@ -82,6 +82,7 @@ export interface SkillSummary {
 
 export interface StoredSkill extends SkillSummary {
   instructions: string;
+  originalFile: { name: string; base64: string };
 }
 
 export interface SkillMention extends Pick<SkillSummary, "id" | "revision" | "name"> {

@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import { Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   Dialog,
@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { base64ToBlob, bytesToBase64 } from "@/lib/helper";
 import {
   MAX_SKILL_FILE_BYTES,
   parseSkillFile,
@@ -40,6 +41,21 @@ interface SkillsSectionProps {
 
 const disabled = "disabled:cursor-not-allowed disabled:opacity-40";
 
+function downloadSkill(skill: StoredSkill) {
+  const file = skill.originalFile;
+  if (!file) {
+    toast.error("Reimport this skill to download the original file.");
+    return;
+  }
+  const blob = base64ToBlob(file.base64, "text/markdown;charset=utf-8");
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export default function SkillsSection({ skills, loadError, saving, onStage }: SkillsSectionProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [dialog, setDialog] = useState<SkillDialog | null>(null);
@@ -66,8 +82,10 @@ export default function SkillsSection({ skills, loadError, saving, onStage }: Sk
 
     setReadingFile(true);
     try {
-      const skill = parseSkillFile(await file.text());
-      setDialog({ kind: "import", skill });
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const definition = parseSkillFile(new TextDecoder().decode(bytes));
+      const originalFile = { name: file.name, base64: bytesToBase64(bytes) };
+      setDialog({ kind: "import", skill: { ...definition, originalFile } });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't read the skill file.");
     } finally {
@@ -179,7 +197,7 @@ export default function SkillsSection({ skills, loadError, saving, onStage }: Sk
                 {dialog.kind === "import" && (
                   <p className={panelSubtitle}>
                     {replacedSkill && "Saving changes will replace this skill. "}
-                    Cloud models receive these instructions when you use the skill.
+                    Models receive these instructions when you use the skill.
                   </p>
                 )}
                 <pre className="max-h-[min(24rem,45vh)] overflow-auto rounded-lg border border-white/10 bg-black/40 p-3 font-mono text-xs leading-relaxed wrap-anywhere whitespace-pre-wrap">
@@ -198,22 +216,11 @@ export default function SkillsSection({ skills, loadError, saving, onStage }: Sk
                 />
               </div>
             )}
-            <DialogFooter className={dialog.kind === "import" ? undefined : "flex-row justify-end"}>
-              {dialog.kind === "remove" && managedSkill ? (
-                <button
-                  type="button"
-                  className={`${secondaryButton} ${disabled}`}
-                  disabled={busy}
-                  onClick={() => setDialog({ kind: "manage", skillId: managedSkill.id })}
-                >
-                  Cancel
-                </button>
-              ) : (
+            {dialog.kind === "import" ? (
+              <DialogFooter>
                 <DialogClose className={`${secondaryButton} ${disabled}`} disabled={busy}>
-                  {dialog.kind === "import" ? "Cancel" : "Done"}
+                  Cancel
                 </DialogClose>
-              )}
-              {dialog.kind === "import" && (
                 <button
                   type="button"
                   className={`${primaryButton} ${disabled}`}
@@ -225,25 +232,48 @@ export default function SkillsSection({ skills, loadError, saving, onStage }: Sk
                 >
                   {replacedSkill ? "Replace skill" : "Import skill"}
                 </button>
-              )}
-              {managedSkill && (
-                <button
-                  type="button"
-                  className={`${dangerButton} ${disabled}`}
-                  disabled={busy}
-                  onClick={() => {
-                    if (dialog.kind === "remove") {
-                      onStage(managedSkill);
-                      setDialog(null);
-                    } else {
-                      setDialog({ kind: "remove", skillId: managedSkill.id });
-                    }
-                  }}
-                >
-                  {dialog.kind === "remove" ? "Remove skill" : "Remove"}
-                </button>
-              )}
-            </DialogFooter>
+              </DialogFooter>
+            ) : (
+              managedSkill && (
+                <DialogFooter className="flex-row justify-end">
+                  {dialog.kind === "manage" ? (
+                    <button
+                      type="button"
+                      className={`${secondaryButton} ${disabled} mr-auto gap-2`}
+                      disabled={busy}
+                      onClick={() => downloadSkill(managedSkill)}
+                    >
+                      <Download size={15} aria-hidden />
+                      Download
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`${secondaryButton} ${disabled}`}
+                      disabled={busy}
+                      onClick={() => setDialog({ kind: "manage", skillId: managedSkill.id })}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`${dangerButton} ${disabled}`}
+                    disabled={busy}
+                    onClick={() => {
+                      if (dialog.kind === "remove") {
+                        onStage(managedSkill);
+                        setDialog(null);
+                      } else {
+                        setDialog({ kind: "remove", skillId: managedSkill.id });
+                      }
+                    }}
+                  >
+                    {dialog.kind === "remove" ? "Remove skill" : "Remove"}
+                  </button>
+                </DialogFooter>
+              )
+            )}
           </DialogContent>
         )}
       </Dialog>

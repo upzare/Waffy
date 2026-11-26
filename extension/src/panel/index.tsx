@@ -174,7 +174,9 @@ const App = () => {
     const skillSubscription = observeSkills().subscribe({
       next: (storedSkills) =>
         setSkills(
-          storedSkills.filter((skill) => skill.enabled).map(({ instructions, ...summary }) => summary)
+          storedSkills
+            .filter((skill) => skill.enabled)
+            .map(({ instructions, originalFile, ...summary }) => summary)
         ),
       error: () => setSkills([]),
     });
