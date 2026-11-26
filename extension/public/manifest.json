@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Waffy - AI Copilot for Web",
   "short_name": "Waffy",
-  "version": "1.3.9",
+  "version": "1.4.0",
   "description": "AI browser assistant for web research, writing and automation. Use on-device models and memory with Agent Skills and MCP tools.",
   "homepage_url": "https://waffy.io",
   "icons": {
